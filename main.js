@@ -1,6 +1,3 @@
-"use strict";
-
-
 let countdown = select('.countdown');
 const output = countdown.innerHTML;
 const periodoutput = document.getElementsByClassName('period')[0].innerHTML;
