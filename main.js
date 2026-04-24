@@ -1,27 +1,17 @@
-/**
- * PHS Schedule Modern Logic
- * Replaces old Maundy template helpers with direct ID targeting
- */
+// --- CONFIGURATION & GLOBALS ---
+let countdown = document.querySelector('.countdown');
+const output = countdown.innerHTML;
+const periodoutput = document.querySelector('.period').innerHTML;
+const typeoutput = document.querySelector('.stype').innerHTML;
+const dateoutput = document.querySelector('.date').innerHTML;
+const timeuntiloutput = document.querySelector('.timeuntil').innerHTML;
 
-let data;
 let goal = 24420;
 let period = "";
 let myArray = [];
+let data;
 
-// Modern UI Templates
-const countdownPlaceholder = `
-    <div class="time-box"><h3>%h</h3><span>Hours</span></div>
-    <div class="time-box"><h3>%m</h3><span>Mins</span></div>
-    <div class="time-box"><h3>%s</h3><span>Secs</span></div>`;
-
-const periodTemplate = "Current Period: <strong>%d</strong>";
-const typeTemplate = "%a";
-const dateTemplate = "Today's Date: <strong>%ss</strong>";
-const timeUntilTemplate = "Time until %inf";
-
-// Initialize
-main();
-
+// --- INITIALIZATION ---
 async function main() {
     try {
         const response = await fetch('data.json');
@@ -30,33 +20,41 @@ async function main() {
         updateSchedule();
         countDownDate();
 
-        // Real-time updates
         setInterval(countDownDate, 1000);
         setInterval(updateSchedule, 1000);
-    } catch (error) {
-        console.error("Data Fetch Error:", error);
+    } catch (e) {
+        console.error("Error loading data.json", e);
     }
 }
+main();
 
+// --- LOGIC FUNCTIONS ---
 function updateSchedule() {
     calculateGoal();
-    let result = '<table class="table table-dark table-bordered mt-3"><thead><tr><th>Period</th><th>Time</th></tr></thead><tbody>';
+    let result = '<table class="table table-dark table-bordered mt-3" style="width: 90%; margin: auto;">';
+    result += '<thead><tr><th>Period Name</th><th>Time</th></tr></thead><tbody>';
 
     for (let i = 0; i < myArray.length; i++) {
         result += `<tr><td>${myArray[i][0]}</td><td>${myArray[i][1]}</td></tr>`;
     }
     result += "</tbody></table>";
 
-    const schedContainer = document.querySelector('.scheds');
-    if (schedContainer) schedContainer.innerHTML = result;
+    const schedsDiv = document.querySelector('.scheds');
+    if (schedsDiv) schedsDiv.innerHTML = result;
 }
 
 const proccessTime = function(time) {
-    if (Math.floor(time / 3600) > 12) { time -= 43200; }
-    return "" + Math.floor(time / 3600) + ":" + (Math.floor((time / 60)) % 60 < 10 ? "0" : "") + Math.floor((time / 60)) % 60;
+    // 12-hour conversion logic
+    let displayTime = time;
+    if (Math.floor(displayTime / 3600) > 12) {
+        displayTime -= 43200; // 12 * 60 * 60
+    }
+    let h = Math.floor(displayTime / 3600);
+    let m = Math.floor((displayTime / 60)) % 60;
+    return `${h}:${m < 10 ? "0" : ""}${m}`;
 }
 
-function calculateGoal() {
+const calculateGoal = function() {
     if (!data) return;
     const date = new Date();
     let str = `${date.getMonth() + 1}/${date.getDate()}`;
@@ -64,73 +62,70 @@ function calculateGoal() {
     
     if (!(str in data)) { str = "base"; }
     
-    let arr = data[str];
-    let periods = arr[1];
+    let periods = data[str][1];
     let largestUnder = -1;
     let largest = -1;
     myArray = [];
 
     let schoolStart = 10000000;
     for (let k in periods) {
-        let key = parseInt(k);
-        if (key < schoolStart) { schoolStart = key; }
-        myArray.push([periods[key][1], proccessTime(key) + " -> " + proccessTime(periods[key][0])]);
+        k = parseInt(k);
+        if (k < schoolStart) schoolStart = k;
         
-        if (key <= val && key > largestUnder) { largestUnder = key; }
-        if (key > largest) { largest = key; }
+        myArray.push([periods[k][1], proccessTime(k) + " -> " + proccessTime(periods[k][0])]);
+        
+        if (k <= val && k > largestUnder) largestUnder = k;
+        if (k > largest) largest = k;
     }
 
-    const infoDisplay = document.getElementById('time-until-display');
-    
+    const timeUntilDiv = document.querySelector('.timeuntil');
+
     if (largestUnder == -1) {
         goal = schoolStart;
         period = "Before School";
-        if (infoDisplay) infoDisplay.innerHTML = timeUntilTemplate.replace('%inf', "period starts...");
+        if (timeUntilDiv) timeUntilDiv.innerHTML = timeuntiloutput.replace('%inf', "period starts...");
     } else if (periods[largestUnder][0] - val < 0 && largestUnder != largest) {
-        if (infoDisplay) infoDisplay.innerHTML = timeUntilTemplate.replace('%inf', "period starts...");
+        if (timeUntilDiv) timeUntilDiv.innerHTML = timeuntiloutput.replace('%inf', "period starts...");
         for (let k in periods) {
-            let key = parseInt(k);
-            if (key > largestUnder) { goal = key; break; }
+            k = parseInt(k);
+            if (k > largestUnder) {
+                goal = k;
+                break;
+            }
         }
         period = "Transition";
     } else {
         period = periods[largestUnder][1];
         goal = periods[largestUnder][0];
-        if (infoDisplay) infoDisplay.innerHTML = timeUntilTemplate.replace('%inf', "period ends...");
+        if (timeUntilDiv) timeUntilDiv.innerHTML = timeuntiloutput.replace('%inf', "period ends...");
     }
 }
 
-function countDownDate() {
+const countDownDate = function() {
     if (!data) return;
     calculateGoal();
+    
     const date = new Date();
     let str = `${date.getMonth() + 1}/${date.getDate()}`;
     if (!(str in data)) { str = "base"; }
 
     let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
-    let timeleft = goal - val;
-    if (timeleft <= 0) timeleft = 0;
+    let timeleft = Math.max(0, goal - val);
     
-    let h = Math.floor(timeleft / 3600);
-    let m = Math.floor((timeleft % 3600) / 60);
-    let s = timeleft % 60;
+    let hours = Math.floor(timeleft / 3600);
+    let minutes = Math.floor((timeleft % 3600) / 60);
+    let seconds = timeleft % 60;
 
-    // Browser Tab Update
-    document.title = (h === 0) ? `${m}:${(s + '').padStart(2, '0')} PHS` : `${h}:${(m + '').padStart(2, '0')} PHS`;
+    // Browser Title
+    document.title = (hours === 0) ? 
+        `${minutes}:${(seconds + '').padStart(2, '0')} PHS` : 
+        `${hours}:${(minutes + '').padStart(2, '0')} PHS`;
 
-    // Inject Modern UI Data
-    const cdBox = document.getElementById('countdown-box');
-    if (cdBox) cdBox.innerHTML = countdownPlaceholder.replace('%h', h).replace('%m', m).replace('%s', s);
+    // UI Updates
+    document.querySelector('.countdown').innerHTML = output.replace('%h', hours).replace('%m', minutes).replace('%s', seconds);
+    document.querySelector('.period').innerHTML = periodoutput.replace('%d', period);
+    document.querySelector('.stype').innerHTML = typeoutput.replace('%a', data[str][0]);
     
-    const pBox = document.getElementById('period-display');
-    if (pBox) pBox.innerHTML = periodTemplate.replace('%d', period);
-    
-    const tBox = document.getElementById('schedule-type-display');
-    if (tBox) tBox.innerHTML = typeTemplate.replace('%a', data[str][0]);
-    
-    const dBox = document.getElementById('date-display');
-    if (dBox) {
-        let ds = (date.getMonth() + 1) + "/" + date.getDate() + "/" + date.getFullYear();
-        dBox.innerHTML = dateTemplate.replace('%ss', ds);
-    }
+    let dateStr = (date.getMonth() + 1) + "/" + date.getDate() + "/" + date.getFullYear();
+    document.querySelector('.date').innerHTML = dateoutput.replace('%ss', dateStr);
 }
