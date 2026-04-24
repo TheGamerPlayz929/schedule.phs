@@ -2,34 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>PHS Schedule | Live</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PHS Schedule</title>
   
   <meta http-equiv="refresh" content="600">
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Raleway:wght@700&display=swap" rel="stylesheet">
-
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <link rel="stylesheet" href="main.css">
 </head>
 
 <body>
   <div class="glass-overlay"></div>
 
-  <header id="header" class="container py-5 text-center position-relative">
-    <h1 class="display-4 fw-bold mb-0">PHS Schedule</h1>
+  <header id="header" class="container py-5 text-center">
+    <h1 class="display-4 fw-bold mb-2">PHS Schedule</h1>
     <div class="mb-4">
-      <a href="https://phsmap.github.io/" class="btn-map"><i class="bi bi-map"></i> Interactive Map</a>
+      <a href="https://phsmap.github.io/" class="btn-map">
+        <i class="bi bi-map-fill"></i> Interactive Map
+      </a>
     </div>
 
     <div class="status-card mx-auto mb-4">
-      <h2 class="h5 opacity-75">Today's Date: <span class="fw-bold text-white">%ss</span></h2>
-      <h2 class="h3">Current Period: <span class="badge bg-teal">%d</span></h2>
-      <p class="mt-2 text-uppercase tracking-wider">Time until %inf</p>
+      <h2 class="h5 opacity-75" id="date-display">Today's Date: <strong>%ss</strong></h2>
+      <h2 class="h3" id="period-display">Current Period: <strong>%d</strong></h2>
+      <p class="mt-2 text-uppercase fw-semibold" id="time-until-display">Time until %inf</p>
     </div>
 
-    <div class="countdown-container d-flex justify-content-center gap-3">
+    <div class="countdown-container d-flex justify-content-center gap-2" id="countdown-box">
       <div class="time-box"><h3>%h</h3><span>Hours</span></div>
       <div class="time-box"><h3>%m</h3><span>Mins</span></div>
       <div class="time-box"><h3>%s</h3><span>Secs</span></div>
@@ -38,25 +38,24 @@
 
   <main class="container py-4 text-center">
     <section class="info-section mx-auto shadow-lg">
-      <div class="p-4">
-        <h3 class="h5 mb-1">Today's Schedule Type</h3>
-        <p class="h4 text-teal fw-bold">%a</p>
+      <div class="p-4 border-bottom border-white border-opacity-10">
+        <h3 class="h6 text-uppercase opacity-75">Today's Schedule Type</h3>
+        <p class="h4 text-teal fw-bold mb-0" id="schedule-type-display">%a</p>
       </div>
       
-      <div class="scheds-dynamic px-3 pb-3">
-        </div>
+      <div class="scheds px-3 py-4"></div>
 
-      <div class="footer-status border-top border-secondary p-3">
-        <p class="small mb-1">STATUS: <span class="text-success">● Working</span> | v2.0.0</p>
-        <p class="small opacity-50 mb-0">Discord: TheGamerPlayz</p>
+      <div class="footer-status p-3 bg-black bg-opacity-25 rounded-bottom">
+        <p class="small mb-1">STATUS: <span class="text-success fw-bold">● Working</span> | v2.0.0</p>
+        <p class="small opacity-50 mb-0">DISCORD: TheGamerPlayz</p>
       </div>
     </section>
   </main>
 
-  <footer class="container text-center py-4 opacity-75">
+  <footer class="container text-center py-5 opacity-50">
     <p class="small">&copy; thegamerplayz. Modification & Design by TheGamerPlayz929</p>
   </footer>
 
-  <script src="main.js" async></script>
+  <script src="main.js"></script>
 </body>
 </html>
