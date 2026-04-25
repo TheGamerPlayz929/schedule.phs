@@ -4,40 +4,74 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PHS Schedule</title>
-  <meta http-equiv="refresh" content="600">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta name="description" content="Beautiful Shader Experiences - PHS Schedule">
+  <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
-  <div class="glass-overlay"></div>
 
-  <header id="header" class="container py-5 text-center">
-    <h1 class="display-4 fw-bold mb-4">PHS Schedule</h1>
-    
-    <div class="status-card mx-auto mb-4">
-      <h2 class="h5 opacity-75 date">Today's Date: %ss</h2>
-      <h2 class="h3 period">Current Period: <span class="badge bg-teal">%d</span></h2>
-      <p class="mt-2 text-uppercase fw-semibold timeuntil">Time until %inf</p>
-    </div>
+<div class="ambient-canvas">
+  <div class="ambient-orb ambient-orb--1"></div>
+  <div class="ambient-orb ambient-orb--2"></div>
+  <div class="ambient-orb ambient-orb--3"></div>
+  <div class="ambient-noise"></div>
+</div>
 
-    <div class="countdown countdown-container d-flex justify-content-center gap-2">
-      <div class="time-box"><h3>%h</h3><span>Hours</span></div>
-      <div class="time-box"><h3>%m</h3><span>Mins</span></div>
-      <div class="time-box"><h3>%s</h3><span>Secs</span></div>
-    </div>
-  </header>
-
-  <main class="container py-4 text-center">
-    <section class="info-section mx-auto shadow-lg">
-      <div class="p-4 border-bottom border-white border-opacity-10">
-        <h3 class="h6 text-uppercase opacity-75">Schedule Type</h3>
-        <p class="h4 text-teal fw-bold mb-0 stype">%a</p>
+<div class="app-shell">
+  <!-- Navigation -->
+  <nav class="glass-nav fade-up" style="--stagger: 0">
+    <div class="brand">
+      <div class="brand-icon">
+        <img src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
       </div>
-      
-      <div class="scheds px-3 py-4"></div>
-    </section>
+    </div>
+    <div class="nav-links">
+      <a href="announcements.html" class="nav-btn">Announcements</a>
+      <a href="map.html" class="nav-btn">Map</a>
+    </div>
+    <div></div> <!-- Empty div for 3-column grid alignment -->
+  </nav>
+
+  <!-- Hero Section -->
+  <main class="hero">
+    <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off">
+      <span class="status-dot"></span>
+      <span id="status-label">Loading...</span>
+    </div>
+
+    <div class="hero-title-wrapper fade-up" style="--stagger: 2">
+      <h2 class="hero-eyebrow" id="hero-eyebrow">Current</h2>
+      <h1 class="hero-title" id="hero-title">—</h1>
+    </div>
+
+    <!-- Glass Countdown Panel -->
+    <div class="glass-circle fade-up" style="--stagger: 3">
+      <div class="countdown-wrapper" aria-live="polite">
+        <div class="cd-main" id="cd-hm">00</div>
+        <div class="cd-sub">
+          <span class="cd-sec" id="cd-s">00</span>
+          <span class="cd-sec-label">SEC</span>
+        </div>
+      </div>
+    </div>
   </main>
 
-  <script src="main.js"></script>
+  <!-- Schedule Section -->
+  <section class="schedule-section fade-up" style="--stagger: 4">
+    <div class="schedule-header">
+      <h3 id="schedule-title">Normal Schedule</h3>
+      <span class="date" id="schedule-date"></span>
+    </div>
+    <ol class="period-list" id="period-list">
+      <!-- JS renders period-card elements here -->
+    </ol>
+  </section>
+
+  <footer class="app-footer fade-up" style="--stagger: 5">
+    xxx
+  </footer>
+</div>
+
+<script src="main.js"></script>
 </body>
 </html>

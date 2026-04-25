@@ -1,121 +1,247 @@
+/* ==========================================================================
+   PHS Schedule — Purple Liquid Glass Design (Render Logic)
+   ========================================================================== */
+
 let data;
 let goal = 24420;
 let period = "";
 let myArray = [];
+let periodStartTime = 0;
+let periodEndTime = 0;
+let scheduleType = "";
+let isBeforeSchool = false;
+let isTransition = false;
 
-// These will be defined once the page loads
-let countdown, output, periodoutput, typeoutput, dateoutput, timeuntiloutput;
+/* --- Cache DOM refs --- */
+let _hmEl, _sEl, _heroTitle, _heroEyebrow;
+let _progressFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
+let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
 
 async function main() {
-    try {
-        // 1. Initialize selectors after page is ready
-        countdown = document.querySelector('.countdown');
-        if (!countdown) return; // Safety check
+  try {
+    const response = await fetch('data.json');
+    data = await response.json();
 
-        output = countdown.innerHTML;
-        periodoutput = document.querySelector('.period').innerHTML;
-        typeoutput = document.querySelector('.stype').innerHTML;
-        dateoutput = document.querySelector('.date').innerHTML;
-        timeuntiloutput = document.querySelector('.timeuntil').innerHTML;
+    _hmEl = document.getElementById('cd-hm');
+    _sEl = document.getElementById('cd-s');
+    _heroTitle = document.getElementById('hero-title');
+    _heroEyebrow = document.querySelector('.hero-eyebrow');
+    _progressFill = document.getElementById('progress-fill');
+    _statusPill = document.getElementById('status-pill');
+    _statusLabel = document.getElementById('status-label');
+    _schedTitle = document.getElementById('schedule-title');
+    _schedDate = document.getElementById('schedule-date');
+    _periodList = document.getElementById('period-list');
 
-        // 2. Fetch Data
-        const response = await fetch('data.json');
-        data = await response.json();
-        
-        // 3. Start Loops
-        updateSchedule();
-        countDownDate();
-        setInterval(countDownDate, 1000);
-        setInterval(updateSchedule, 1000);
-    } catch (e) {
-        console.error("Initialization failed:", e);
-    }
+    updateAll();
+    setInterval(updateAll, 1000);
+  } catch (e) {
+    console.error("Initialization failed:", e);
+  }
 }
 
-// Keep your original logic functions exactly as they are
-const proccessTime = function(time) {
-    let displayTime = time;
-    if (Math.floor(displayTime / 3600) > 12) { displayTime -= 43200; }
-    let h = Math.floor(displayTime / 3600);
-    let m = Math.floor((displayTime / 60)) % 60;
-    return `${h}:${m < 10 ? "0" : ""}${m}`;
+/* --------------------------------------------------------------------------
+   Original logic — preserved exactly
+   -------------------------------------------------------------------------- */
+
+const proccessTime = function (time) {
+  let displayTime = time;
+  if (Math.floor(displayTime / 3600) > 12) { displayTime -= 43200; }
+  let h = Math.floor(displayTime / 3600);
+  let m = Math.floor((displayTime / 60)) % 60;
+  return `${h}:${m < 10 ? "0" : ""}${m}`;
 }
 
 function calculateGoal() {
-    if (!data) return;
-    const date = new Date();
-    let str = `${date.getMonth() + 1}/${date.getDate()}`;
-    let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
-    if (!(str in data)) { str = "base"; }
-    
-    let periods = data[str][1];
-    let largestUnder = -1;
-    let largest = -1;
-    myArray = [];
+  if (!data) return;
+  const date = new Date();
+  let str = `${date.getMonth() + 1}/${date.getDate()}`;
+  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+  if (!(str in data)) { str = "base"; }
 
-    let schoolStart = 10000000;
+  let arr = data[str];
+  scheduleType = arr[0];
+  let periods = arr[1];
+  let largestUnder = -1;
+  let largest = -1;
+  myArray = [];
+
+  let schoolStart = 10000000;
+  for (let k in periods) {
+    let key = parseInt(k);
+    if (key < schoolStart) schoolStart = key;
+    myArray.push({
+      name: periods[key][1],
+      startSec: key,
+      endSec: periods[key][0],
+      timeStr: proccessTime(key) + " \u2192 " + proccessTime(periods[key][0])
+    });
+    if (key <= val && key > largestUnder) largestUnder = key;
+    if (key > largest) largest = key;
+  }
+
+  isBeforeSchool = false;
+  isTransition = false;
+
+  if (largestUnder == -1) {
+    goal = schoolStart;
+    period = "Before School";
+    periodStartTime = 0;
+    periodEndTime = schoolStart;
+    isBeforeSchool = true;
+  } else if (periods[largestUnder][0] - val < 0 && largestUnder != largest) {
     for (let k in periods) {
-        let key = parseInt(k);
-        if (key < schoolStart) schoolStart = key;
-        myArray.push([periods[key][1], proccessTime(key) + " -> " + proccessTime(periods[key][0])]);
-        if (key <= val && key > largestUnder) largestUnder = key;
-        if (key > largest) largest = key;
+      let key = parseInt(k);
+      if (key > largestUnder) { goal = key; break; }
     }
+    period = "Transition";
+    periodStartTime = periods[largestUnder][0];
+    periodEndTime = goal;
+    isTransition = true;
+  } else {
+    period = periods[largestUnder][1];
+    goal = periods[largestUnder][0];
+    periodStartTime = largestUnder;
+    periodEndTime = periods[largestUnder][0];
+  }
+}
 
-    const timeUntilDiv = document.querySelector('.timeuntil');
-    if (largestUnder == -1) {
-        goal = schoolStart; period = "Before School";
-        if (timeUntilDiv) timeUntilDiv.innerHTML = timeuntiloutput.replace('%inf', "period starts...");
-    } else if (periods[largestUnder][0] - val < 0 && largestUnder != largest) {
-        if (timeUntilDiv) timeUntilDiv.innerHTML = timeuntiloutput.replace('%inf', "period starts...");
-        for (let k in periods) {
-            let key = parseInt(k);
-            if (key > largestUnder) { goal = key; break; }
-        }
-        period = "Transition";
+/* --------------------------------------------------------------------------
+   Render layer
+   -------------------------------------------------------------------------- */
+
+function updateAll() {
+  if (!data) return;
+  calculateGoal();
+
+  const date = new Date();
+  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+  let timeleft = Math.max(0, goal - val);
+
+  let h = Math.floor(timeleft / 3600);
+  let m = Math.floor((timeleft % 3600) / 60);
+  let s = timeleft % 60;
+
+  /* --- Zero Timer if No School --- */
+  const dayIsOver = (timeleft <= 0 && !isBeforeSchool);
+  const noSchool = scheduleType === "No School" || scheduleType === "No School (Most Likely)" || dayIsOver;
+
+  if (noSchool) {
+    h = 0; m = 0; s = 0;
+  }
+
+  /* --- Countdown --- */
+  if (_hmEl && _sEl) {
+    const hm = h > 0
+      ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      : `${String(m).padStart(2, '0')}`;
+    const ss = String(s).padStart(2, '0');
+
+    if (hm !== _lastHm) { _hmEl.textContent = hm; _lastHm = hm; }
+    if (ss !== _lastS) { _sEl.textContent = ss; _lastS = ss; }
+  }
+
+  document.title = h === 0
+    ? `${m}:${String(s).padStart(2, '0')} PHS`
+    : `${h}:${String(m).padStart(2, '0')} PHS`;
+
+  /* --- Hero text & Status --- */
+  if (_heroTitle && _heroEyebrow && _statusPill && _statusLabel) {
+    if (noSchool) {
+      _heroEyebrow.style.display = "none";
+      _heroTitle.style.display = "block";
+      _heroTitle.textContent = "No School";
+      
+      _statusPill.style.display = "inline-flex";
+      _statusPill.dataset.status = "off";
+      _statusLabel.textContent = "Enjoy your day \u2728";
+    } else if (isBeforeSchool) {
+      _heroEyebrow.style.display = "block";
+      _heroEyebrow.textContent = "Starts in";
+      _heroTitle.style.display = "none";
+      _statusPill.style.display = "none";
     } else {
-        period = periods[largestUnder][1];
-        goal = periods[largestUnder][0];
-        if (timeUntilDiv) timeUntilDiv.innerHTML = timeuntiloutput.replace('%inf', "period ends...");
+      _heroEyebrow.style.display = "block";
+      _heroEyebrow.textContent = isTransition ? "Passing" : "Current";
+      _heroTitle.style.display = "block";
+      _heroTitle.textContent = period;
+      
+      _statusPill.style.display = "inline-flex";
+      if (isTransition) {
+        _statusPill.dataset.status = "passing";
+        _statusLabel.textContent = "Next period soon";
+      } else if (timeleft <= 60 && timeleft > 0) {
+        _statusPill.dataset.status = "urgent";
+        _statusLabel.textContent = "Ending Soon";
+      } else {
+        _statusPill.dataset.status = "live";
+        _statusLabel.textContent = "In Session";
+      }
     }
+  }
+
+  /* --- Progress bar --- */
+  if (_progressFill && periodEndTime > periodStartTime) {
+    const elapsed = val - periodStartTime;
+    const total = periodEndTime - periodStartTime;
+    const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+    _progressFill.style.width = pct + '%';
+  }
+
+  /* --- Schedule header --- */
+  if (_schedTitle) _schedTitle.textContent = scheduleType;
+  if (_schedDate) {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    _schedDate.textContent = `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  }
+
+  /* --- Period list --- */
+  renderPeriodList(val);
 }
 
-function countDownDate() {
-    if (!data) return;
-    calculateGoal();
-    const date = new Date();
-    let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
-    let timeleft = Math.max(0, goal - val);
-    
-    let h = Math.floor(timeleft / 3600);
-    let m = Math.floor((timeleft % 3600) / 60);
-    let s = timeleft % 60;
+function renderPeriodList(currentSeconds) {
+  if (!_periodList) return;
 
-    document.title = (h === 0) ? `${m}:${(s + '').padStart(2, '0')} PHS` : `${h}:${(m + '').padStart(2, '0')} PHS`;
-
-    // Injecting into the classes
-    document.querySelector('.countdown').innerHTML = output.replace('%h', h).replace('%m', m).replace('%s', s);
-    document.querySelector('.period').innerHTML = periodoutput.replace('%d', period);
-    
-    let str = `${date.getMonth() + 1}/${date.getDate()}`;
-    if (!(str in data)) { str = "base"; }
-    document.querySelector('.stype').innerHTML = typeoutput.replace('%a', data[str][0]);
-    
-    let ds = (date.getMonth() + 1) + "/" + date.getDate() + "/" + date.getFullYear();
-    document.querySelector('.date').innerHTML = dateoutput.replace('%ss', ds);
-}
-
-function updateSchedule() {
-    if (!data) return;
-    calculateGoal();
-    let result = '<table class="table table-dark table-bordered mt-3"><thead><tr><th>Period</th><th>Time</th></tr></thead><tbody>';
+  if (_periodList.children.length === myArray.length && myArray.length === _lastPeriodCount) {
     for (let i = 0; i < myArray.length; i++) {
-        result += `<tr><td>${myArray[i][0]}</td><td>${myArray[i][1]}</td></tr>`;
+      const li = _periodList.children[i];
+      const p = myArray[i];
+      const stateClass = getStateClass(p, currentSeconds);
+
+      // We only care about base class 'period-card' plus the dynamic state
+      const expectedClass = 'period-card ' + stateClass;
+      if (li.className !== expectedClass.trim()) {
+        li.className = expectedClass.trim();
+      }
     }
-    result += "</tbody></table>";
-    const schedsDiv = document.querySelector('.scheds');
-    if (schedsDiv) schedsDiv.innerHTML = result;
+    return;
+  }
+
+  _periodList.innerHTML = '';
+  for (let i = 0; i < myArray.length; i++) {
+    const p = myArray[i];
+    const stateClass = getStateClass(p, currentSeconds);
+    const durationMin = Math.round((p.endSec - p.startSec) / 60);
+
+    const li = document.createElement('li');
+    li.className = 'period-card ' + stateClass;
+
+    li.innerHTML = `
+      <div class="period-time">${p.timeStr}</div>
+      <div class="period-name">${p.name}</div>
+      <div class="period-meta">${durationMin} min</div>
+    `;
+
+    _periodList.appendChild(li);
+  }
+  _lastPeriodCount = myArray.length;
 }
 
-// Run when window loads
+function getStateClass(period, currentSeconds) {
+  if (currentSeconds >= period.endSec) return 'is-past';
+  if (currentSeconds >= period.startSec && currentSeconds < period.endSec) return 'is-current';
+  return '';
+}
+
 window.onload = main;
