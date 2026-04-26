@@ -15,6 +15,7 @@ let isTransition = false;
 /* --- Cache DOM refs --- */
 let _hmEl, _sEl, _heroTitle, _heroEyebrow;
 let _progressFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
+let _hmTextNode = null; // explicit text node for the minutes/hours display
 let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
 
 async function main() {
@@ -32,6 +33,13 @@ async function main() {
     _schedTitle = document.getElementById('schedule-title');
     _schedDate = document.getElementById('schedule-date');
     _periodList = document.getElementById('period-list');
+
+    /* Build a stable text node as the first child of #cd-hm so we never
+       clobber the MIN span that lives inside it. */
+    if (_hmEl) {
+      _hmTextNode = document.createTextNode('');
+      _hmEl.insertBefore(_hmTextNode, _hmEl.firstChild);
+    }
 
     updateAll();
     setInterval(updateAll, 1000);
@@ -131,13 +139,22 @@ function updateAll() {
   }
 
   /* --- Countdown --- */
-  if (_hmEl && _sEl) {
+  if (_hmEl && _hmTextNode) {
     const hm = h > 0
       ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       : `${String(m).padStart(2, '0')}`;
     const ss = String(s).padStart(2, '0');
 
-    if (hm !== _lastHm) { _hmEl.firstChild.textContent = hm + ' '; _lastHm = hm; }
+    // Show/hide the MIN span depending on whether school is in session
+    const minSpan = _hmEl.querySelector('.cd-min-label');
+    if (minSpan) {
+      minSpan.style.display = noSchool ? 'none' : '';
+    }
+
+    if (hm !== _lastHm) {
+      _hmTextNode.textContent = noSchool ? hm : hm + ' ';
+      _lastHm = hm;
+    }
     if (ss !== _lastS) { _sEl.textContent = ss; _lastS = ss; }
   }
 
@@ -209,7 +226,6 @@ function renderPeriodList(currentSeconds) {
       const p = myArray[i];
       const stateClass = getStateClass(p, currentSeconds);
 
-      // We only care about base class 'period-card' plus the dynamic state
       const expectedClass = 'period-card ' + stateClass;
       if (li.className !== expectedClass.trim()) {
         li.className = expectedClass.trim();
