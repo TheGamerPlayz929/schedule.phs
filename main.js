@@ -148,13 +148,8 @@ function updateAll() {
       : `${String(m).padStart(2, '0')}`;
     const ss = String(s).padStart(2, '0');
 
-    const minSpan = _hmEl.querySelector('.cd-min-label');
-    if (minSpan) {
-      minSpan.style.display = noSchool ? 'none' : '';
-    }
-
     if (hm !== _lastHm) {
-      _hmTextNode.textContent = noSchool ? hm : hm + ' ';
+      _hmTextNode.textContent = hm + ' ';
       _lastHm = hm;
     }
     if (ss !== _lastS) { _sEl.textContent = ss; _lastS = ss; }
