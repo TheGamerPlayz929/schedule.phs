@@ -15,7 +15,7 @@ let isTransition = false;
 /* --- Cache DOM refs --- */
 let _hmEl, _sEl, _heroTitle, _heroEyebrow;
 let _progressFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
-let _hmTextNode = null; // explicit text node for the minutes/hours display
+let _hmTextNode = null;
 let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
 
 async function main() {
@@ -34,9 +34,12 @@ async function main() {
     _schedDate = document.getElementById('schedule-date');
     _periodList = document.getElementById('period-list');
 
-    /* Build a stable text node as the first child of #cd-hm so we never
-       clobber the MIN span that lives inside it. */
+    /* Strip any existing text nodes from #cd-hm (the hardcoded "00 " in HTML),
+       then insert a single controlled text node before the MIN span. */
     if (_hmEl) {
+      Array.from(_hmEl.childNodes)
+        .filter(n => n.nodeType === Node.TEXT_NODE)
+        .forEach(n => n.remove());
       _hmTextNode = document.createTextNode('');
       _hmEl.insertBefore(_hmTextNode, _hmEl.firstChild);
     }
@@ -145,7 +148,6 @@ function updateAll() {
       : `${String(m).padStart(2, '0')}`;
     const ss = String(s).padStart(2, '0');
 
-    // Show/hide the MIN span depending on whether school is in session
     const minSpan = _hmEl.querySelector('.cd-min-label');
     if (minSpan) {
       minSpan.style.display = noSchool ? 'none' : '';
@@ -168,7 +170,7 @@ function updateAll() {
       _heroEyebrow.style.display = "none";
       _heroTitle.style.display = "block";
       _heroTitle.textContent = "No School";
-      
+
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
       _statusLabel.textContent = "Enjoy your day \u2728";
@@ -182,7 +184,7 @@ function updateAll() {
       _heroEyebrow.textContent = isTransition ? "Passing" : "Current";
       _heroTitle.style.display = "block";
       _heroTitle.textContent = period;
-      
+
       _statusPill.style.display = "inline-flex";
       if (isTransition) {
         _statusPill.dataset.status = "passing";
