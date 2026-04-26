@@ -1,7 +1,6 @@
-<<<<<<< HEAD
-Hey gng welcome to phase 3
-=======
 # PHS Student Portal
+
+Hey gng welcome to phase 3
 
 A student portal for Poolesville High School with three pages, embedding GradeMelon (a StudentVue grade viewer) directly into the site.
 
@@ -50,4 +49,3 @@ The embedded grade viewer is a separate Next.js app deployed to Firebase. Change
 ## Deployment
 - GradeMelon: `FIREBASE_BUILD=true npm run build` → `firebase deploy --only hosting:schedulephs`
 - PHS Site: push to GitHub → auto-deploys via GitHub Pages
->>>>>>> 1d2c6d92867ffe2ab4a66a5be1222c6f75ee6871
