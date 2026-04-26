@@ -137,7 +137,7 @@ function updateAll() {
       : `${String(m).padStart(2, '0')}`;
     const ss = String(s).padStart(2, '0');
 
-    if (hm !== _lastHm) { _hmEl.textContent = hm; _lastHm = hm; }
+    if (hm !== _lastHm) { _hmEl.firstChild.textContent = hm + ' '; _lastHm = hm; }
     if (ss !== _lastS) { _sEl.textContent = ss; _lastS = ss; }
   }
 
