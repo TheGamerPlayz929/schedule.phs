@@ -126,7 +126,7 @@ function updateAll() {
   calculateGoal();
 
   const date = new Date();
-  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37;
   let timeleft = Math.max(0, goal - val);
 
   let h = Math.floor(timeleft / 3600);
