@@ -64,7 +64,7 @@
     <div class="grades-scaler" id="grades-scaler">
       <iframe
         id="grades-frame"
-        src="https://schedulephs.web.app/login"
+        src="http://localhost:3002/login"
         scrolling="yes"
         allowtransparency="true"
         title="GradeMelon Grades"
@@ -84,8 +84,12 @@
   const scaler = document.getElementById('grades-scaler');
   const frame  = document.getElementById('grades-frame');
 
+  let isFullscreen = false;
+  const savedTransforms = [];
+
   function setSize() {
-    const h = Math.max(520, window.innerHeight - 250);
+    if (isFullscreen) return;
+    const h = Math.max(380, window.innerHeight - 440);
     frame.style.width  = scaler.offsetWidth + 'px';
     frame.style.height = h + 'px';
     scaler.style.height = h + 'px';
@@ -93,6 +97,58 @@
 
   setSize();
   new ResizeObserver(setSize).observe(scaler);
+  window.addEventListener('resize', setSize);
+
+  function goFullscreen() {
+    if (isFullscreen) return;
+    isFullscreen = true;
+    let el = frame.parentElement;
+    while (el && el !== document.body) {
+      savedTransforms.push({
+        el,
+        transform: el.style.transform,
+        willChange: el.style.willChange,
+        animation: el.style.animation,
+        opacity: el.style.opacity,
+      });
+      el.style.transform = "none";
+      el.style.willChange = "auto";
+      el.style.animation = "none";
+      el.style.opacity = "1";
+      el = el.parentElement;
+    }
+    frame.style.position = "fixed";
+    frame.style.top = "0";
+    frame.style.left = "0";
+    frame.style.width = "100vw";
+    frame.style.height = "100vh";
+    frame.style.zIndex = "99999";
+    frame.style.borderRadius = "0";
+  }
+
+  function exitFullscreen() {
+    if (!isFullscreen) return;
+    isFullscreen = false;
+    savedTransforms.forEach(s => {
+      s.el.style.transform = s.transform;
+      s.el.style.willChange = s.willChange;
+      s.el.style.animation = s.animation;
+      s.el.style.opacity = s.opacity;
+    });
+    savedTransforms.length = 0;
+    frame.style.position = "";
+    frame.style.top = "";
+    frame.style.left = "";
+    frame.style.zIndex = "";
+    frame.style.borderRadius = "";
+    setSize();
+  }
+
+  window.addEventListener("message", (e) => {
+    if (!e.data) return;
+    if (e.data.type === "modalOpen") goFullscreen();
+    if (e.data.type === "modalClose") exitFullscreen();
+  });
 </script>
 </body>
 </html>

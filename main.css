@@ -297,11 +297,19 @@ ol {
 .cd-main {
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  font-size: 48px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
+  font-size: 58px;
+  font-weight: 500;
+  letter-spacing: -0.05em;
   line-height: 0.9;
   color: var(--fg-1);
+}
+
+.cd-min-label {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--fg-2);
+  vertical-align: baseline;
 }
 
 .cd-sub {

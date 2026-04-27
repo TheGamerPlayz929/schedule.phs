@@ -142,17 +142,18 @@ function updateAll() {
   }
 
   /* --- Countdown --- */
-  if (_hmEl && _hmTextNode) {
+  if (_hmEl) {
+    const u = (t) => `<span class="cd-min-label">${t}</span>`;
     const hm = h > 0
-      ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      : `${String(m).padStart(2, '0')}`;
-    const ss = String(s).padStart(2, '0');
+      ? `${h}${u('h')}${m > 0 ? (m < 10 ? '&nbsp;' : '') + m + u('m') : ''}`
+      : `${m}${u('m')}`;
+    if (hm !== _lastHm) { _hmEl.innerHTML = hm; _lastHm = hm; }
 
-    if (hm !== _lastHm) {
-      _hmTextNode.textContent = hm + ' ';
-      _lastHm = hm;
+    const ss = String(s).padStart(2, '0');
+    if (ss !== _lastS && _sEl) {
+      _sEl.innerHTML = `${ss}<span class="cd-sec-label" style="margin-left:3px">s</span>`;
+      _lastS = ss;
     }
-    if (ss !== _lastS) { _sEl.textContent = ss; _lastS = ss; }
   }
 
   document.title = h === 0
