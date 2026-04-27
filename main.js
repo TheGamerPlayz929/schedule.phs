@@ -12,9 +12,93 @@ let scheduleType = "";
 let isBeforeSchool = false;
 let isTransition = false;
 
+/* --- Admin time override (localhost only) --- */
+let _timeOffsetSeconds = 0; // added to real time
+
+function _isLocalhost() {
+  return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+}
+
+function _initAdminPanel() {
+  if (!_isLocalhost()) return;
+  if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && !location.pathname.endsWith('/')) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'admin-panel';
+  panel.innerHTML = `
+    <div class="admin-header">
+      <span class="admin-dot"></span>
+      <span>Dev Clock</span>
+      <button type="button" class="admin-collapse-btn" id="admin-collapse">▾</button>
+    </div>
+    <div class="admin-body" id="admin-body">
+      <div class="admin-time-row">
+        <div class="admin-field">
+          <input type="number" id="admin-h" class="admin-seg" min="1" max="12" placeholder="12">
+          <span class="admin-seg-label">h</span>
+        </div>
+        <div class="admin-field">
+          <input type="number" id="admin-m" class="admin-seg" min="0" max="59" placeholder="00">
+          <span class="admin-seg-label">m</span>
+        </div>
+        <div class="admin-field">
+          <input type="number" id="admin-s" class="admin-seg" min="0" max="59" placeholder="00">
+          <span class="admin-seg-label">s</span>
+        </div>
+        <button type="button" id="admin-ampm" class="admin-ampm-btn">AM</button>
+      </div>
+      <div class="admin-actions">
+        <button type="button" id="admin-apply" class="admin-btn admin-btn--apply">Apply</button>
+        <button type="button" id="admin-reset" class="admin-btn admin-btn--reset">Reset</button>
+      </div>
+      <div class="admin-status" id="admin-status">Real time</div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  let collapsed = false;
+  document.getElementById('admin-collapse').addEventListener('click', () => {
+    collapsed = !collapsed;
+    document.getElementById('admin-body').style.display = collapsed ? 'none' : 'flex';
+    document.getElementById('admin-collapse').textContent = collapsed ? '▸' : '▾';
+  });
+
+  const ampmBtn = document.getElementById('admin-ampm');
+  ampmBtn.addEventListener('click', () => {
+    ampmBtn.textContent = ampmBtn.textContent === 'AM' ? 'PM' : 'AM';
+    ampmBtn.classList.toggle('admin-ampm-btn--pm', ampmBtn.textContent === 'PM');
+  });
+
+  document.getElementById('admin-apply').addEventListener('click', () => {
+    let h = parseInt(document.getElementById('admin-h').value) || 12;
+    const m = parseInt(document.getElementById('admin-m').value) || 0;
+    const s = parseInt(document.getElementById('admin-s').value) || 0;
+    const isPM = ampmBtn.textContent === 'PM';
+    if (isPM && h !== 12) h += 12;
+    if (!isPM && h === 12) h = 0;
+    const targetSec = h * 3600 + m * 60 + s;
+    const now = new Date();
+    const realSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    _timeOffsetSeconds = targetSec - realSec;
+    const pad = (n) => String(n).padStart(2, '0');
+    const dispH = parseInt(document.getElementById('admin-h').value) || 12;
+    document.getElementById('admin-status').textContent = `Set → ${dispH}:${pad(m)}:${pad(s)} ${ampmBtn.textContent}`;
+    updateAll();
+  });
+
+  document.getElementById('admin-reset').addEventListener('click', () => {
+    _timeOffsetSeconds = 0;
+    document.getElementById('admin-h').value = '';
+    document.getElementById('admin-m').value = '';
+    document.getElementById('admin-s').value = '';
+    document.getElementById('admin-status').textContent = 'Real time';
+    updateAll();
+  });
+}
+
 /* --- Cache DOM refs --- */
 let _hmEl, _sEl, _heroTitle, _heroEyebrow;
-let _progressFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
+let _ringFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
 let _hmTextNode = null;
 let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
 
@@ -27,7 +111,7 @@ async function main() {
     _sEl = document.getElementById('cd-s');
     _heroTitle = document.getElementById('hero-title');
     _heroEyebrow = document.querySelector('.hero-eyebrow');
-    _progressFill = document.getElementById('progress-fill');
+    _ringFill = document.getElementById('ring-fill');
     _statusPill = document.getElementById('status-pill');
     _statusLabel = document.getElementById('status-label');
     _schedTitle = document.getElementById('schedule-title');
@@ -44,6 +128,7 @@ async function main() {
       _hmEl.insertBefore(_hmTextNode, _hmEl.firstChild);
     }
 
+    _initAdminPanel();
     updateAll();
     setInterval(updateAll, 1000);
   } catch (e) {
@@ -67,7 +152,7 @@ function calculateGoal() {
   if (!data) return;
   const date = new Date();
   let str = `${date.getMonth() + 1}/${date.getDate()}`;
-  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + _timeOffsetSeconds;
   if (!(str in data)) { str = "base"; }
 
   let arr = data[str];
@@ -126,7 +211,7 @@ function updateAll() {
   calculateGoal();
 
   const date = new Date();
-  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37;
+  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
   let timeleft = Math.max(0, goal - val);
 
   let h = Math.floor(timeleft / 3600);
@@ -195,12 +280,17 @@ function updateAll() {
     }
   }
 
-  /* --- Progress bar --- */
-  if (_progressFill && periodEndTime > periodStartTime) {
+  /* --- Ring --- */
+  if (_ringFill && periodEndTime > periodStartTime) {
     const elapsed = val - periodStartTime;
     const total = periodEndTime - periodStartTime;
-    const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
-    _progressFill.style.width = pct + '%';
+    const pctRemaining = Math.min(1, Math.max(0, 1 - elapsed / total));
+    const arcLen = pctRemaining * 100;
+    _ringFill.style.strokeDasharray = `${arcLen} 100`;
+    _ringFill.style.strokeDashoffset = '0';
+  } else if (_ringFill) {
+    _ringFill.style.strokeDasharray = '0 100';
+    _ringFill.style.strokeDashoffset = '0';
   }
 
   /* --- Schedule header --- */
