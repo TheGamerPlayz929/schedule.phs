@@ -64,7 +64,7 @@
     <div class="grades-scaler" id="grades-scaler">
       <iframe
         id="grades-frame"
-        src="http://localhost:3002/login"
+        src="about:blank"
         scrolling="yes"
         allowtransparency="true"
         title="GradeMelon Grades"
@@ -83,6 +83,10 @@
 <script>
   const scaler = document.getElementById('grades-scaler');
   const frame  = document.getElementById('grades-frame');
+
+  // Use local grademelon when running on localhost, otherwise use live Firebase URL
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  frame.src = isLocal ? 'http://localhost:3002/login' : 'https://schedulephs.web.app/login';
 
   let isFullscreen = false;
   const savedTransforms = [];
