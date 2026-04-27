@@ -1,4 +1,4 @@
-# PHS Student Portal
+# PHS Student Portal 
 
 A student portal for Poolesville High School with three pages, embedding GradeMelon (a StudentVue grade viewer) directly into the site.
 
