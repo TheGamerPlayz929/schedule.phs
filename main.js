@@ -177,7 +177,7 @@ function updateAll() {
       _statusPill.style.display = "none";
     } else {
       _heroEyebrow.style.display = "block";
-      _heroEyebrow.textContent = isTransition ? "Passing" : "Current";
+      _heroEyebrow.textContent = isTransition ? "Passing" : "Currently in";
       _heroTitle.style.display = "block";
       _heroTitle.textContent = period;
 
