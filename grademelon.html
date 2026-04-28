@@ -12,7 +12,6 @@
       width: 100%;
       padding-bottom: 32px;
     }
-
     .grades-scaler {
       position: relative;
       left: 50%;
@@ -23,10 +22,148 @@
       border-radius: 16px;
       background: transparent;
     }
-
     #grades-frame {
       border: none;
       display: block;
+    }
+
+    /* ── Admin shared card ── */
+    .admin-card {
+      max-width: 520px;
+      margin: 0 auto 40px;
+      padding: 40px 44px;
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.25);
+      text-align: center;
+    }
+    .admin-card h2 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .admin-card .subtitle {
+      color: var(--fg-2);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .admin-field {
+      text-align: left;
+      margin-bottom: 16px;
+    }
+    .admin-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-2);
+      margin-bottom: 6px;
+    }
+    .admin-input {
+      width: 100%;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: white;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    .admin-input:focus {
+      border-color: var(--accent);
+      background: rgba(255,255,255,0.08);
+    }
+    .admin-input option { background: #1a1a2e; }
+    .admin-error {
+      font-size: 13px;
+      color: #ff6b6b;
+      margin-bottom: 16px;
+      min-height: 18px;
+    }
+    .admin-btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .admin-btn-primary {
+      flex: 1;
+      padding: 13px 20px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+      font-family: inherit;
+    }
+    .admin-btn-primary:hover { transform: translateY(-2px); }
+    .admin-btn-primary:disabled { opacity: 0.5; cursor: default; transform: none; }
+    .admin-btn-ghost {
+      padding: 13px 20px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: var(--fg-2);
+      font-weight: 500;
+      font-size: 15px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+    .admin-btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: white; }
+
+    /* ── Dashboard extras ── */
+    .admin-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin: 28px 0;
+    }
+    .admin-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 99px;
+      font-size: 13px;
+      color: var(--fg-2);
+      margin-bottom: 28px;
+    }
+    .admin-status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px #4ade80;
+    }
+    .admin-status-dot.override-active {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+    .admin-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-2);
+      text-align: left;
+      margin-bottom: 10px;
+    }
+    .admin-success {
+      font-size: 13px;
+      color: #4ade80;
+      margin-top: 12px;
+      min-height: 18px;
     }
   </style>
 </head>
@@ -60,6 +197,61 @@
     </div>
   </main>
 
+  <!-- ── Secret Admin Login ── -->
+  <section id="admin-login-section" class="fade-up" style="--stagger: 2; display: none;">
+    <div class="admin-card">
+      <h2>Admin Access</h2>
+      <p class="subtitle">Restricted to authorised staff only.</p>
+      <div class="admin-field">
+        <label>Username</label>
+        <input type="text" id="admin-user" class="admin-input" placeholder="Username" autocomplete="off">
+      </div>
+      <div class="admin-field">
+        <label>Password</label>
+        <input type="password" id="admin-pass" class="admin-input" placeholder="Password" autocomplete="off">
+      </div>
+      <div class="admin-error" id="admin-login-error"></div>
+      <div class="admin-btn-row">
+        <button id="admin-login-btn" class="admin-btn-primary" onclick="checkAdminLogin()">Login</button>
+        <button class="admin-btn-ghost" onclick="hideAdminLogin()">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Admin Dashboard ── -->
+  <section id="admin-dashboard" class="fade-up" style="--stagger: 2; display: none;">
+    <div class="admin-card">
+      <h2>Admin Dashboard</h2>
+      <p class="subtitle">Control the school schedule for all users.</p>
+
+      <div class="admin-status-badge">
+        <span class="admin-status-dot" id="override-dot"></span>
+        <span id="override-status-text">Loading current override…</span>
+      </div>
+
+      <hr class="admin-divider">
+
+      <div class="admin-section-label">Set Schedule Override</div>
+      <div class="admin-field">
+        <label>Schedule Type</label>
+        <select id="schedule-select" class="admin-input">
+          <option value="none">— Clear override (use data.json) —</option>
+          <option value="Normal Schedule">Normal Schedule</option>
+          <option value="Advisory">Advisory</option>
+          <option value="Early Release">Early Release</option>
+          <option value="No School">No School</option>
+        </select>
+      </div>
+      <div class="admin-error" id="admin-save-error"></div>
+      <div class="admin-btn-row">
+        <button id="save-btn" class="admin-btn-primary" onclick="saveSchedule()">Update Schedule</button>
+        <button class="admin-btn-ghost" onclick="logoutAdmin()">Logout</button>
+      </div>
+      <div class="admin-success" id="admin-save-success"></div>
+    </div>
+  </section>
+
+  <!-- ── GradeMelon iframe ── -->
   <section class="grades-wrap fade-up" id="grades-wrap" style="--stagger: 2">
     <div class="grades-scaler" id="grades-scaler">
       <iframe
@@ -81,6 +273,7 @@
 
 <script src="main.js"></script>
 <script>
+  /* ── Iframe sizing ── */
   const scaler = document.getElementById('grades-scaler');
   const frame  = document.getElementById('grades-frame');
 
@@ -97,7 +290,6 @@
     frame.style.height = h + 'px';
     scaler.style.height = h + 'px';
   }
-
   setSize();
   new ResizeObserver(setSize).observe(scaler);
   window.addEventListener('resize', setSize);
@@ -107,51 +299,163 @@
     isFullscreen = true;
     let el = frame.parentElement;
     while (el && el !== document.body) {
-      savedTransforms.push({
-        el,
-        transform: el.style.transform,
-        willChange: el.style.willChange,
-        animation: el.style.animation,
-        opacity: el.style.opacity,
-      });
-      el.style.transform = "none";
-      el.style.willChange = "auto";
-      el.style.animation = "none";
-      el.style.opacity = "1";
+      savedTransforms.push({ el, transform: el.style.transform, willChange: el.style.willChange, animation: el.style.animation, opacity: el.style.opacity });
+      el.style.transform = 'none'; el.style.willChange = 'auto';
+      el.style.animation = 'none'; el.style.opacity = '1';
       el = el.parentElement;
     }
-    frame.style.position = "fixed";
-    frame.style.top = "0";
-    frame.style.left = "0";
-    frame.style.width = "100vw";
-    frame.style.height = "100vh";
-    frame.style.zIndex = "99999";
-    frame.style.borderRadius = "0";
+    frame.style.cssText += ';position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;border-radius:0';
   }
-
   function exitFullscreen() {
     if (!isFullscreen) return;
     isFullscreen = false;
-    savedTransforms.forEach(s => {
-      s.el.style.transform = s.transform;
-      s.el.style.willChange = s.willChange;
-      s.el.style.animation = s.animation;
-      s.el.style.opacity = s.opacity;
-    });
+    savedTransforms.forEach(s => { s.el.style.transform = s.transform; s.el.style.willChange = s.willChange; s.el.style.animation = s.animation; s.el.style.opacity = s.opacity; });
     savedTransforms.length = 0;
-    frame.style.position = "";
-    frame.style.top = "";
-    frame.style.left = "";
-    frame.style.zIndex = "";
-    frame.style.borderRadius = "";
+    frame.style.position = ''; frame.style.top = ''; frame.style.left = '';
+    frame.style.zIndex = ''; frame.style.borderRadius = '';
     setSize();
   }
-
-  window.addEventListener("message", (e) => {
+  window.addEventListener('message', (e) => {
     if (!e.data) return;
-    if (e.data.type === "modalOpen") goFullscreen();
-    if (e.data.type === "modalClose") exitFullscreen();
+    if (e.data.type === 'modalOpen') goFullscreen();
+    if (e.data.type === 'modalClose') exitFullscreen();
   });
+
+  /* ── Hashed credentials (SHA-256, never plaintext in source) ──
+     Username: ADMIN  → 835d6dc88b708bc646d6db82c853ef4182fabbd4a8de59c213f2b5ab3ae7d9be
+     Password: change via ADMIN_PASSWORD_HASH env var on Railway
+     Client hash below must match SHA-256 of the plaintext password.       */
+  const _UH = '835d6dc88b708bc646d6db82c853ef4182fabbd4a8de59c213f2b5ab3ae7d9be';
+  const _PH = '0be64ae89ddd24e225434de95d501711339baeee18f009ba9b4369af27d30d60';
+
+  const BACKEND = isLocal
+    ? 'http://localhost:3000'
+    : 'https://phs-grades-backend.onrender.com';
+
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  /* Keep plaintext password in memory only after successful login
+     so we can send it as the auth token to the backend.           */
+  let _adminToken = null;
+
+  /* ── Hidden login trigger: type "ADMIN" in username and focus password ── */
+  document.getElementById('admin-user').addEventListener('input', function() {
+    if (this.value === 'ADMIN') {
+      document.getElementById('admin-login-section').style.display = 'block';
+      document.getElementById('grades-wrap').style.display = 'none';
+    }
+  });
+
+  /* Also expose a keyboard shortcut: Ctrl+Shift+A on the page */
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+      const ls = document.getElementById('admin-login-section');
+      if (ls.style.display === 'none') {
+        ls.style.display = 'block';
+        document.getElementById('grades-wrap').style.display = 'none';
+      }
+    }
+  });
+
+  function hideAdminLogin() {
+    document.getElementById('admin-login-section').style.display = 'none';
+    document.getElementById('grades-wrap').style.display = 'block';
+    document.getElementById('admin-user').value = '';
+    document.getElementById('admin-pass').value = '';
+    document.getElementById('admin-login-error').textContent = '';
+  }
+
+  async function checkAdminLogin() {
+    const btn = document.getElementById('admin-login-btn');
+    const errEl = document.getElementById('admin-login-error');
+    const user = document.getElementById('admin-user').value.trim();
+    const pass = document.getElementById('admin-pass').value;
+    btn.disabled = true;
+    errEl.textContent = '';
+    try {
+      const [uh, ph] = await Promise.all([sha256(user), sha256(pass)]);
+      if (uh === _UH && ph === _PH) {
+        _adminToken = pass;
+        showDashboard();
+      } else {
+        errEl.textContent = 'Invalid credentials.';
+      }
+    } catch(e) {
+      errEl.textContent = 'Error during login. Try again.';
+    }
+    btn.disabled = false;
+  }
+
+  /* Enter key submits login */
+  document.getElementById('admin-pass').addEventListener('keydown', e => { if (e.key === 'Enter') checkAdminLogin(); });
+
+  async function showDashboard() {
+    document.getElementById('admin-login-section').style.display = 'none';
+    document.getElementById('admin-dashboard').style.display = 'block';
+    await refreshOverrideStatus();
+  }
+
+  async function refreshOverrideStatus() {
+    const dot = document.getElementById('override-dot');
+    const txt = document.getElementById('override-status-text');
+    try {
+      const res = await fetch(`${BACKEND}/schedule-override`);
+      const json = await res.json();
+      if (json.override) {
+        dot.classList.add('override-active');
+        txt.textContent = `Override active: ${json.override.type}`;
+        document.getElementById('schedule-select').value = json.override.type;
+      } else {
+        dot.classList.remove('override-active');
+        txt.textContent = 'No override — using data.json schedule';
+        document.getElementById('schedule-select').value = 'none';
+      }
+    } catch(e) {
+      txt.textContent = 'Could not reach server.';
+    }
+  }
+
+  async function saveSchedule() {
+    const btn = document.getElementById('save-btn');
+    const errEl = document.getElementById('admin-save-error');
+    const sucEl = document.getElementById('admin-save-success');
+    const type = document.getElementById('schedule-select').value;
+    btn.disabled = true;
+    errEl.textContent = '';
+    sucEl.textContent = '';
+    try {
+      const res = await fetch(`${BACKEND}/schedule-override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, token: _adminToken })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        sucEl.textContent = type === 'none'
+          ? 'Override cleared. Site will use data.json schedule.'
+          : `Schedule set to "${type}". All users will see this within 30 s.`;
+        await refreshOverrideStatus();
+      } else {
+        errEl.textContent = json.error || 'Failed to update.';
+      }
+    } catch(e) {
+      errEl.textContent = 'Network error. Check connection.';
+    }
+    btn.disabled = false;
+  }
+
+  function logoutAdmin() {
+    _adminToken = null;
+    document.getElementById('admin-dashboard').style.display = 'none';
+    document.getElementById('grades-wrap').style.display = 'block';
+    document.getElementById('admin-user').value = '';
+    document.getElementById('admin-pass').value = '';
+    document.getElementById('admin-save-success').textContent = '';
+    document.getElementById('admin-save-error').textContent = '';
+  }
 </script>
 </body>
 </html>

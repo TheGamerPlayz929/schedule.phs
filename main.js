@@ -15,6 +15,40 @@ let isTransition = false;
 /* --- Admin time override (localhost only) --- */
 let _timeOffsetSeconds = 0; // added to real time
 
+/* --- Schedule override (set by admin panel, synced from backend) --- */
+let _scheduleOverride = null; // { type: string, timestamp: number } | null
+
+const _BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://phs-grades-backend.onrender.com';
+
+async function _pollScheduleOverride() {
+  try {
+    const res = await fetch(`${_BACKEND_URL}/schedule-override`);
+    const json = await res.json();
+    _scheduleOverride = json.override || null;
+    if (_scheduleOverride) {
+      localStorage.setItem('phs_schedule_override', JSON.stringify(_scheduleOverride));
+    } else {
+      localStorage.removeItem('phs_schedule_override');
+    }
+  } catch (e) {
+    // Fallback to localStorage when offline
+    const stored = localStorage.getItem('phs_schedule_override');
+    _scheduleOverride = stored ? JSON.parse(stored) : null;
+  }
+}
+
+function _getOverrideData(targetType) {
+  if (!data) return null;
+  for (const key of Object.keys(data)) {
+    if (key !== 'base' && Array.isArray(data[key]) && data[key][0] === targetType) {
+      return data[key];
+    }
+  }
+  return null;
+}
+
 function _isLocalhost() {
   return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 }
@@ -129,6 +163,8 @@ async function main() {
     }
 
     _initAdminPanel();
+    await _pollScheduleOverride();
+    setInterval(_pollScheduleOverride, 30000); // re-check every 30 s
     updateAll();
     setInterval(updateAll, 1000);
   } catch (e) {
@@ -156,6 +192,11 @@ function calculateGoal() {
   if (!(str in data)) { str = "base"; }
 
   let arr = data[str];
+  // Apply admin schedule override if one is active
+  if (_scheduleOverride && _scheduleOverride.type) {
+    const overrideArr = _getOverrideData(_scheduleOverride.type);
+    if (overrideArr) arr = overrideArr;
+  }
   scheduleType = arr[0];
   let periods = arr[1];
   let largestUnder = -1;
