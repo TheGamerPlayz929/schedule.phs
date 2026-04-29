@@ -188,7 +188,7 @@ function calculateGoal() {
   if (!data) return;
   const date = new Date();
   let str = `${date.getMonth() + 1}/${date.getDate()}`;
-  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + _timeOffsetSeconds;
+  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
   if (!(str in data)) { str = "base"; }
 
   let arr = data[str];
@@ -226,7 +226,7 @@ function calculateGoal() {
     periodStartTime = 0;
     periodEndTime = schoolStart;
     isBeforeSchool = true;
-  } else if (periods[largestUnder][0] - val < 0 && largestUnder != largest) {
+  } else if (periods[largestUnder][0] - val <= 0 && largestUnder != largest) {
     for (let k in periods) {
       let key = parseInt(k);
       if (key > largestUnder) { goal = key; break; }

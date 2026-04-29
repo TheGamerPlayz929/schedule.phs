@@ -1,12 +1,12 @@
 // Simple static file server for the PHS schedule site.
 // Run: node local-server.js
-// Then open: http://localhost:3000
+// Then open: http://localhost:8080
 
 const http = require("http");
 const fs   = require("fs");
 const path = require("path");
 
-const PORT = 3000;
+const PORT = 8080;
 const ROOT = __dirname;
 
 const MIME = {
