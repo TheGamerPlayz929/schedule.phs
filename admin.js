@@ -1,6 +1,7 @@
 /* PHS Schedule — Admin dashboard
- * Talks to the backend admin API at /admin/* and /site-settings.
- * Designed to be fully driven by `SCHEMA` so adding a new field is a one-liner.
+ * Schema-driven settings editor talking to /admin/* and /site-settings.
+ * Preview overlay pipes the *draft* into the iframe via postMessage so admins
+ * can verify changes before publishing.
  */
 (() => {
   'use strict';
@@ -16,75 +17,104 @@
     defaults: null,
     draft: null,       // working copy with unsaved edits
     activeTab: 'branding',
-    search: ''
+    search: '',
+    previewMode: 'draft' // 'draft' | 'live'
+  };
+
+  // ── SVG icons (Lucide-style stroke icons, no emoji) ────────────────────
+  const ICON = {
+    branding:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>`,
+    nav:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>`,
+    hero:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="M4 10h16"/></svg>`,
+    announce:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l13-7v16L3 13zM3 11v2"/><path d="M16 8a4 4 0 010 8"/></svg>`,
+    schedule:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>`,
+    bell:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9z"/><path d="M10 21a2 2 0 004 0"/></svg>`,
+    grades:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>`,
+    grademelon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18"/></svg>`,
+    theme:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a4 4 0 010 8 4 4 0 010 8"/></svg>`,
+    footer:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v10H4z"/><path d="M4 13h16"/></svg>`,
+    countdown:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 3h6"/></svg>`,
+    privacy:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-4 8-8 9-4-1-8-4-8-9V7z"/></svg>`,
+    audit:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>`,
+    search:      `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></svg>`,
+    eye:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
+    logout:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>`,
+    refresh:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0115-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15 6.7L3 16M3 21v-5h5"/></svg>`,
+    close:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M6 18 18 6"/></svg>`,
+    plus:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    up:          `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`,
+    down:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
+    trash:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>`,
+    upload:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>`,
   };
 
   // ── Schema (drives the entire UI) ──────────────────────────────────────
-  // Each tab has fields. Fields target a dotted path on the settings object.
   const SCHEMA = [
-    {
-      id: 'branding', label: 'Branding', icon: '🪪',
+    { id: 'branding',    label: 'Branding',         icon: 'branding',
       sub: 'Site title, logo, favicon — visible on every page.',
       groups: [{
         title: 'Identity', fields: [
           { path: 'branding.siteTitle',       label: 'Site title (browser tab)', kind: 'text', max: 200 },
           { path: 'branding.siteDescription', label: 'Meta description',         kind: 'text', max: 300 },
-        ]
-      },{
+        ]},{
         title: 'Logo', fields: [
           { path: 'branding.logoSrc',  label: 'Logo image', kind: 'image', help: 'PNG / JPG / SVG, ≤ 4 MB' },
           { path: 'branding.logoAlt',  label: 'Logo alt text', kind: 'text', max: 120 },
           { path: 'branding.logoLink', label: 'Logo click-through URL', kind: 'url' },
-        ]
-      },{
+        ]},{
         title: 'Favicon', fields: [
           { path: 'branding.favicon', label: 'Favicon (ico / png)', kind: 'image' }
-        ]
-      }]
+        ]}]
     },
-    {
-      id: 'nav', label: 'Navigation', icon: '🧭',
+    { id: 'nav',          label: 'Navigation',       icon: 'nav',
       sub: 'Links shown in the top navigation bar of every page.',
       groups: [{ title: 'Nav items', custom: 'navEditor' }]
     },
-    {
-      id: 'hero', label: 'Page Headers', icon: '🎯',
+    { id: 'hero',         label: 'Page Headers',     icon: 'hero',
       sub: 'Hero text on each page.',
       groups: [{
         title: 'Schedule page', fields: [
           { path: 'hero.schedulePageEyebrow',        label: 'Eyebrow above period name', kind: 'text', max: 80 },
           { path: 'hero.schedulePageStatusFallback', label: 'Status pill loading text', kind: 'text', max: 60 },
-        ]
-      },{
+        ]},{
         title: 'Other pages', fields: [
           { path: 'hero.announcementsPageTitle', label: 'Announcements title', kind: 'text', max: 80 },
           { path: 'hero.gradesPageTitle',        label: 'Grades title',        kind: 'text', max: 80 },
-        ]
-      }]
+        ]}]
     },
-    {
-      id: 'announcements', label: 'Announcements', icon: '📣',
+    { id: 'announcements',label: 'Announcements',    icon: 'announce',
       sub: 'Cards shown on the announcements page.',
       groups: [{ title: 'Cards', custom: 'announcementsEditor' }]
     },
-    {
-      id: 'schedule', label: 'Schedule Override', icon: '📅',
+    { id: 'bellSchedules',label: 'Bell Schedule',    icon: 'bell',
+      sub: 'Edit individual periods for each schedule type. Empty templates fall back to data.json.',
+      groups: [{ title: 'Templates', custom: 'bellEditor' }]
+    },
+    { id: 'schedule',     label: 'Schedule Override',icon: 'schedule',
       sub: 'Force a schedule type for all users (overrides data.json).',
       groups: [{ title: 'Override', custom: 'scheduleOverrideEditor' }]
     },
-    {
-      id: 'grades', label: 'Grades Iframe', icon: '🍉',
+    { id: 'grades',       label: 'Grades Iframe',    icon: 'grades',
       sub: 'Where the embedded GradeMelon iframe loads from.',
       groups: [{
         title: 'Iframe URLs', fields: [
           { path: 'grades.iframeUrlLocal', label: 'Local-development URL', kind: 'url', help: 'Used when site runs on localhost.' },
           { path: 'grades.iframeUrlProd',  label: 'Production URL',         kind: 'url' },
           { path: 'grades.pageTitle',      label: 'Browser-tab title',      kind: 'text' },
-        ]
+        ]}]
+    },
+    { id: 'gradeMelon',   label: 'GradeMelon Copy',  icon: 'grademelon',
+      sub: 'Text rendered inside the GradeMelon iframe (privacy FAQ, button labels).',
+      groups: [{
+        title: 'Privacy / Safety FAQ', fields: [
+          { path: 'gradeMelon.privacyButtonLabel', label: 'Link button label', kind: 'text' },
+          { path: 'gradeMelon.privacyTitle',       label: 'Modal title',       kind: 'text' },
+          { path: 'gradeMelon.privacyDoneLabel',   label: 'Close-button label',kind: 'text' },
+        ]},{
+        title: 'Modal paragraphs', custom: 'privacyParagraphsEditor'
       }]
     },
-    {
-      id: 'theme', label: 'Theme Colors', icon: '🎨',
+    { id: 'theme',        label: 'Theme Colors',     icon: 'theme',
       sub: 'CSS variables applied site-wide (--accent, --bg-1, etc.).',
       groups: [{
         title: 'Palette', fields: [
@@ -94,42 +124,26 @@
           { path: 'theme.bg2',     label: 'Background inner', kind: 'color' },
           { path: 'theme.fg1',     label: 'Foreground',       kind: 'color' },
           { path: 'theme.fg2',     label: 'Muted foreground', kind: 'color' },
-        ]
-      }]
+        ]}]
     },
-    {
-      id: 'footer', label: 'Footer', icon: '🪧',
-      sub: 'Footer copy, feedback link, support email.',
+    { id: 'footer',       label: 'Footer',           icon: 'footer',
+      sub: 'Footer copy, feedback link, support contact.',
       groups: [{
         title: 'Footer', fields: [
           { path: 'footer.copyright',     label: 'Copyright line',  kind: 'text' },
           { path: 'footer.feedbackUrl',   label: 'Feedback URL',    kind: 'url' },
           { path: 'footer.feedbackLabel', label: 'Feedback label',  kind: 'text' },
-          { path: 'footer.supportEmail',  label: 'Support email',   kind: 'email' },
-        ]
-      }]
+          { path: 'footer.supportEmail',  label: 'Support contact (any text or email)', kind: 'text', help: 'Email addresses become a clickable mailto: link automatically. Any other text is rendered as plain text.' },
+        ]}]
     },
-    {
-      id: 'countdown', label: 'Countdown copy', icon: '⏱️',
+    { id: 'countdown',    label: 'Countdown',        icon: 'countdown',
       sub: 'Labels around the countdown ring.',
       groups: [{
         title: 'Labels', fields: [
           { path: 'countdown.minSuffix', label: 'Minute suffix (e.g. "m")', kind: 'text', max: 6 }
-        ]
-      }]
+        ]}]
     },
-    {
-      id: 'privacy', label: 'Privacy / Support', icon: '🔒',
-      sub: 'Copy for the GradeMelon Privacy & Safety FAQ.',
-      groups: [{
-        title: 'FAQ copy', fields: [
-          { path: 'privacy.faqTitle', label: 'Modal title',  kind: 'text' },
-          { path: 'privacy.faqBody',  label: 'Modal body',   kind: 'textarea' },
-        ]
-      }]
-    },
-    {
-      id: 'audit', label: 'Audit Log', icon: '📜',
+    { id: 'audit',        label: 'Audit Log',        icon: 'audit',
       sub: 'Recent admin changes — read only.',
       groups: [{ title: 'Recent events', custom: 'auditLog' }]
     }
@@ -138,31 +152,38 @@
   // ── Helpers ────────────────────────────────────────────────────────────
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-
-  function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+  const deepClone = (o) => JSON.parse(JSON.stringify(o));
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   function get(obj, path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj); }
   function set(obj, path, val) {
     const parts = path.split('.');
     let cur = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-      cur[parts[i]] = cur[parts[i]] ?? {};
-      cur = cur[parts[i]];
-    }
+    for (let i = 0; i < parts.length - 1; i++) { cur[parts[i]] = cur[parts[i]] ?? {}; cur = cur[parts[i]]; }
     cur[parts[parts.length - 1]] = val;
   }
-  function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
   function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-
-  function authHeaders(extra = {}) {
-    return Object.assign({ 'Authorization': 'Bearer ' + state.token }, extra);
+  // seconds-from-midnight ⇄ "HH:MM"
+  function secsToHHMM(s) {
+    s = Math.max(0, Math.min(86399, parseInt(s, 10) || 0));
+    const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+  function hhmmToSecs(t) {
+    const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const h = +m[1], mm = +m[2];
+    if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
+    return h * 3600 + mm * 60;
   }
 
   async function api(path, opts = {}) {
     const init = Object.assign({}, opts);
-    init.headers = Object.assign({}, opts.headers || {}, opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {});
-    if (state.token) Object.assign(init.headers, { Authorization: 'Bearer ' + state.token });
+    init.headers = Object.assign({},
+      opts.headers || {},
+      opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {});
+    if (state.token) init.headers['Authorization'] = 'Bearer ' + state.token;
     const res = await fetch(BACKEND + path, init);
     if (res.status === 401) {
       state.token = null;
@@ -184,11 +205,11 @@
     el.className = 'admin-toast ' + kind;
     el.textContent = msg;
     host.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, ms - 300);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .25s'; }, ms - 250);
     setTimeout(() => el.remove(), ms);
   }
 
-  // ── Login ──────────────────────────────────────────────────────────────
+  // ── Login / boot ───────────────────────────────────────────────────────
   function showLogin(errorMsg) {
     $('#app-shell').classList.add('hidden');
     $('#login-shell').classList.remove('hidden');
@@ -222,7 +243,7 @@
     } catch (ex) {
       err.textContent = ex.message;
     } finally {
-      btn.disabled = false; btn.textContent = 'Sign In';
+      btn.disabled = false; btn.textContent = 'Sign in';
     }
   });
 
@@ -233,10 +254,8 @@
     showLogin('Signed out.');
   });
 
-  // ── Boot ───────────────────────────────────────────────────────────────
   async function bootApp() {
     try {
-      // Validate token before showing the shell
       await api('/admin/whoami');
       const [settings, defaults] = await Promise.all([
         fetch(BACKEND + '/site-settings').then(r => r.json()),
@@ -254,12 +273,15 @@
       showLogin('Sign in to continue.');
     }
   }
-
   function pingConnection() {
     fetch(BACKEND + '/health')
       .then(r => r.ok ? r.json() : null)
-      .then(j => { $('#conn-status').textContent = j?.ok ? 'Backend online · ' + new URL(BACKEND).host : 'Backend reachable but not OK'; })
-      .catch(() => { $('#conn-status').textContent = 'Backend offline'; });
+      .then(j => {
+        const el = $('#conn-status');
+        if (j?.ok) { el.classList.remove('offline'); el.textContent = 'Backend online · ' + new URL(BACKEND).host; }
+        else { el.classList.add('offline'); el.textContent = 'Backend reachable but not OK'; }
+      })
+      .catch(() => { const el = $('#conn-status'); el.classList.add('offline'); el.textContent = 'Backend offline'; });
   }
 
   // ── Sidebar / tabs ─────────────────────────────────────────────────────
@@ -270,7 +292,7 @@
       const b = document.createElement('button');
       b.className = 'admin-tab-btn' + (tab.id === state.activeTab ? ' active' : '');
       b.dataset.tab = tab.id;
-      b.innerHTML = `<span class="admin-tab-icon">${tab.icon}</span><span>${escapeHtml(tab.label)}</span>`;
+      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span>${escapeHtml(tab.label)}</span>`;
       b.addEventListener('click', () => { state.activeTab = tab.id; renderSidebar(); renderActiveTab(); });
       nav.appendChild(b);
     }
@@ -278,12 +300,8 @@
 
   // ── Field rendering ────────────────────────────────────────────────────
   function fieldId(path) { return 'fld_' + path.replace(/\./g, '_'); }
-  function isModified(path) {
-    return !eq(get(state.settings, path), get(state.draft, path));
-  }
-  function isDefault(path) {
-    return eq(get(state.draft, path), get(state.defaults, path));
-  }
+  function isModified(path) { return !eq(get(state.settings, path), get(state.draft, path)); }
+  function isDefault(path) { return eq(get(state.draft, path), get(state.defaults, path)); }
 
   function renderField(field) {
     const wrap = document.createElement('div');
@@ -295,9 +313,8 @@
     head.className = 'admin-field-row';
     head.innerHTML = `<label for="${fieldId(field.path)}">${escapeHtml(field.label)}</label>`;
     const reset = document.createElement('button');
-    reset.className = 'admin-field-reset';
-    reset.type = 'button';
-    reset.textContent = isDefault(field.path) ? '· default ·' : 'reset to default';
+    reset.className = 'admin-field-reset'; reset.type = 'button';
+    reset.textContent = isDefault(field.path) ? 'default' : 'reset to default';
     reset.disabled = isDefault(field.path);
     reset.addEventListener('click', () => {
       set(state.draft, field.path, deepClone(get(state.defaults, field.path)));
@@ -310,39 +327,33 @@
 
     if (field.kind === 'textarea') {
       const ta = document.createElement('textarea');
-      ta.className = 'admin-textarea';
-      ta.id = fieldId(field.path);
+      ta.className = 'admin-textarea'; ta.id = fieldId(field.path);
       ta.value = value ?? '';
-      ta.addEventListener('input', () => { set(state.draft, field.path, ta.value); markDirty(); refreshDirtyMarkers(); });
+      ta.addEventListener('input', () => onFieldChange(field.path, ta.value));
       wrap.appendChild(ta);
     } else if (field.kind === 'color') {
       const row = document.createElement('div');
       row.className = 'admin-color-row';
       const hex = document.createElement('input');
-      hex.type = 'color';
-      hex.value = (value || '#000000').slice(0, 7);
+      hex.type = 'color'; hex.value = (value || '#000000').slice(0, 7);
       const text = document.createElement('input');
-      text.className = 'admin-input';
-      text.id = fieldId(field.path);
-      text.value = value || '';
-      function commit(v) { set(state.draft, field.path, v); markDirty(); refreshDirtyMarkers(); }
-      hex.addEventListener('input', () => { text.value = hex.value; commit(hex.value); });
-      text.addEventListener('input', () => { if (/^#[0-9a-fA-F]{3,8}$/.test(text.value)) hex.value = text.value.slice(0,7); commit(text.value); });
+      text.className = 'admin-input mono'; text.id = fieldId(field.path); text.value = value || '';
+      hex.addEventListener('input', () => { text.value = hex.value; onFieldChange(field.path, hex.value); });
+      text.addEventListener('input', () => { if (/^#[0-9a-fA-F]{3,8}$/.test(text.value)) hex.value = text.value.slice(0,7); onFieldChange(field.path, text.value); });
       row.append(hex, text);
       wrap.appendChild(row);
     } else if (field.kind === 'image') {
       wrap.appendChild(renderImageField(field, value));
     } else {
       const input = document.createElement('input');
-      input.className = 'admin-input';
+      input.className = 'admin-input' + (field.kind === 'url' ? ' mono' : '');
       input.id = fieldId(field.path);
-      input.type = field.kind === 'email' ? 'email' : 'text';
+      input.type = 'text';
       if (field.max) input.maxLength = field.max;
       input.value = value ?? '';
-      input.addEventListener('input', () => { set(state.draft, field.path, input.value); markDirty(); refreshDirtyMarkers(); });
+      input.addEventListener('input', () => onFieldChange(field.path, input.value));
       wrap.appendChild(input);
     }
-
     if (field.help) {
       const h = document.createElement('div');
       h.className = 'admin-field-help';
@@ -351,69 +362,62 @@
     }
     return wrap;
   }
+  function onFieldChange(path, value) {
+    set(state.draft, path, value);
+    markDirty();
+    refreshDirtyMarkers();
+    pushPreview();
+  }
 
   function renderImageField(field, value) {
     const host = document.createElement('div');
     const preview = document.createElement('div');
     preview.className = 'admin-image-preview';
-    function urlOf(v) {
-      if (!v) return '';
-      if (/^(https?:|\/uploads\/)/.test(v)) return v;
-      // Relative file in schedule.phs-main
-      return v;
-    }
     function paint() {
       const v = get(state.draft, field.path) || '';
       preview.innerHTML = `
-        <img src="${escapeHtml(urlOf(v))}" alt="" onerror="this.style.opacity=.2">
+        <img src="${escapeHtml(v)}" alt="" onerror="this.style.opacity=.2">
         <div class="info">
           <div class="name">${escapeHtml(v) || '— no image set —'}</div>
-          <div class="meta">Click "Choose file" to upload, or paste a URL/path below.</div>
+          <div class="meta">Choose a file to upload, or paste a URL/path.</div>
         </div>
       `;
     }
     paint();
     const text = document.createElement('input');
-    text.className = 'admin-input';
+    text.className = 'admin-input mono';
     text.style.marginTop = '10px';
     text.value = value || '';
     text.placeholder = 'phs-logo.png · /uploads/123-logo.svg · https://…';
-    text.addEventListener('input', () => { set(state.draft, field.path, text.value); markDirty(); paint(); refreshDirtyMarkers(); });
+    text.addEventListener('input', () => { onFieldChange(field.path, text.value); paint(); });
 
     const file = document.createElement('input');
-    file.type = 'file';
-    file.accept = 'image/*';
-    file.style.display = 'none';
+    file.type = 'file'; file.accept = 'image/*'; file.style.display = 'none';
     file.addEventListener('change', async () => {
       if (!file.files?.length) return;
       const fd = new FormData();
       fd.append('file', file.files[0]);
       try {
-        const res = await fetch(BACKEND + '/admin/upload', { method: 'POST', headers: authHeaders(), body: fd });
+        const res = await fetch(BACKEND + '/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + state.token }, body: fd });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Upload failed');
         text.value = BACKEND + json.url;
-        set(state.draft, field.path, text.value);
-        markDirty(); paint(); refreshDirtyMarkers();
+        onFieldChange(field.path, text.value); paint();
         toast('Uploaded ' + json.filename);
       } catch (e) { toast(e.message, 'error'); }
       file.value = '';
     });
-
     const btnRow = document.createElement('div');
     btnRow.style.marginTop = '8px';
-    btnRow.style.display = 'flex';
-    btnRow.style.gap = '8px';
+    btnRow.style.display = 'flex'; btnRow.style.gap = '8px';
     const upBtn = document.createElement('button');
-    upBtn.type = 'button';
-    upBtn.className = 'admin-btn admin-btn-sm';
-    upBtn.textContent = 'Choose file…';
+    upBtn.type = 'button'; upBtn.className = 'admin-btn admin-btn-sm';
+    upBtn.innerHTML = ICON.upload + '<span>Choose file…</span>';
     upBtn.addEventListener('click', () => file.click());
     const clrBtn = document.createElement('button');
-    clrBtn.type = 'button';
-    clrBtn.className = 'admin-btn admin-btn-sm admin-btn-ghost';
+    clrBtn.type = 'button'; clrBtn.className = 'admin-btn admin-btn-sm admin-btn-ghost';
     clrBtn.textContent = 'Clear';
-    clrBtn.addEventListener('click', () => { text.value = ''; set(state.draft, field.path, ''); markDirty(); paint(); refreshDirtyMarkers(); });
+    clrBtn.addEventListener('click', () => { text.value = ''; onFieldChange(field.path, ''); paint(); });
     btnRow.append(upBtn, clrBtn, file);
 
     host.append(preview, text, btnRow);
@@ -423,8 +427,8 @@
   // ── Custom editors ─────────────────────────────────────────────────────
   function renderNavEditor() {
     const host = document.createElement('div');
-    const items = state.draft.nav?.items || [];
-
+    state.draft.nav = state.draft.nav || { items: [] };
+    const items = state.draft.nav.items;
     function paint() {
       host.innerHTML = '';
       items.forEach((it, i) => {
@@ -434,40 +438,33 @@
           <div class="admin-list-item-head">
             <span class="handle">Item ${i + 1}</span>
             <div class="admin-list-item-actions">
-              <button class="admin-btn admin-btn-sm" data-act="up"   ${i===0 ? 'disabled' : ''}>↑</button>
-              <button class="admin-btn admin-btn-sm" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>↓</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger" data-act="del">Delete</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Up" data-act="up"   ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Down" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" title="Remove" data-act="del">${ICON.trash}</button>
             </div>
           </div>
           <div class="admin-grid-2">
             <div class="admin-field" style="margin-bottom:0">
-              <label>Label</label>
+              <div class="admin-field-row"><label>Label</label></div>
               <input class="admin-input" data-field="label" value="${escapeHtml(it.label || '')}" maxlength="60">
             </div>
             <div class="admin-field" style="margin-bottom:0">
-              <label>Href</label>
-              <input class="admin-input" data-field="href" value="${escapeHtml(it.href || '')}" maxlength="500">
+              <div class="admin-field-row"><label>Href</label></div>
+              <input class="admin-input mono" data-field="href" value="${escapeHtml(it.href || '')}" maxlength="500">
             </div>
-          </div>
-        `;
-        card.querySelectorAll('[data-field]').forEach(inp => {
-          inp.addEventListener('input', () => { it[inp.dataset.field] = inp.value; markDirty(); });
-        });
-        card.querySelector('[data-act=up]').addEventListener('click', () => { items.splice(i-1,0,items.splice(i,1)[0]); markDirty(); paint(); });
-        card.querySelector('[data-act=down]').addEventListener('click', () => { items.splice(i+1,0,items.splice(i,1)[0]); markDirty(); paint(); });
-        card.querySelector('[data-act=del]').addEventListener('click', () => { items.splice(i,1); markDirty(); paint(); });
+          </div>`;
+        card.querySelectorAll('[data-field]').forEach(inp => inp.addEventListener('input', () => { it[inp.dataset.field] = inp.value; markDirty(); pushPreview(); }));
+        card.querySelector('[data-act=up]').addEventListener('click', () => { items.splice(i-1,0,items.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
+        card.querySelector('[data-act=down]').addEventListener('click', () => { items.splice(i+1,0,items.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
+        card.querySelector('[data-act=del]').addEventListener('click', () => { items.splice(i,1); markDirty(); paint(); pushPreview(); });
         host.appendChild(card);
       });
-
       const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'admin-btn admin-btn-sm';
-      addBtn.textContent = '+ Add nav item';
-      addBtn.addEventListener('click', () => { items.push({ label: 'New', href: '#' }); markDirty(); paint(); });
+      addBtn.type = 'button'; addBtn.className = 'admin-btn admin-btn-sm';
+      addBtn.innerHTML = ICON.plus + '<span>Add nav item</span>';
+      addBtn.addEventListener('click', () => { items.push({ label: 'New', href: '#' }); markDirty(); paint(); pushPreview(); });
       host.appendChild(addBtn);
     }
-    state.draft.nav = state.draft.nav || { items: [] };
-    state.draft.nav.items = items;
     paint();
     return host;
   }
@@ -476,7 +473,6 @@
     const host = document.createElement('div');
     state.draft.announcements = state.draft.announcements || { items: [] };
     const items = state.draft.announcements.items;
-
     function paint() {
       host.innerHTML = '';
       items.forEach((card, i) => {
@@ -486,22 +482,21 @@
           <div class="admin-list-item-head">
             <span class="handle">Card ${i + 1}</span>
             <div class="admin-list-item-actions">
-              <button class="admin-btn admin-btn-sm" data-act="up"   ${i===0 ? 'disabled' : ''}>↑</button>
-              <button class="admin-btn admin-btn-sm" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>↓</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger" data-act="del">Delete</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="up"   ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" data-act="del">${ICON.trash}</button>
             </div>
           </div>
           <div class="admin-field">
-            <label>Title</label>
+            <div class="admin-field-row"><label>Title</label></div>
             <input class="admin-input" data-card-field="title" value="${escapeHtml(card.title || '')}" maxlength="200">
           </div>
           <div class="admin-field" style="margin-bottom:8px">
-            <label>Bullet points</label>
+            <div class="admin-field-row"><label>Bullets</label></div>
             <div data-bullets></div>
           </div>
-          <button class="admin-btn admin-btn-sm" data-act="add-bullet">+ Add bullet</button>
-        `;
-        wrap.querySelector('[data-card-field=title]').addEventListener('input', e => { card.title = e.target.value; markDirty(); });
+          <button class="admin-btn admin-btn-sm" data-act="add-bullet">${ICON.plus}<span>Add bullet</span></button>`;
+        wrap.querySelector('[data-card-field=title]').addEventListener('input', e => { card.title = e.target.value; markDirty(); pushPreview(); });
         const bulletsHost = wrap.querySelector('[data-bullets]');
         function paintBullets() {
           bulletsHost.innerHTML = '';
@@ -510,31 +505,28 @@
             row.className = 'admin-bullet-row';
             row.innerHTML = `
               <input class="admin-input" value="${escapeHtml(b)}" maxlength="2000">
-              <button class="admin-btn admin-btn-sm admin-btn-ghost" type="button">↑</button>
-              <button class="admin-btn admin-btn-sm admin-btn-ghost" type="button">↓</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger" type="button">✕</button>
-            `;
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" type="button">${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" type="button">${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" type="button">${ICON.trash}</button>`;
             const [inp, up, dn, del] = row.children;
-            inp.addEventListener('input', () => { card.bullets[j] = inp.value; markDirty(); });
-            up.addEventListener('click', () => { if (j>0) { card.bullets.splice(j-1,0,card.bullets.splice(j,1)[0]); markDirty(); paintBullets(); } });
-            dn.addEventListener('click', () => { if (j<card.bullets.length-1) { card.bullets.splice(j+1,0,card.bullets.splice(j,1)[0]); markDirty(); paintBullets(); } });
-            del.addEventListener('click', () => { card.bullets.splice(j,1); markDirty(); paintBullets(); });
+            inp.addEventListener('input', () => { card.bullets[j] = inp.value; markDirty(); pushPreview(); });
+            up.addEventListener('click', () => { if (j>0) { card.bullets.splice(j-1,0,card.bullets.splice(j,1)[0]); markDirty(); paintBullets(); pushPreview(); } });
+            dn.addEventListener('click', () => { if (j<card.bullets.length-1) { card.bullets.splice(j+1,0,card.bullets.splice(j,1)[0]); markDirty(); paintBullets(); pushPreview(); } });
+            del.addEventListener('click', () => { card.bullets.splice(j,1); markDirty(); paintBullets(); pushPreview(); });
             bulletsHost.appendChild(row);
           });
         }
         paintBullets();
-        wrap.querySelector('[data-act=up]').addEventListener('click', () => { items.splice(i-1,0,items.splice(i,1)[0]); markDirty(); paint(); });
-        wrap.querySelector('[data-act=down]').addEventListener('click', () => { items.splice(i+1,0,items.splice(i,1)[0]); markDirty(); paint(); });
-        wrap.querySelector('[data-act=del]').addEventListener('click', () => { items.splice(i,1); markDirty(); paint(); });
-        wrap.querySelector('[data-act=add-bullet]').addEventListener('click', () => { card.bullets = card.bullets || []; card.bullets.push(''); markDirty(); paintBullets(); });
+        wrap.querySelector('[data-act=up]').addEventListener('click', () => { items.splice(i-1,0,items.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
+        wrap.querySelector('[data-act=down]').addEventListener('click', () => { items.splice(i+1,0,items.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
+        wrap.querySelector('[data-act=del]').addEventListener('click', () => { items.splice(i,1); markDirty(); paint(); pushPreview(); });
+        wrap.querySelector('[data-act=add-bullet]').addEventListener('click', () => { card.bullets = card.bullets || []; card.bullets.push(''); markDirty(); paintBullets(); pushPreview(); });
         host.appendChild(wrap);
       });
-
       const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'admin-btn admin-btn-sm';
-      addBtn.textContent = '+ Add announcement card';
-      addBtn.addEventListener('click', () => { items.push({ title: 'New announcement', bullets: ['…'] }); markDirty(); paint(); });
+      addBtn.type = 'button'; addBtn.className = 'admin-btn admin-btn-sm';
+      addBtn.innerHTML = ICON.plus + '<span>Add announcement card</span>';
+      addBtn.addEventListener('click', () => { items.push({ title: 'New announcement', bullets: ['…'] }); markDirty(); paint(); pushPreview(); });
       host.appendChild(addBtn);
     }
     paint();
@@ -544,27 +536,159 @@
   function renderScheduleOverrideEditor() {
     const host = document.createElement('div');
     const types = ['none', 'Normal Schedule', 'Advisory', 'Early Release', 'No School'];
-    function curType() {
-      const o = state.draft.scheduleOverride;
-      return o?.type || 'none';
-    }
+    function curType() { return state.draft.scheduleOverride?.type || 'none'; }
     function paint() {
       const cur = curType();
       host.innerHTML = `
         <div class="admin-field">
-          <label>Active override</label>
+          <div class="admin-field-row"><label>Active override</label></div>
           <select class="admin-select" id="sched-override-select">
             ${types.map(t => `<option value="${escapeHtml(t)}" ${t===cur?'selected':''}>${t==='none'?'— No override (use data.json) —':escapeHtml(t)}</option>`).join('')}
           </select>
           <div class="admin-field-help">Saved overrides take effect for all users within 30 seconds.</div>
         </div>
-        ${state.draft.scheduleOverride ? `<div class="admin-field-help">Set at ${new Date(state.draft.scheduleOverride.timestamp).toLocaleString()}.</div>` : ''}
-      `;
+        ${state.draft.scheduleOverride ? `<div class="admin-field-help">Set at ${new Date(state.draft.scheduleOverride.timestamp).toLocaleString()}.</div>` : ''}`;
       host.querySelector('#sched-override-select').addEventListener('change', (e) => {
         const v = e.target.value;
         state.draft.scheduleOverride = (v === 'none') ? null : { type: v, timestamp: Date.now() };
-        markDirty(); paint();
+        markDirty(); paint(); pushPreview();
       });
+    }
+    paint();
+    return host;
+  }
+
+  function renderBellEditor() {
+    const host = document.createElement('div');
+    state.draft.bellSchedules = state.draft.bellSchedules || {};
+    const types = ['Normal Schedule', 'Advisory', 'Early Release'];
+    let activeType = types[0];
+
+    const tabs = document.createElement('div');
+    tabs.className = 'admin-preview-bar';
+    tabs.style.cssText = 'background:transparent;border:none;padding:0 0 12px 0;justify-content:flex-start';
+    function paintTabs() {
+      tabs.innerHTML = `<div class="seg" id="bell-seg">
+        ${types.map(t => `<button data-type="${escapeHtml(t)}" class="${t===activeType?'active':''}">${escapeHtml(t)}</button>`).join('')}
+      </div>`;
+      tabs.querySelectorAll('[data-type]').forEach(btn => btn.addEventListener('click', () => { activeType = btn.dataset.type; paintTabs(); paintBody(); }));
+    }
+    paintTabs();
+    host.appendChild(tabs);
+
+    const body = document.createElement('div');
+    host.appendChild(body);
+
+    function getRows() {
+      const map = state.draft.bellSchedules[activeType] || {};
+      return Object.keys(map).map(k => ({ start: +k, end: +map[k][0], name: map[k][1] }))
+        .sort((a, b) => a.start - b.start);
+    }
+    function commit(rows) {
+      const dedup = {};
+      for (const r of rows) {
+        if (!Number.isFinite(r.start) || !Number.isFinite(r.end) || r.start < 0 || r.end < 0) continue;
+        dedup[String(r.start)] = [r.end, String(r.name || '')];
+      }
+      state.draft.bellSchedules[activeType] = dedup;
+      markDirty(); pushPreview();
+    }
+    function paintBody() {
+      const rows = getRows();
+      body.innerHTML = `
+        <div class="admin-bell-row" style="font-size:11px;color:var(--fg-3);padding-bottom:4px">
+          <span>Order</span><span>Period name</span><span>Start (HH:MM)</span><span>End (HH:MM)</span><span></span>
+        </div>
+      `;
+      rows.forEach((r, i) => {
+        const row = document.createElement('div');
+        row.className = 'admin-bell-row';
+        const dur = Math.max(0, Math.round((r.end - r.start) / 60));
+        row.innerHTML = `
+          <span class="role">${i+1}</span>
+          <input class="admin-input" data-f="name" value="${escapeHtml(r.name)}" maxlength="60">
+          <input class="admin-input mono" data-f="start" type="time" value="${secsToHHMM(r.start)}">
+          <input class="admin-input mono" data-f="end" type="time" value="${secsToHHMM(r.end)}">
+          <div class="row-gap-8">
+            <span class="role">${dur}m</span>
+            <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" data-f="del" title="Remove">${ICON.trash}</button>
+          </div>`;
+        row.querySelector('[data-f=name]').addEventListener('input', e => { rows[i].name = e.target.value; commit(rows); paintBody(); });
+        row.querySelector('[data-f=start]').addEventListener('change', e => { const s = hhmmToSecs(e.target.value); if (s != null) { rows[i].start = s; commit(rows); paintBody(); } });
+        row.querySelector('[data-f=end]').addEventListener('change',   e => { const s = hhmmToSecs(e.target.value); if (s != null) { rows[i].end   = s; commit(rows); paintBody(); } });
+        row.querySelector('[data-f=del]').addEventListener('click', () => { rows.splice(i, 1); commit(rows); paintBody(); });
+        body.appendChild(row);
+      });
+
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;gap:8px;margin-top:14px;flex-wrap:wrap';
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button'; addBtn.className = 'admin-btn admin-btn-sm';
+      addBtn.innerHTML = ICON.plus + '<span>Add period</span>';
+      addBtn.addEventListener('click', () => {
+        const last = rows[rows.length - 1];
+        const start = last ? Math.min(86340, last.end + 300) : 27900;
+        rows.push({ start, end: Math.min(86399, start + 2700), name: 'New Period' });
+        commit(rows); paintBody();
+      });
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button'; resetBtn.className = 'admin-btn admin-btn-sm admin-btn-ghost';
+      resetBtn.textContent = 'Reset this template to default';
+      resetBtn.addEventListener('click', () => {
+        state.draft.bellSchedules[activeType] = deepClone(state.defaults.bellSchedules[activeType] || {});
+        markDirty(); pushPreview(); paintBody();
+      });
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button'; clearBtn.className = 'admin-btn admin-btn-sm admin-btn-ghost';
+      clearBtn.textContent = 'Clear (defer to data.json)';
+      clearBtn.addEventListener('click', () => {
+        state.draft.bellSchedules[activeType] = {};
+        markDirty(); pushPreview(); paintBody();
+      });
+      actions.append(addBtn, resetBtn, clearBtn);
+      body.appendChild(actions);
+
+      const help = document.createElement('div');
+      help.className = 'admin-field-help';
+      help.style.marginTop = '12px';
+      help.textContent = 'Times are in 24-hour HH:MM. The schedule page will use this template whenever the active schedule type is "' + activeType + '". Clearing the template falls back to the per-date data.json.';
+      body.appendChild(help);
+    }
+    paintBody();
+    return host;
+  }
+
+  function renderPrivacyParagraphsEditor() {
+    const host = document.createElement('div');
+    state.draft.gradeMelon = state.draft.gradeMelon || {};
+    state.draft.gradeMelon.privacyParagraphs = state.draft.gradeMelon.privacyParagraphs || [];
+    const arr = state.draft.gradeMelon.privacyParagraphs;
+    function paint() {
+      host.innerHTML = '';
+      arr.forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'admin-list-item';
+        row.innerHTML = `
+          <div class="admin-list-item-head">
+            <span class="handle">Paragraph ${i+1}</span>
+            <div class="admin-list-item-actions">
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="up"   ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="down" ${i===arr.length-1 ? 'disabled' : ''}>${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" data-act="del">${ICON.trash}</button>
+            </div>
+          </div>
+          <textarea class="admin-textarea" maxlength="4000">${escapeHtml(p)}</textarea>`;
+        row.querySelector('textarea').addEventListener('input', e => { arr[i] = e.target.value; markDirty(); pushPreview(); });
+        row.querySelector('[data-act=up]').addEventListener('click', () => { arr.splice(i-1,0,arr.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
+        row.querySelector('[data-act=down]').addEventListener('click', () => { arr.splice(i+1,0,arr.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
+        row.querySelector('[data-act=del]').addEventListener('click', () => { arr.splice(i,1); markDirty(); paint(); pushPreview(); });
+        host.appendChild(row);
+      });
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button'; addBtn.className = 'admin-btn admin-btn-sm';
+      addBtn.innerHTML = ICON.plus + '<span>Add paragraph</span>';
+      addBtn.addEventListener('click', () => { arr.push(''); markDirty(); paint(); pushPreview(); });
+      host.appendChild(addBtn);
     }
     paint();
     return host;
@@ -581,16 +705,14 @@
           <tbody>
             ${j.entries.map(e => `
               <tr>
-                <td>${new Date(e.ts).toLocaleString()}</td>
-                <td>${escapeHtml(e.ip || '—')}</td>
+                <td class="muted">${new Date(e.ts).toLocaleString()}</td>
+                <td class="muted">${escapeHtml(e.ip || '—')}</td>
                 <td class="action">${escapeHtml(e.action)}</td>
-                <td>${escapeHtml([e.sections?.join(','), e.section, e.file, e.type].filter(Boolean).join(' · ') || '—')}</td>
-              </tr>
-            `).join('')}
+                <td class="muted">${escapeHtml([e.sections?.join(','), e.section, e.file, e.type].filter(Boolean).join(' · ') || '—')}</td>
+              </tr>`).join('')}
           </tbody>
-        </table>
-      `;
-    }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:#ff6b6b">${escapeHtml(e.message)}</div>`; });
+        </table>`;
+    }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`; });
     return host;
   }
 
@@ -611,10 +733,12 @@
       card.className = 'admin-card';
       card.innerHTML = `<h2>${escapeHtml(group.title)}</h2>`;
 
-      if (group.custom === 'navEditor')              { card.appendChild(renderNavEditor()); anyVisible = true; }
-      else if (group.custom === 'announcementsEditor'){ card.appendChild(renderAnnouncementsEditor()); anyVisible = true; }
+      if (group.custom === 'navEditor')                 { card.appendChild(renderNavEditor()); anyVisible = true; }
+      else if (group.custom === 'announcementsEditor')  { card.appendChild(renderAnnouncementsEditor()); anyVisible = true; }
       else if (group.custom === 'scheduleOverrideEditor'){ card.appendChild(renderScheduleOverrideEditor()); anyVisible = true; }
-      else if (group.custom === 'auditLog')          { card.appendChild(renderAuditLog()); anyVisible = true; }
+      else if (group.custom === 'bellEditor')           { card.appendChild(renderBellEditor()); anyVisible = true; }
+      else if (group.custom === 'privacyParagraphsEditor'){ card.appendChild(renderPrivacyParagraphsEditor()); anyVisible = true; }
+      else if (group.custom === 'auditLog')             { card.appendChild(renderAuditLog()); anyVisible = true; }
       else if (group.fields) {
         const visible = group.fields.filter(f => matches(f.label) || matches(f.path));
         if (!visible.length) continue;
@@ -624,16 +748,18 @@
       panels.appendChild(card);
     }
     if (!anyVisible && q) {
-      panels.innerHTML = `<div class="admin-card"><div class="admin-field-help">No fields match “${escapeHtml(q)}” on this tab. Other tabs may have matches.</div></div>`;
+      panels.innerHTML = `<div class="admin-card"><div class="admin-field-help">No fields match "${escapeHtml(q)}" on this tab. Other tabs may have matches.</div></div>`;
     }
 
     refreshDirtyMarkers();
+    pushPreview();
   }
 
   // ── Dirty / publish ────────────────────────────────────────────────────
   function refreshDirtyMarkers() {
     const dirty = !eq(state.settings, state.draft);
     $('#dirty-pill').classList.toggle('visible', dirty);
+    $('#dirty-pill').textContent = dirty ? 'Unsaved changes' : '';
     $('#publish-btn').disabled = !dirty;
     $('#discard-btn').disabled = !dirty;
     $$('.admin-field').forEach(f => {
@@ -653,7 +779,6 @@
     const btn = $('#publish-btn');
     btn.disabled = true; btn.textContent = 'Publishing…';
     try {
-      // Compute a top-level patch (only sections that changed)
       const patch = {};
       const keys = new Set([...Object.keys(state.settings), ...Object.keys(state.draft)]);
       for (const k of keys) {
@@ -665,20 +790,19 @@
       state.settings = json.settings;
       state.draft = deepClone(json.settings);
       toast('Changes published — public site will update within 30 s.', 'success', 4000);
-      // Refresh preview if open
-      if ($('#preview-host').classList.contains('open')) refreshPreview();
       renderActiveTab();
+      // If the preview is open in DRAFT mode, switch to LIVE-from-server-fresh
+      if ($('#preview-host').classList.contains('open')) refreshPreview();
     } catch (e) {
       toast('Publish failed: ' + e.message, 'error', 6000);
     } finally {
-      btn.disabled = false; btn.textContent = 'Publish changes';
+      btn.disabled = false; btn.textContent = 'Publish';
     }
   });
 
   // ── Search ─────────────────────────────────────────────────────────────
   $('#search-input').addEventListener('input', (e) => {
     state.search = e.target.value;
-    // If query is non-empty, show all tabs but auto-jump to first tab with a match
     if (state.search) {
       for (const tab of SCHEMA) {
         const hits = tab.groups.some(g => (g.fields || []).some(f => (f.label || '').toLowerCase().includes(state.search.toLowerCase())));
@@ -690,20 +814,52 @@
   });
 
   // ── Preview overlay ────────────────────────────────────────────────────
+  // Mode 'draft' → load page with ?_preview, then postMessage draft into it.
+  // Mode 'live'  → load page without ?_preview so it fetches the published version.
   let previewPage = 'index.html';
+  let _previewReady = false;
+  function buildPreviewUrl() {
+    const ts = Date.now();
+    return state.previewMode === 'draft'
+      ? `${previewPage}?_preview=1&_ts=${ts}`
+      : `${previewPage}?_ts=${ts}`;
+  }
   function refreshPreview() {
-    const frame = $('#preview-frame');
-    // cache-bust to force a fresh fetch of /site-settings
-    frame.src = previewPage + '?_preview=' + Date.now();
+    _previewReady = false;
+    $('#preview-frame').src = buildPreviewUrl();
+    paintPreviewBar();
+  }
+  function pushPreview() {
+    if (!$('#preview-host').classList.contains('open')) return;
+    if (state.previewMode !== 'draft') return;
+    if (!_previewReady) return;
+    try {
+      $('#preview-frame').contentWindow.postMessage({ type: 'phs:preview-settings', settings: state.draft }, '*');
+    } catch {}
+  }
+  function paintPreviewBar() {
+    $('#preview-mode-pill').className = 'mode-pill' + (state.previewMode === 'draft' ? ' draft' : '');
+    $('#preview-mode-pill').textContent = state.previewMode === 'draft' ? 'Showing draft (un-published)' : 'Showing published version';
+    $$('#preview-mode-seg button').forEach(b => b.classList.toggle('active', b.dataset.mode === state.previewMode));
+    $$('#preview-page-seg button').forEach(b => b.classList.toggle('active', b.dataset.previewPage === previewPage));
   }
   $('#open-preview-btn').addEventListener('click', () => {
     $('#preview-host').classList.add('open');
-    $('#preview-mode-label').textContent = 'Live (latest published)';
+    state.previewMode = 'draft';
     refreshPreview();
   });
   $('#preview-close-btn').addEventListener('click', () => { $('#preview-host').classList.remove('open'); });
   $('#preview-refresh-btn').addEventListener('click', refreshPreview);
-  $$('#preview-host [data-preview-page]').forEach(b => b.addEventListener('click', () => { previewPage = b.dataset.previewPage; refreshPreview(); }));
+  $$('#preview-page-seg button').forEach(b => b.addEventListener('click', () => { previewPage = b.dataset.previewPage; refreshPreview(); }));
+  $$('#preview-mode-seg button').forEach(b => b.addEventListener('click', () => { state.previewMode = b.dataset.mode; refreshPreview(); }));
+
+  // Iframe signals readiness; we then immediately push the draft.
+  window.addEventListener('message', (e) => {
+    if (e.data?.type === 'phs:preview-ready') {
+      _previewReady = true;
+      pushPreview();
+    }
+  });
 
   // ── Init ───────────────────────────────────────────────────────────────
   if (state.token) bootApp(); else showLogin();

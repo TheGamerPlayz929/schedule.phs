@@ -13,14 +13,14 @@
 <!-- ── Login screen ── -->
 <div id="login-shell" class="admin-login-shell">
   <form class="admin-login-card" id="login-form">
-    <h1>Admin Sign In</h1>
-    <p>Restricted to authorised PHS staff. Enter the admin password to continue.</p>
+    <h1>Sign in</h1>
+    <p>Restricted to authorised PHS staff.</p>
     <div class="admin-field">
-      <label for="login-password">Password</label>
+      <div class="admin-field-row"><label for="login-password">Password</label></div>
       <input id="login-password" class="admin-input" type="password" autocomplete="current-password" placeholder="••••••••" required>
     </div>
-    <div id="login-error" class="admin-field-help" style="color:#ff6b6b;min-height:16px"></div>
-    <button id="login-btn" class="admin-btn admin-btn-primary" type="submit" style="width:100%">Sign In</button>
+    <div id="login-error" class="admin-field-help" style="color:var(--danger);min-height:16px"></div>
+    <button id="login-btn" class="admin-btn admin-btn-primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
   </form>
 </div>
 
@@ -30,18 +30,27 @@
     <div class="admin-sidebar-brand">
       <img src="phs-logo.png" alt="" class="admin-sidebar-brand-img">
       <span class="admin-sidebar-brand-text">PHS Admin</span>
+      <span class="admin-sidebar-brand-tag">v1</span>
     </div>
 
     <div class="admin-sidebar-search">
-      <input id="search-input" type="search" class="admin-input" placeholder="Search settings…" autocomplete="off">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></svg>
+      <input id="search-input" type="search" placeholder="Search settings…" autocomplete="off">
     </div>
 
+    <div class="admin-sidebar-section-label">Site</div>
     <nav id="tabs"></nav>
 
     <div class="admin-sidebar-footer">
-      <button id="open-preview-btn" class="admin-btn admin-btn-sm">👁  Open Preview</button>
-      <button id="logout-btn" class="admin-btn admin-btn-sm admin-btn-ghost">Sign Out</button>
-      <div class="admin-status-line" id="conn-status">…</div>
+      <button id="open-preview-btn" class="admin-btn">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Open preview</span>
+      </button>
+      <button id="logout-btn" class="admin-btn">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
+        <span>Sign out</span>
+      </button>
+      <div class="admin-status-line" id="conn-status">Connecting…</div>
     </div>
   </aside>
 
@@ -52,9 +61,9 @@
         <div class="sub" id="tab-sub">Identity & visual basics for the public site.</div>
       </div>
       <div class="admin-actions">
-        <span id="dirty-pill" class="admin-dirty-pill">Unsaved</span>
+        <span id="dirty-pill" class="admin-dirty-pill">Unsaved changes</span>
         <button id="discard-btn" class="admin-btn admin-btn-ghost" disabled>Discard</button>
-        <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish changes</button>
+        <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish</button>
       </div>
     </header>
 
@@ -65,15 +74,24 @@
 <!-- ── Live preview overlay ── -->
 <div id="preview-host" class="admin-preview-host">
   <div class="admin-preview-bar">
-    <div>
-      <button class="admin-btn admin-btn-sm" data-preview-page="index.html">Schedule</button>
-      <button class="admin-btn admin-btn-sm" data-preview-page="announcements.html">Announcements</button>
-      <button class="admin-btn admin-btn-sm" data-preview-page="gradeviewer.html">Grades</button>
-      <span class="label" id="preview-mode-label" style="margin-left:14px"></span>
+    <div class="row-gap-8">
+      <div class="seg" id="preview-page-seg">
+        <button data-preview-page="index.html" class="active">Schedule</button>
+        <button data-preview-page="announcements.html">Announcements</button>
+        <button data-preview-page="gradeviewer.html">Grades</button>
+      </div>
+      <div class="seg" id="preview-mode-seg" style="margin-left:6px">
+        <button data-mode="draft" class="active">Draft</button>
+        <button data-mode="live">Published</button>
+      </div>
+      <span class="mode-pill draft" id="preview-mode-pill" style="margin-left:6px">Showing draft (un-published)</span>
     </div>
-    <div>
-      <button id="preview-refresh-btn" class="admin-btn admin-btn-sm">Refresh</button>
-      <button id="preview-close-btn" class="admin-btn admin-btn-sm admin-btn-ghost">Close ✕</button>
+    <div class="row-gap-8">
+      <button id="preview-refresh-btn" class="admin-btn admin-btn-sm">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0115-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15 6.7L3 16M3 21v-5h5"/></svg>
+        Refresh
+      </button>
+      <button id="preview-close-btn" class="admin-btn admin-btn-sm admin-btn-ghost">Close</button>
     </div>
   </div>
   <iframe id="preview-frame" class="admin-preview-frame" src="about:blank" title="Preview"></iframe>

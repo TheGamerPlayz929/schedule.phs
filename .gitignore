@@ -1,6 +1,10 @@
 temp_zip_extract/
 .claude/
+.agents/
 *.zip
 node_modules/
 __pycache__/
 *.pyc
+.firebase/
+*.log
+OneDrive/

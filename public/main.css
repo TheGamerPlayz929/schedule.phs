@@ -4,12 +4,6 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
 
-@font-face {
-  font-family: 'Alex Brush Local';
-  src: url('assets/fonts/AlexBrush-Regular.ttf') format('truetype');
-  font-display: swap;
-}
-
 :root {
   --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-serif: 'Instrument Serif', Georgia, serif;
@@ -206,38 +200,29 @@ ol {
    Hero Section
    ========================================================================== */
 .hero {
-  margin-top: clamp(18px, 2.5vh, 34px);
-  margin-bottom: clamp(18px, 3vh, 34px);
+  margin-top: 4vh;
+  margin-bottom: 56px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.hero--compact {
-  margin-top: clamp(16px, 2vh, 28px);
-  margin-bottom: clamp(18px, 2.5vh, 32px);
-}
-
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 16px;
+  padding: 6px 14px;
   border-radius: 99px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 10px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
-    0 18px 48px rgba(0, 0, 0, 0.22),
-    0 0 42px rgba(168, 85, 247, 0.12);
+  margin-bottom: 24px;
 }
 
 .status-dot {
@@ -257,41 +242,19 @@ ol {
   box-shadow: 0 0 8px var(--status-passing);
 }
 
-.status-badge[data-status="soon"] .status-dot,
-.status-badge[data-status="urgent"] .status-dot {
+.status-badge[data-status="soon"] .status-dot {
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
 }
 
 .hero-title-wrapper {
-  margin-bottom: 10px;
-  position: relative;
-  width: min(100%, 900px);
-  min-height: clamp(130px, 16vw, 190px);
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.hero-title-wrapper.signature-single {
-  min-height: clamp(126px, 15vw, 176px);
-}
-
-.hero-title-wrapper.signature-double {
-  min-height: clamp(180px, 21vw, 238px);
-}
-
-.hero--compact .hero-title-wrapper {
-  min-height: auto;
-  margin-bottom: 0;
+  margin-bottom: 32px;
 }
 
 .hero-eyebrow {
-  font-family: 'Alex Brush Local', var(--font-serif);
+  font-family: var(--font-serif);
   font-size: 56px;
-  font-style: normal;
+  font-style: italic;
   font-weight: 400;
   color: var(--fg-2);
   line-height: 1.1;
@@ -299,108 +262,16 @@ ol {
 }
 
 .hero-title {
-  font-family: 'Alex Brush Local', var(--font-serif);
-  font-size: 90px;
+  font-size: 80px;
   font-weight: 400;
-  letter-spacing: 0;
+  letter-spacing: -0.04em;
   line-height: 1;
   color: var(--fg-1);
-  text-shadow: 0 0 28px rgba(255, 255, 255, 0.2);
-}
-
-.signature-ready .hero-eyebrow,
-.signature-ready .hero-title {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  opacity: 0;
-}
-
-.signature-stage {
-  display: none;
-  width: 100%;
-  margin: 0 auto;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.signature-stage.is-visible {
-  display: block;
-}
-
-.signature-stage--eyebrow {
-  height: clamp(50px, 6.6vw, 82px);
-  margin-bottom: -18px;
-}
-
-.signature-stage--title {
-  height: clamp(102px, 13vw, 166px);
-  margin-top: -8px;
-}
-
-.signature-stage svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.signature-fill {
-  fill: #fff;
-  filter:
-    drop-shadow(0 0 7px rgba(255, 255, 255, 0.5))
-    drop-shadow(0 0 28px rgba(255, 255, 255, 0.18));
-}
-
-.signature-glint {
-  fill: rgba(255, 255, 255, 0.72);
-  filter:
-    blur(0.4px)
-    drop-shadow(0 0 8px rgba(255, 255, 255, 0.62));
-  opacity: 0;
-  mix-blend-mode: screen;
 }
 
 /* ==========================================================================
-   Ring + Glass Circle (Countdown)
+   Glass Circle (Countdown)
    ========================================================================== */
-.ring-wrap {
-  position: relative;
-  width: 220px;
-  height: 220px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.progress-ring {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.progress-ring__track {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.06);
-  stroke-width: 3;
-}
-
-.progress-ring__fill {
-  fill: none;
-  stroke: url(#ringGradient);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: 100 100;
-  stroke-dashoffset: 0;
-  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.7));
-  transition: stroke-dasharray 1s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 .glass-circle {
   width: 200px;
   height: 200px;
@@ -414,8 +285,6 @@ ol {
   justify-content: center;
   align-items: center;
   box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.02), 0 20px 40px rgba(0, 0, 0, 0.2);
-  position: relative;
-  z-index: 1;
 }
 
 .countdown-wrapper {
@@ -428,19 +297,11 @@ ol {
 .cd-main {
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  font-size: 58px;
-  font-weight: 500;
-  letter-spacing: -0.05em;
+  font-size: 48px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
   line-height: 0.9;
   color: var(--fg-1);
-}
-
-.cd-min-label {
-  font-size: 18px;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--fg-2);
-  vertical-align: baseline;
 }
 
 .cd-sub {
@@ -472,11 +333,6 @@ ol {
   margin-bottom: 80px;
 }
 
-.hero--compact + .schedule-section,
-.hero--compact + .grades-wrap {
-  margin-top: 0;
-}
-
 .schedule-header {
   display: flex;
   justify-content: space-between;
@@ -486,14 +342,14 @@ ol {
 }
 
 .schedule-header h3 {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--fg-1);
 }
 
 .schedule-header .date {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--fg-3);
 }
 
@@ -521,20 +377,20 @@ ol {
 
 .period-time {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 11px;
   color: var(--fg-3);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
 
 .period-name {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--fg-2);
 }
 
 .period-meta {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--fg-3);
   text-align: right;
 }
@@ -550,7 +406,7 @@ ol {
 }
 
 .period-card.is-current .period-name {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--fg-1);
 }
@@ -558,186 +414,6 @@ ol {
 .period-card.is-current .period-time,
 .period-card.is-current .period-meta {
   color: var(--fg-2);
-}
-
-/* ==========================================================================
-   Admin Panel (localhost only)
-   ========================================================================== */
-#admin-panel {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9999;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  min-width: 220px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.08);
-  font-family: var(--font-sans);
-  overflow: hidden;
-}
-
-.admin-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-2);
-  user-select: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.admin-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-  flex-shrink: 0;
-}
-
-.admin-collapse-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--fg-3);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-}
-
-.admin-collapse-btn:hover {
-  color: var(--fg-1);
-}
-
-.admin-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-}
-
-.admin-time-row {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-}
-
-.admin-field {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-}
-
-.admin-seg {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: var(--fg-1);
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 500;
-  padding: 6px 4px;
-  width: 100%;
-  text-align: center;
-  outline: none;
-  -moz-appearance: textfield;
-}
-
-.admin-seg::-webkit-inner-spin-button,
-.admin-seg::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-}
-
-.admin-seg:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
-}
-
-.admin-seg-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-}
-
-.admin-ampm-btn {
-  align-self: center;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: var(--fg-2);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  padding: 6px 8px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-bottom: 14px;
-}
-
-.admin-ampm-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--fg-1);
-}
-
-.admin-ampm-btn--pm {
-  background: rgba(168, 85, 247, 0.2);
-  border-color: rgba(168, 85, 247, 0.4);
-  color: #c084fc;
-}
-
-.admin-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.admin-btn {
-  flex: 1;
-  padding: 7px 0;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.admin-btn--apply {
-  background: var(--accent);
-  color: #fff;
-}
-
-.admin-btn--apply:hover {
-  background: #9333ea;
-}
-
-.admin-btn--reset {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--fg-2);
-}
-
-.admin-btn--reset:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--fg-1);
-}
-
-.admin-status {
-  font-size: 10px;
-  color: var(--fg-3);
-  text-align: center;
-  font-family: var(--font-mono);
 }
 
 /* ==========================================================================
@@ -762,11 +438,6 @@ ol {
 
   .hero-title {
     font-size: 64px;
-  }
-
-  .ring-wrap {
-    width: 180px;
-    height: 180px;
   }
 
   .glass-circle {

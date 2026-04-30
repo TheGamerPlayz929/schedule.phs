@@ -455,6 +455,11 @@ function calculateGoal() {
   }
   scheduleType = arr[0];
   let periods = arr[1];
+  // Admin-controlled bell-schedule template overrides for this type, if non-empty.
+  const _bs = (window.__SITE_SETTINGS__ && window.__SITE_SETTINGS__.bellSchedules) || null;
+  if (_bs && _bs[scheduleType] && Object.keys(_bs[scheduleType]).length) {
+    periods = _bs[scheduleType];
+  }
   let largestUnder = -1;
   let largest = -1;
   myArray = [];
