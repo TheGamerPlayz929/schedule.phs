@@ -15,6 +15,10 @@
   <form class="admin-login-card" id="login-form">
     <h1>Sign in</h1>
     <p>Restricted to authorised PHS staff.</p>
+    <div id="google-login-wrap" class="admin-google-login hidden">
+      <div id="google-login-btn"></div>
+    </div>
+    <div id="login-divider" class="admin-login-divider hidden"><span>or</span></div>
     <div class="admin-field">
       <div class="admin-field-row"><label for="login-password">Password</label></div>
       <input id="login-password" class="admin-input" type="password" autocomplete="current-password" placeholder="••••••••" required>
@@ -99,6 +103,7 @@
 
 <div class="admin-toast-host" id="toast-host"></div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="admin.js"></script>
 </body>
 </html>

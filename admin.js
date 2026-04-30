@@ -13,6 +13,7 @@
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
     token: localStorage.getItem(TOKEN_KEY) || null,
+    authConfig: null,
     settings: null,    // current saved settings (server)
     defaults: null,
     draft: null,       // working copy with unsaved edits
@@ -219,6 +220,73 @@
   function showApp() {
     $('#login-shell').classList.add('hidden');
     $('#app-shell').classList.remove('hidden');
+  }
+
+  async function loadAuthConfig() {
+    try {
+      const res = await fetch(BACKEND + '/admin/auth-config', { credentials: 'omit' });
+      state.authConfig = res.ok ? await res.json() : {};
+    } catch {
+      state.authConfig = {};
+    }
+    if (state.authConfig.passwordLoginEnabled === false) {
+      $('#login-password')?.closest('.admin-field')?.classList.add('hidden');
+      $('#login-btn')?.classList.add('hidden');
+      $('#login-divider')?.classList.add('hidden');
+    }
+    configureGoogleLogin();
+  }
+
+  function configureGoogleLogin() {
+    const clientId = state.authConfig?.googleClientId;
+    if (!clientId) return;
+
+    $('#google-login-wrap')?.classList.remove('hidden');
+    $('#login-divider')?.classList.remove('hidden');
+
+    const render = () => {
+      if (!window.google?.accounts?.id || !$('#google-login-btn')) return false;
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredential
+      });
+      window.google.accounts.id.renderButton($('#google-login-btn'), {
+        theme: 'outline',
+        size: 'large',
+        type: 'standard',
+        text: 'signin_with',
+        shape: 'rectangular',
+        width: 320
+      });
+      return true;
+    };
+
+    if (!render()) {
+      let tries = 0;
+      const timer = setInterval(() => {
+        tries += 1;
+        if (render() || tries > 50) clearInterval(timer);
+      }, 100);
+    }
+  }
+
+  async function handleGoogleCredential(response) {
+    const err = $('#login-error');
+    err.textContent = '';
+    try {
+      const res = await fetch(BACKEND + '/admin/google-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Google sign-in failed');
+      state.token = json.token;
+      localStorage.setItem(TOKEN_KEY, json.token);
+      await bootApp();
+    } catch (ex) {
+      err.textContent = ex.message;
+    }
   }
 
   $('#login-form').addEventListener('submit', async (e) => {
@@ -863,4 +931,5 @@
 
   // ── Init ───────────────────────────────────────────────────────────────
   if (state.token) bootApp(); else showLogin();
+  loadAuthConfig();
 })();
