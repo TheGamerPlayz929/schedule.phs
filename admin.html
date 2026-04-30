@@ -12,20 +12,15 @@
 
 <!-- ── Login screen ── -->
 <div id="login-shell" class="admin-login-shell">
-  <form class="admin-login-card" id="login-form">
+  <div class="admin-login-card" id="login-card">
     <h1>Sign in</h1>
-    <p>Restricted to authorised PHS staff.</p>
+    <p>Use an approved Google account to manage the PHS site.</p>
     <div id="google-login-wrap" class="admin-google-login hidden">
       <div id="google-login-btn"></div>
     </div>
-    <div id="login-divider" class="admin-login-divider hidden"><span>or</span></div>
-    <div class="admin-field">
-      <div class="admin-field-row"><label for="login-password">Password</label></div>
-      <input id="login-password" class="admin-input" type="password" autocomplete="current-password" placeholder="••••••••" required>
-    </div>
+    <div id="google-login-loading" class="admin-field-help">Loading Google sign-in...</div>
     <div id="login-error" class="admin-field-help" style="color:var(--danger);min-height:16px"></div>
-    <button id="login-btn" class="admin-btn admin-btn-primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
-  </form>
+  </div>
 </div>
 
 <!-- ── Main shell ── -->

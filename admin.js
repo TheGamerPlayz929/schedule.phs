@@ -212,10 +212,11 @@
 
   // ── Login / boot ───────────────────────────────────────────────────────
   function showLogin(errorMsg) {
+    state.token = null;
+    localStorage.removeItem(TOKEN_KEY);
     $('#app-shell').classList.add('hidden');
     $('#login-shell').classList.remove('hidden');
     if (errorMsg) $('#login-error').textContent = errorMsg;
-    setTimeout(() => $('#login-password').focus(), 50);
   }
   function showApp() {
     $('#login-shell').classList.add('hidden');
@@ -229,20 +230,17 @@
     } catch {
       state.authConfig = {};
     }
-    if (state.authConfig.passwordLoginEnabled === false) {
-      $('#login-password')?.closest('.admin-field')?.classList.add('hidden');
-      $('#login-btn')?.classList.add('hidden');
-      $('#login-divider')?.classList.add('hidden');
-    }
     configureGoogleLogin();
   }
 
   function configureGoogleLogin() {
     const clientId = state.authConfig?.googleClientId;
-    if (!clientId) return;
+    if (!clientId) {
+      $('#google-login-loading').textContent = 'Google sign-in is not configured yet.';
+      return;
+    }
 
     $('#google-login-wrap')?.classList.remove('hidden');
-    $('#login-divider')?.classList.remove('hidden');
 
     const render = () => {
       if (!window.google?.accounts?.id || !$('#google-login-btn')) return false;
@@ -258,6 +256,7 @@
         shape: 'rectangular',
         width: 320
       });
+      $('#google-login-loading')?.classList.add('hidden');
       return true;
     };
 
@@ -285,35 +284,12 @@
       localStorage.setItem(TOKEN_KEY, json.token);
       await bootApp();
     } catch (ex) {
-      err.textContent = ex.message;
+      showLogin(ex.message || 'This Google account is not authorized.');
+      if (window.google?.accounts?.id) {
+        try { window.google.accounts.id.disableAutoSelect(); } catch {}
+      }
     }
   }
-
-  $('#login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const pw = $('#login-password').value;
-    const btn = $('#login-btn');
-    const err = $('#login-error');
-    err.textContent = '';
-    btn.disabled = true; btn.textContent = 'Signing in…';
-    try {
-      const res = await fetch(BACKEND + '/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw })
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Login failed');
-      state.token = json.token;
-      localStorage.setItem(TOKEN_KEY, json.token);
-      $('#login-password').value = '';
-      await bootApp();
-    } catch (ex) {
-      err.textContent = ex.message;
-    } finally {
-      btn.disabled = false; btn.textContent = 'Sign in';
-    }
-  });
 
   $('#logout-btn').addEventListener('click', async () => {
     try { await api('/admin/logout', { method: 'POST' }); } catch {}
@@ -338,7 +314,7 @@
       pingConnection();
     } catch (e) {
       console.warn('boot error', e);
-      showLogin('Sign in to continue.');
+      showLogin(state.token ? 'Session expired. Sign in with Google again.' : '');
     }
   }
   function pingConnection() {
