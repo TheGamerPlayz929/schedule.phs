@@ -412,6 +412,42 @@ input, textarea, select { font-family: inherit; }
 }
 .admin-audit-table td.muted { color: var(--fg-3); }
 
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.admin-stat {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-0);
+  padding: 14px;
+}
+.admin-stat span {
+  display: block;
+  color: var(--fg-3);
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.admin-stat strong {
+  display: block;
+  color: var(--fg-1);
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.admin-privacy-note {
+  border: 1px solid rgba(74,222,128,0.25);
+  color: #86efac;
+  background: rgba(74,222,128,0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
 /* ── Preview overlay ─────────────────────────────────────────────── */
 .admin-preview-host {
   position: fixed; inset: 0; z-index: 200;

@@ -36,6 +36,7 @@
     footer:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v10H4z"/><path d="M4 13h16"/></svg>`,
     countdown:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 3h6"/></svg>`,
     privacy:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-4 8-8 9-4-1-8-4-8-9V7z"/></svg>`,
+    analytics:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="7" width="3" height="9"/><rect x="17" y="13" width="3" height="3"/></svg>`,
     audit:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>`,
     search:      `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></svg>`,
     eye:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
@@ -143,6 +144,10 @@
         title: 'Labels', fields: [
           { path: 'countdown.minSuffix', label: 'Minute suffix (e.g. "m")', kind: 'text', max: 6 }
         ]}]
+    },
+    { id: 'analytics',    label: 'Statistics',       icon: 'analytics',
+      sub: 'Privacy-safe aggregate usage data. No personal data is collected.',
+      groups: [{ title: 'Usage overview', custom: 'analyticsDashboard' }]
     },
     { id: 'audit',        label: 'Audit Log',        icon: 'audit',
       sub: 'Recent admin changes — read only.',
@@ -760,6 +765,91 @@
     return host;
   }
 
+  function formatNumber(n) {
+    return new Intl.NumberFormat().format(Math.round(Number(n) || 0));
+  }
+
+  function formatDuration(seconds) {
+    seconds = Math.round(Number(seconds) || 0);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    return `${Math.round(minutes / 60)}h`;
+  }
+
+  function pageLabel(page) {
+    return ({ schedule: 'Schedule', announcements: 'Announcements', grades: 'Grades' })[page] || page;
+  }
+
+  function renderAnalyticsDashboard() {
+    const host = document.createElement('div');
+    host.innerHTML = '<div class="admin-field-help">Loading statistics…</div>';
+    api('/admin/analytics').then(j => {
+      const days = j.days || {};
+      const keys = Object.keys(days).sort();
+      const last7 = keys.slice(-7);
+      const totals = last7.reduce((acc, key) => {
+        const t = days[key]?.totals || {};
+        acc.pageviews += t.pageviews || 0;
+        acc.heartbeats += t.heartbeats || 0;
+        acc.durationSeconds += t.durationSeconds || 0;
+        return acc;
+      }, { pageviews: 0, heartbeats: 0, durationSeconds: 0 });
+
+      const pages = {};
+      for (const key of last7) {
+        for (const [page, metrics] of Object.entries(days[key]?.pages || {})) {
+          pages[page] ||= { pageviews: 0, heartbeats: 0, durationSeconds: 0 };
+          pages[page].pageviews += metrics.pageviews || 0;
+          pages[page].heartbeats += metrics.heartbeats || 0;
+          pages[page].durationSeconds += metrics.durationSeconds || 0;
+        }
+      }
+
+      const pageRows = Object.entries(pages)
+        .sort((a, b) => b[1].pageviews - a[1].pageviews)
+        .map(([page, m]) => `
+          <tr>
+            <td class="action">${escapeHtml(pageLabel(page))}</td>
+            <td>${formatNumber(m.pageviews)}</td>
+            <td>${formatDuration(m.durationSeconds)}</td>
+            <td>${formatNumber(j.active?.pages?.[page] || 0)}</td>
+          </tr>`).join('');
+
+      const dayRows = last7.reverse().map(key => {
+        const t = days[key]?.totals || {};
+        return `<tr>
+          <td class="action">${escapeHtml(key)}</td>
+          <td>${formatNumber(t.pageviews)}</td>
+          <td>${formatDuration(t.durationSeconds)}</td>
+          <td>${formatNumber(t.heartbeats)}</td>
+        </tr>`;
+      }).join('');
+
+      host.innerHTML = `
+        <div class="admin-stat-grid">
+          <div class="admin-stat"><span>Active now</span><strong>${formatNumber(j.active?.total || 0)}</strong></div>
+          <div class="admin-stat"><span>7-day page views</span><strong>${formatNumber(totals.pageviews)}</strong></div>
+          <div class="admin-stat"><span>7-day time on site</span><strong>${formatDuration(totals.durationSeconds)}</strong></div>
+          <div class="admin-stat"><span>Privacy status</span><strong>Aggregate only</strong></div>
+        </div>
+        <div class="admin-privacy-note">
+          No names, emails, IP addresses, user agents, cookies, persistent IDs, grade data, or StudentVue credentials are collected.
+        </div>
+        <h2 style="margin-top:22px">Pages</h2>
+        <table class="admin-audit-table">
+          <thead><tr><th>Page</th><th>Views</th><th>Total time</th><th>Active now</th></tr></thead>
+          <tbody>${pageRows || '<tr><td colspan="4" class="muted">No page data yet.</td></tr>'}</tbody>
+        </table>
+        <h2 style="margin-top:22px">Recent days</h2>
+        <table class="admin-audit-table">
+          <thead><tr><th>Date</th><th>Views</th><th>Total time</th><th>Heartbeats</th></tr></thead>
+          <tbody>${dayRows || '<tr><td colspan="4" class="muted">No daily data yet.</td></tr>'}</tbody>
+        </table>`;
+    }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`; });
+    return host;
+  }
+
   // ── Tab body render ────────────────────────────────────────────────────
   function renderActiveTab() {
     const tab = SCHEMA.find(t => t.id === state.activeTab) || SCHEMA[0];
@@ -782,6 +872,7 @@
       else if (group.custom === 'scheduleOverrideEditor'){ card.appendChild(renderScheduleOverrideEditor()); anyVisible = true; }
       else if (group.custom === 'bellEditor')           { card.appendChild(renderBellEditor()); anyVisible = true; }
       else if (group.custom === 'privacyParagraphsEditor'){ card.appendChild(renderPrivacyParagraphsEditor()); anyVisible = true; }
+      else if (group.custom === 'analyticsDashboard')   { card.appendChild(renderAnalyticsDashboard()); anyVisible = true; }
       else if (group.custom === 'auditLog')             { card.appendChild(renderAuditLog()); anyVisible = true; }
       else if (group.fields) {
         const visible = group.fields.filter(f => matches(f.label) || matches(f.path));
