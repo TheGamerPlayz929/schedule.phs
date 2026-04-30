@@ -182,14 +182,14 @@
       const saved = JSON.parse(localStorage.getItem(IMPORT_STATE_KEY) || 'null');
       if (saved && typeof saved === 'object') return saved;
     } catch {}
-    return { sourceText: '', days: [], uploads: {}, reviewed: {}, updatedAt: null };
+    return { sourceText: '', days: [], updatedAt: null };
   }
   function saveImportAssistantState() {
     localStorage.setItem(IMPORT_STATE_KEY, JSON.stringify(state.importAssistant));
   }
   function importAttentionCount() {
     const days = state.importAssistant?.days || [];
-    return days.filter(d => d.needsCustom && !state.importAssistant?.reviewed?.[d.key]).length;
+    return days.filter(d => d.needsCustom).length;
   }
   function scheduleAttentionCount() { return importAttentionCount(); }
   // seconds-from-midnight ⇄ "HH:MM"
@@ -617,8 +617,8 @@
       const attention = scheduleAttentionCount();
       host.innerHTML = `
         ${attention ? `<div class="admin-import-alert danger">
-          <strong>${attention} imported custom schedule${attention === 1 ? '' : 's'} still need review</strong>
-          <span>Open Import Assistant, attach the adjusted bell schedule image/PDF, and mark it reviewed before changing the live override.</span>
+          <strong>${attention} imported custom schedule${attention === 1 ? '' : 's'} detected</strong>
+          <span>Open Import Assistant to see which day cannot be handled by a saved template. This does not read images or publish automatically.</span>
         </div>` : ''}
         <div class="admin-field">
           <div class="admin-field-row"><label>Active override</label></div>
@@ -844,10 +844,8 @@
       const data = state.importAssistant;
       const attention = importAttentionCount();
       const rows = (data.days || []).map(day => {
-        const upload = data.uploads?.[day.key];
-        const reviewed = !!data.reviewed?.[day.key];
         return `
-          <div class="admin-import-day ${day.needsCustom && !reviewed ? 'needs-review' : ''}">
+          <div class="admin-import-day ${day.needsCustom ? 'needs-review' : ''}">
             <div>
               <div class="admin-import-day-title">${escapeHtml(day.day)}${day.date ? `, ${escapeHtml(day.date)}` : ''}</div>
               <div class="admin-import-day-detail">${escapeHtml(day.detail)}</div>
@@ -856,22 +854,15 @@
               <span class="admin-import-pill ${day.needsCustom ? 'warning' : 'ok'}">${escapeHtml(day.template)}</span>
               ${day.modifier ? `<span class="admin-import-pill">${escapeHtml(day.modifier)}</span>` : ''}
               ${day.note ? `<span class="admin-import-pill">${escapeHtml(day.note)}</span>` : ''}
-              ${day.needsCustom ? `
-                <label class="admin-btn admin-btn-sm">
-                  ${ICON.upload}<span>${upload ? 'Replace file' : 'Attach image/PDF'}</span>
-                  <input type="file" data-upload="${escapeHtml(day.key)}" accept="image/*,.pdf" hidden>
-                </label>
-                ${upload ? `<span class="admin-import-file">${escapeHtml(upload.name)}</span>` : ''}
-                <button type="button" class="admin-btn admin-btn-sm ${reviewed ? 'admin-btn-ghost' : ''}" data-review="${escapeHtml(day.key)}">${reviewed ? 'Reviewed' : 'Mark reviewed'}</button>
-              ` : ''}
+              ${day.needsCustom ? '<span class="admin-import-pill warning">Needs source monitor</span>' : ''}
             </div>
           </div>`;
       }).join('');
 
       host.innerHTML = `
         <div class="admin-import-alert ${attention ? 'danger' : 'ok'}">
-          <strong>${attention ? `${attention} custom day${attention === 1 ? '' : 's'} need review` : 'No custom days waiting for review'}</strong>
-          <span>${attention ? 'Attach the adjusted schedule image/PDF, then mark it reviewed before publishing manually.' : 'Default schedules can use the saved templates.'}</span>
+          <strong>${attention ? `${attention} custom day${attention === 1 ? '' : 's'} detected` : 'No custom days detected'}</strong>
+          <span>${attention ? 'A saved template cannot fully handle this. The next useful step is an automatic source monitor, not image upload.' : 'Default schedules can use the saved templates.'}</span>
         </div>
         <div class="admin-field">
           <div class="admin-field-row"><label>StudentSquare weekly schedule text</label></div>
@@ -892,36 +883,14 @@
       });
       host.querySelector('#parse-import').addEventListener('click', () => {
         const nextDays = parseWeeklySchedule(data.sourceText);
-        const oldUploads = data.uploads || {};
-        const oldReviewed = data.reviewed || {};
         data.days = nextDays;
-        data.uploads = Object.fromEntries(nextDays.filter(d => oldUploads[d.key]).map(d => [d.key, oldUploads[d.key]]));
-        data.reviewed = Object.fromEntries(nextDays.filter(d => oldReviewed[d.key]).map(d => [d.key, oldReviewed[d.key]]));
         persistAndPaint(nextDays.length ? `Detected ${nextDays.length} schedule day${nextDays.length === 1 ? '' : 's'}.` : 'No schedule lines detected.');
       });
       host.querySelector('#clear-import').addEventListener('click', () => {
-        state.importAssistant = { sourceText: '', days: [], uploads: {}, reviewed: {}, updatedAt: Date.now() };
+        state.importAssistant = { sourceText: '', days: [], updatedAt: Date.now() };
         saveImportAssistantState();
         renderSidebar();
         paint();
-      });
-      host.querySelectorAll('[data-upload]').forEach(input => {
-        input.addEventListener('change', e => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const key = e.target.dataset.upload;
-          data.uploads = data.uploads || {};
-          data.uploads[key] = { name: file.name, type: file.type || 'file', size: file.size, addedAt: Date.now() };
-          persistAndPaint('Attached schedule file to the draft.');
-        });
-      });
-      host.querySelectorAll('[data-review]').forEach(btn => {
-        btn.addEventListener('click', e => {
-          const key = e.currentTarget.dataset.review;
-          data.reviewed = data.reviewed || {};
-          data.reviewed[key] = !data.reviewed[key];
-          persistAndPaint(data.reviewed[key] ? 'Marked custom schedule reviewed.' : 'Marked custom schedule as needing review.');
-        });
       });
     }
 

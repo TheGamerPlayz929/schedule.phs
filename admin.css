@@ -456,14 +456,6 @@ input, textarea, select { font-family: inherit; }
   border-color: rgba(248,113,113,0.36);
   background: rgba(248,113,113,0.055);
 }
-.admin-import-file {
-  max-width: 180px;
-  color: var(--fg-3);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 @media (max-width: 900px) {
   .admin-import-day {
     grid-template-columns: 1fr;
