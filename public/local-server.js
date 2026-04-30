@@ -1,12 +1,12 @@
 // Simple static file server for the PHS schedule site.
 // Run: node local-server.js
-// Then open: http://localhost:3000
+// Then open: http://localhost:8080
 
 const http = require("http");
 const fs   = require("fs");
 const path = require("path");
 
-const PORT = 3000;
+const PORT = 8080;
 const ROOT = __dirname;
 
 const MIME = {
@@ -20,6 +20,8 @@ const MIME = {
   ".jpeg": "image/jpeg",
   ".svg":  "image/svg+xml",
   ".webp": "image/webp",
+  ".ttf":  "font/ttf",
+  ".otf":  "font/otf",
   ".woff": "font/woff",
   ".woff2":"font/woff2",
 };
@@ -31,6 +33,18 @@ http.createServer((req, res) => {
   const filePath = path.join(ROOT, urlPath);
 
   fs.readFile(filePath, (err, data) => {
+    if (err && !path.extname(filePath)) {
+      // Try appending .html for extensionless routes (e.g. /grademelon → grademelon.html)
+      return fs.readFile(filePath + ".html", (err2, data2) => {
+        if (err2) {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("404 Not Found: " + urlPath);
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(data2);
+      });
+    }
     if (err) {
       res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("404 Not Found: " + urlPath);

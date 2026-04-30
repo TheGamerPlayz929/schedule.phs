@@ -4,6 +4,12 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
 
+@font-face {
+  font-family: 'Alex Brush Local';
+  src: url('assets/fonts/AlexBrush-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
 :root {
   --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-serif: 'Instrument Serif', Georgia, serif;
@@ -200,29 +206,38 @@ ol {
    Hero Section
    ========================================================================== */
 .hero {
-  margin-top: 4vh;
-  margin-bottom: 56px;
+  margin-top: clamp(18px, 2.5vh, 34px);
+  margin-bottom: clamp(18px, 3vh, 34px);
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
+.hero--compact {
+  margin-top: clamp(16px, 2vh, 28px);
+  margin-bottom: clamp(18px, 2.5vh, 32px);
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 7px 16px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 24px;
+  margin-bottom: 10px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
+    0 18px 48px rgba(0, 0, 0, 0.22),
+    0 0 42px rgba(168, 85, 247, 0.12);
 }
 
 .status-dot {
@@ -242,19 +257,41 @@ ol {
   box-shadow: 0 0 8px var(--status-passing);
 }
 
-.status-badge[data-status="soon"] .status-dot {
+.status-badge[data-status="soon"] .status-dot,
+.status-badge[data-status="urgent"] .status-dot {
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
 }
 
 .hero-title-wrapper {
-  margin-bottom: 32px;
+  margin-bottom: 10px;
+  position: relative;
+  width: min(100%, 900px);
+  min-height: clamp(130px, 16vw, 190px);
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-title-wrapper.signature-single {
+  min-height: clamp(126px, 15vw, 176px);
+}
+
+.hero-title-wrapper.signature-double {
+  min-height: clamp(180px, 21vw, 238px);
+}
+
+.hero--compact .hero-title-wrapper {
+  min-height: auto;
+  margin-bottom: 0;
 }
 
 .hero-eyebrow {
-  font-family: var(--font-serif);
+  font-family: 'Alex Brush Local', var(--font-serif);
   font-size: 56px;
-  font-style: italic;
+  font-style: normal;
   font-weight: 400;
   color: var(--fg-2);
   line-height: 1.1;
@@ -262,11 +299,69 @@ ol {
 }
 
 .hero-title {
-  font-size: 80px;
+  font-family: 'Alex Brush Local', var(--font-serif);
+  font-size: 90px;
   font-weight: 400;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1;
   color: var(--fg-1);
+  text-shadow: 0 0 28px rgba(255, 255, 255, 0.2);
+}
+
+.signature-ready .hero-eyebrow,
+.signature-ready .hero-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.signature-stage {
+  display: none;
+  width: 100%;
+  margin: 0 auto;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.signature-stage.is-visible {
+  display: block;
+}
+
+.signature-stage--eyebrow {
+  height: clamp(50px, 6.6vw, 82px);
+  margin-bottom: -18px;
+}
+
+.signature-stage--title {
+  height: clamp(102px, 13vw, 166px);
+  margin-top: -8px;
+}
+
+.signature-stage svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.signature-fill {
+  fill: #fff;
+  filter:
+    drop-shadow(0 0 7px rgba(255, 255, 255, 0.5))
+    drop-shadow(0 0 28px rgba(255, 255, 255, 0.18));
+}
+
+.signature-glint {
+  fill: rgba(255, 255, 255, 0.72);
+  filter:
+    blur(0.4px)
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.62));
+  opacity: 0;
+  mix-blend-mode: screen;
 }
 
 /* ==========================================================================
@@ -375,6 +470,11 @@ ol {
    ========================================================================== */
 .schedule-section {
   margin-bottom: 80px;
+}
+
+.hero--compact + .schedule-section,
+.hero--compact + .grades-wrap {
+  margin-top: 0;
 }
 
 .schedule-header {

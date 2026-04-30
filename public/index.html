@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PHS Schedule</title>
-  <meta name="description" content="PHS Schedule">
+  <meta name="description" content="Beautiful Shader Experiences - PHS Schedule">
   <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
   <link rel="stylesheet" href="main.css">
 </head>
@@ -42,16 +42,42 @@
 
     <div class="hero-title-wrapper fade-up" style="--stagger: 2">
       <h2 class="hero-eyebrow" id="hero-eyebrow">Currently in</h2>
+      <div class="signature-stage signature-stage--eyebrow" id="signature-eyebrow" aria-hidden="true"></div>
       <h1 class="hero-title" id="hero-title">—</h1>
+      <div class="signature-stage signature-stage--title" id="signature-title" aria-hidden="true"></div>
     </div>
 
     <!-- Glass Countdown Panel -->
-    <div class="glass-circle fade-up" style="--stagger: 3">
-      <div class="countdown-wrapper" aria-live="polite">
-        <div class="cd-main" id="cd-hm">00 <span class="cd-min-label">m</span></div>
-        <div class="cd-sub">
-          <span class="cd-sec" id="cd-s">00</span>
-          <span class="cd-sec-label">SEC</span>
+    <div class="ring-wrap fade-up" style="--stagger: 3">
+      <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
+        <defs>
+          <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#c084fc"/>
+            <stop offset="100%" stop-color="#7c3aed"/>
+          </linearGradient>
+        </defs>
+        <path
+          class="progress-ring__track"
+          d="M 110 14
+             A 96 96 0 1 0 110 206
+             A 96 96 0 1 0 110 14"
+          pathLength="100"
+        />
+        <path
+          class="progress-ring__fill"
+          id="ring-fill"
+          d="M 110 14
+             A 96 96 0 1 0 110 206
+             A 96 96 0 1 0 110 14"
+          pathLength="100"
+        />
+      </svg>
+      <div class="glass-circle">
+        <div class="countdown-wrapper" aria-live="polite">
+          <div class="cd-main" id="cd-hm">0<span class="cd-min-label">m</span></div>
+          <div class="cd-sub" id="cd-sub">
+            <span class="cd-sec" id="cd-s">0</span>
+          </div>
         </div>
       </div>
     </div>
@@ -69,10 +95,12 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 5">
-    © Jayaditya & Emir / Poolesville High School
+    © Jayaditya & Emir / Poolesville High School / <a href="https://forms.gle/UrULj3gWiL9eqeif9" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Feedback Form</a><br>
+    <a href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;">✉ supportphss@gmail.com</a>
   </footer>
 </div>
 
+<script src="vendor/opentype.min.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
