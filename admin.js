@@ -1184,6 +1184,6 @@
   });
 
   // ── Init ───────────────────────────────────────────────────────────────
-  if (state.token) bootApp(); else showLogin();
-  loadAuthConfig();
+  if (isLocal || state.token) bootApp(); else showLogin();
+  if (!isLocal) loadAuthConfig();
 })();
