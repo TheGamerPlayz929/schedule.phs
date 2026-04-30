@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin · PHS Schedule</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ── Login screen ── -->
+<div id="login-shell" class="admin-login-shell">
+  <form class="admin-login-card" id="login-form">
+    <h1>Admin Sign In</h1>
+    <p>Restricted to authorised PHS staff. Enter the admin password to continue.</p>
+    <div class="admin-field">
+      <label for="login-password">Password</label>
+      <input id="login-password" class="admin-input" type="password" autocomplete="current-password" placeholder="••••••••" required>
+    </div>
+    <div id="login-error" class="admin-field-help" style="color:#ff6b6b;min-height:16px"></div>
+    <button id="login-btn" class="admin-btn admin-btn-primary" type="submit" style="width:100%">Sign In</button>
+  </form>
+</div>
+
+<!-- ── Main shell ── -->
+<div id="app-shell" class="admin-shell hidden">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <img src="phs-logo.png" alt="" class="admin-sidebar-brand-img">
+      <span class="admin-sidebar-brand-text">PHS Admin</span>
+    </div>
+
+    <div class="admin-sidebar-search">
+      <input id="search-input" type="search" class="admin-input" placeholder="Search settings…" autocomplete="off">
+    </div>
+
+    <nav id="tabs"></nav>
+
+    <div class="admin-sidebar-footer">
+      <button id="open-preview-btn" class="admin-btn admin-btn-sm">👁  Open Preview</button>
+      <button id="logout-btn" class="admin-btn admin-btn-sm admin-btn-ghost">Sign Out</button>
+      <div class="admin-status-line" id="conn-status">…</div>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <header class="admin-main-header">
+      <div>
+        <h1 id="tab-title">Branding</h1>
+        <div class="sub" id="tab-sub">Identity & visual basics for the public site.</div>
+      </div>
+      <div class="admin-actions">
+        <span id="dirty-pill" class="admin-dirty-pill">Unsaved</span>
+        <button id="discard-btn" class="admin-btn admin-btn-ghost" disabled>Discard</button>
+        <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish changes</button>
+      </div>
+    </header>
+
+    <div id="panels"></div>
+  </main>
+</div>
+
+<!-- ── Live preview overlay ── -->
+<div id="preview-host" class="admin-preview-host">
+  <div class="admin-preview-bar">
+    <div>
+      <button class="admin-btn admin-btn-sm" data-preview-page="index.html">Schedule</button>
+      <button class="admin-btn admin-btn-sm" data-preview-page="announcements.html">Announcements</button>
+      <button class="admin-btn admin-btn-sm" data-preview-page="gradeviewer.html">Grades</button>
+      <span class="label" id="preview-mode-label" style="margin-left:14px"></span>
+    </div>
+    <div>
+      <button id="preview-refresh-btn" class="admin-btn admin-btn-sm">Refresh</button>
+      <button id="preview-close-btn" class="admin-btn admin-btn-sm admin-btn-ghost">Close ✕</button>
+    </div>
+  </div>
+  <iframe id="preview-frame" class="admin-preview-frame" src="about:blank" title="Preview"></iframe>
+</div>
+
+<div class="admin-toast-host" id="toast-host"></div>
+
+<script src="admin.js"></script>
+</body>
+</html>

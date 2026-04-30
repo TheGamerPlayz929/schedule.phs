@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PHS Schedule</title>
-  <meta name="description" content="Beautiful Shader Experiences - PHS Schedule">
-  <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
+  <title data-bind="branding.siteTitle">PHS Schedule</title>
+  <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Beautiful Shader Experiences - PHS Schedule">
+  <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
@@ -21,27 +21,25 @@
   <!-- Navigation -->
   <nav class="glass-nav fade-up" style="--stagger: 0">
     <div class="brand-icon">
-      <a href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
-        <img src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
+      <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
+        <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
       </a>
     </div>
-    <div class="nav-links">
-      <a href="announcements.html" class="nav-btn">Announcements</a>
-      <a href="index.html" class="nav-btn active">Schedule</a>
-      <a href="gradeviewer.html" class="nav-btn">Grades</a>
+    <div class="nav-links" id="nav-links" data-page="schedule">
+      <!-- rendered from settings -->
     </div>
-    <div></div> <!-- Empty div for 3-column grid alignment -->
+    <div></div>
   </nav>
 
   <!-- Hero Section -->
   <main class="hero">
     <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off">
       <span class="status-dot"></span>
-      <span id="status-label">Loading...</span>
+      <span id="status-label" data-bind="hero.schedulePageStatusFallback">Loading...</span>
     </div>
 
     <div class="hero-title-wrapper fade-up" style="--stagger: 2">
-      <h2 class="hero-eyebrow" id="hero-eyebrow">Currently in</h2>
+      <h2 class="hero-eyebrow" id="hero-eyebrow" data-bind="hero.schedulePageEyebrow">Currently in</h2>
       <div class="signature-stage signature-stage--eyebrow" id="signature-eyebrow" aria-hidden="true"></div>
       <h1 class="hero-title" id="hero-title">—</h1>
       <div class="signature-stage signature-stage--title" id="signature-title" aria-hidden="true"></div>
@@ -74,7 +72,7 @@
       </svg>
       <div class="glass-circle">
         <div class="countdown-wrapper" aria-live="polite">
-          <div class="cd-main" id="cd-hm">0<span class="cd-min-label">m</span></div>
+          <div class="cd-main" id="cd-hm">0<span class="cd-min-label" data-bind="countdown.minSuffix">m</span></div>
           <div class="cd-sub" id="cd-sub">
             <span class="cd-sec" id="cd-s">0</span>
           </div>
@@ -95,11 +93,14 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 5">
-    © Jayaditya & Emir / Poolesville High School / <a href="https://forms.gle/UrULj3gWiL9eqeif9" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Feedback Form</a><br>
-    <a href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;">✉ supportphss@gmail.com</a>
+    <span data-bind="footer.copyright">© Jayaditya & Emir / Poolesville High School</span> /
+    <a data-bind="footer.feedbackUrl" data-bind-attr="href" href="https://forms.gle/UrULj3gWiL9eqeif9" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;"><span data-bind="footer.feedbackLabel">Feedback Form</span></a><br>
+    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;">✉ <span data-bind="footer.supportEmail">supportphss@gmail.com</span></a>
   </footer>
 </div>
 
+<script src="settings-loader.js"></script>
+<script src="nav-renderer.js"></script>
 <script src="vendor/opentype.min.js"></script>
 <script src="main.js"></script>
 </body>

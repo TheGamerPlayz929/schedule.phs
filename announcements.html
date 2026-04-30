@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Announcements - PHS</title>
-  <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
+  <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
   <link rel="stylesheet" href="main.css">
   <style>
     .announcements-list {
@@ -12,7 +12,6 @@
       flex-direction: column;
       gap: 16px;
     }
-    
     .announcement-card {
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid rgba(255, 255, 255, 0.04);
@@ -20,12 +19,10 @@
       padding: 24px 32px;
       transition: all 0.2s ease;
     }
-    
     .announcement-card:hover {
       background: rgba(255, 255, 255, 0.04);
       border-color: rgba(255, 255, 255, 0.08);
     }
-    
     .announcement-title {
       font-size: 20px;
       font-weight: 600;
@@ -33,13 +30,11 @@
       margin-bottom: 16px;
       letter-spacing: -0.02em;
     }
-    
     .announcement-content {
       color: var(--fg-2);
       font-size: 15px;
       line-height: 1.6;
     }
-    
     .announcement-content ul, .announcement-content ol {
       margin-top: 12px;
       padding-left: 20px;
@@ -48,16 +43,18 @@
       gap: 8px;
       list-style-type: disc;
     }
-    
     .announcement-content a {
       color: var(--accent);
       text-decoration: underline;
       text-decoration-color: rgba(168, 85, 247, 0.4);
       transition: all 0.2s;
     }
-    
-    .announcement-content a:hover {
-      text-decoration-color: var(--accent);
+    .announcement-content a:hover { text-decoration-color: var(--accent); }
+    .announcements-empty {
+      color: var(--fg-2);
+      text-align: center;
+      padding: 40px;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -71,63 +68,60 @@
 </div>
 
 <div class="app-shell">
-  <!-- Navigation -->
   <nav class="glass-nav fade-up" style="--stagger: 0">
     <div class="brand">
       <div class="brand-icon">
-        <a href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
-          <img src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
+        <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
+          <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
         </a>
       </div>
     </div>
-    <div class="nav-links">
-      <a href="announcements.html" class="nav-btn active">Announcements</a>
-      <a href="index.html" class="nav-btn">Schedule</a>
-      <a href="gradeviewer.html" class="nav-btn">Grades</a>
-    </div>
+    <div class="nav-links" id="nav-links" data-page="announcements"></div>
     <div></div>
   </nav>
 
-  <!-- Hero Section -->
   <main class="hero hero--compact">
     <div class="hero-title-wrapper fade-up" style="--stagger: 1">
-      <h1 class="hero-title" style="font-size: 56px;">Announcements</h1>
+      <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle">Announcements</h1>
     </div>
   </main>
 
-  <!-- Schedule Section -->
   <section class="schedule-section fade-up" style="--stagger: 2">
-    <div class="announcements-list">
-    
-      <div class="announcement-card">
-        <div class="announcement-title">Certificate</div>
-        <div class="announcement-content">
-          <ul>
-            <li> Certificate of Authenticity: The new website link is the one you are currently on.</li>
-          </ul>
-        </div>
-      </div>
-      
-      <div class="announcement-card">
-        <div class="announcement-title">Welcome!</div>
-        <div class="announcement-content">
-          <ul>
-            <li>Hello everyone!</li>
-            <li>This website was designed in response to the inconveniences students face with modern applications.</li>
-            <li>Working on importing GradeViewer™ for more ease of access.</li>
-          </ul>
-        </div>
-      </div>
-      
+    <div class="announcements-list" id="announcements-list">
+      <div class="announcements-empty">Loading…</div>
     </div>
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 3">
-    © Jayaditya & Emir / Poolesville High School / <a href="https://forms.gle/UrULj3gWiL9eqeif9" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Feedback Form</a><br>
-    <a href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;">✉ supportphss@gmail.com</a>
+    <span data-bind="footer.copyright">© Jayaditya & Emir / Poolesville High School</span> /
+    <a data-bind="footer.feedbackUrl" data-bind-attr="href" href="https://forms.gle/UrULj3gWiL9eqeif9" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;"><span data-bind="footer.feedbackLabel">Feedback Form</span></a><br>
+    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;">✉ <span data-bind="footer.supportEmail">supportphss@gmail.com</span></a>
   </footer>
 </div>
 
+<script src="settings-loader.js"></script>
+<script src="nav-renderer.js"></script>
+<script>
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function renderAnnouncements(settings) {
+    const list = document.getElementById('announcements-list');
+    if (!list) return;
+    const items = settings?.announcements?.items || [];
+    if (!items.length) {
+      list.innerHTML = '<div class="announcements-empty">No announcements yet.</div>';
+      return;
+    }
+    list.innerHTML = items.map(a => {
+      const bullets = (a.bullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join('');
+      return `<div class="announcement-card">
+        <div class="announcement-title">${escapeHtml(a.title || '')}</div>
+        <div class="announcement-content"><ul>${bullets}</ul></div>
+      </div>`;
+    }).join('');
+  }
+  document.addEventListener('site-settings:applied', e => renderAnnouncements(e.detail));
+  if (window.__SITE_SETTINGS__) renderAnnouncements(window.__SITE_SETTINGS__);
+</script>
 <script src="main.js"></script>
 </body>
 </html>
