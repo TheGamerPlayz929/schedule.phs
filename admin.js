@@ -9,6 +9,7 @@
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const BACKEND = isLocal ? 'http://localhost:3000' : 'https://phs-grades-backend.onrender.com';
   const TOKEN_KEY = 'phs:admin-token:v1';
+  const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
 
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
@@ -19,7 +20,8 @@
     draft: null,       // working copy with unsaved edits
     activeTab: 'branding',
     search: '',
-    previewMode: 'draft' // 'draft' | 'live'
+    previewMode: 'draft', // 'draft' | 'live'
+    importAssistant: null
   };
 
   // ── SVG icons (Lucide-style stroke icons, no emoji) ────────────────────
@@ -37,6 +39,7 @@
     countdown:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 3h6"/></svg>`,
     privacy:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-4 8-8 9-4-1-8-4-8-9V7z"/></svg>`,
     analytics:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="7" width="3" height="9"/><rect x="17" y="13" width="3" height="3"/></svg>`,
+    import:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>`,
     audit:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>`,
     search:      `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></svg>`,
     eye:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
@@ -91,6 +94,10 @@
     { id: 'bellSchedules',label: 'Bell Schedule',    icon: 'bell',
       sub: 'Edit individual periods for each schedule type. Empty templates fall back to data.json.',
       groups: [{ title: 'Templates', custom: 'bellEditor' }]
+    },
+    { id: 'importAssistant', label: 'Import Assistant', icon: 'import',
+      sub: 'Paste a StudentSquare weekly post, detect default schedules, and flag custom days that need review.',
+      groups: [{ title: 'Weekly schedule draft', custom: 'importAssistant' }]
     },
     { id: 'schedule',     label: 'Schedule Override',icon: 'schedule',
       sub: 'Force a schedule type for all users (overrides data.json).',
@@ -170,6 +177,21 @@
   function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+  function loadImportAssistantState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(IMPORT_STATE_KEY) || 'null');
+      if (saved && typeof saved === 'object') return saved;
+    } catch {}
+    return { sourceText: '', days: [], uploads: {}, reviewed: {}, updatedAt: null };
+  }
+  function saveImportAssistantState() {
+    localStorage.setItem(IMPORT_STATE_KEY, JSON.stringify(state.importAssistant));
+  }
+  function importAttentionCount() {
+    const days = state.importAssistant?.days || [];
+    return days.filter(d => d.needsCustom && !state.importAssistant?.reviewed?.[d.key]).length;
+  }
+  function scheduleAttentionCount() { return importAttentionCount(); }
   // seconds-from-midnight ⇄ "HH:MM"
   function secsToHHMM(s) {
     s = Math.max(0, Math.min(86399, parseInt(s, 10) || 0));
@@ -313,6 +335,7 @@
       state.settings = settings;
       state.defaults = defaults;
       state.draft = deepClone(settings);
+      state.importAssistant = loadImportAssistantState();
       showApp();
       renderSidebar();
       renderActiveTab();
@@ -341,7 +364,10 @@
       const b = document.createElement('button');
       b.className = 'admin-tab-btn' + (tab.id === state.activeTab ? ' active' : '');
       b.dataset.tab = tab.id;
-      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span>${escapeHtml(tab.label)}</span>`;
+      const attention = tab.id === 'importAssistant' ? importAttentionCount()
+        : tab.id === 'schedule' ? scheduleAttentionCount()
+        : 0;
+      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span class="admin-tab-label">${escapeHtml(tab.label)}</span>${attention ? `<span class="admin-tab-badge" title="${attention} custom schedule${attention === 1 ? '' : 's'} need review">${attention}</span>` : ''}`;
       b.addEventListener('click', () => { state.activeTab = tab.id; renderSidebar(); renderActiveTab(); });
       nav.appendChild(b);
     }
@@ -588,7 +614,12 @@
     function curType() { return state.draft.scheduleOverride?.type || 'none'; }
     function paint() {
       const cur = curType();
+      const attention = scheduleAttentionCount();
       host.innerHTML = `
+        ${attention ? `<div class="admin-import-alert danger">
+          <strong>${attention} imported custom schedule${attention === 1 ? '' : 's'} still need review</strong>
+          <span>Open Import Assistant, attach the adjusted bell schedule image/PDF, and mark it reviewed before changing the live override.</span>
+        </div>` : ''}
         <div class="admin-field">
           <div class="admin-field-row"><label>Active override</label></div>
           <select class="admin-select" id="sched-override-select">
@@ -743,6 +774,161 @@
     return host;
   }
 
+  function classifyScheduleLine(text) {
+    const lower = text.toLowerCase();
+    if (/(adjusted|special|assembly|testing|exam|pep rally|report card|homeroom|distribution)/.test(lower)) {
+      return { template: 'Custom adjusted schedule', needsCustom: true };
+    }
+    if (/(falcon time|ft\/?advisory|advisory)/.test(lower)) {
+      return { template: 'Advisory', needsCustom: false };
+    }
+    if (/early release/.test(lower)) {
+      return { template: 'Early Release', needsCustom: false };
+    }
+    if (/(delayed opening|delay)/.test(lower)) {
+      return { template: 'Delayed Opening', needsCustom: false };
+    }
+    if (/no school|closed|holiday/.test(lower)) {
+      return { template: 'No School', needsCustom: false };
+    }
+    if (/(standard|normal|bell schedule)/.test(lower)) {
+      return { template: 'Normal Schedule', needsCustom: false };
+    }
+    return { template: 'Needs review', needsCustom: true };
+  }
+
+  function parseWeeklySchedule(text) {
+    const lines = String(text || '')
+      .replace(/\u2013|\u2014/g, '-')
+      .split(/\n|•/)
+      .map(line => line.trim().replace(/^\d+\.\s*/, '').replace(/^[-*]\s*/, ''))
+      .filter(Boolean);
+    const dayRe = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*([^-\n]*)?\s*-\s*(.+)$/i;
+    const days = [];
+    for (const line of lines) {
+      const m = line.match(dayRe);
+      if (!m) continue;
+      const day = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
+      const date = (m[2] || '').trim().replace(/,$/, '');
+      const detail = (m[3] || '').trim();
+      const classified = classifyScheduleLine(detail);
+      const no8th = /no\s*(8th|eighth)\s*period/i.test(detail);
+      const key = `${day}-${date || days.length}`;
+      days.push({
+        key,
+        day,
+        date,
+        detail,
+        template: classified.template,
+        needsCustom: classified.needsCustom,
+        modifier: no8th ? 'No 8th period' : '',
+        note: /no homework weekend/i.test(detail) ? 'No Homework Weekend' : ''
+      });
+    }
+    return days;
+  }
+
+  function renderImportAssistant() {
+    const host = document.createElement('div');
+    state.importAssistant = state.importAssistant || loadImportAssistantState();
+
+    function persistAndPaint(message) {
+      state.importAssistant.updatedAt = Date.now();
+      saveImportAssistantState();
+      renderSidebar();
+      paint();
+      if (message) toast(message, 'success', 2200);
+    }
+
+    function paint() {
+      const data = state.importAssistant;
+      const attention = importAttentionCount();
+      const rows = (data.days || []).map(day => {
+        const upload = data.uploads?.[day.key];
+        const reviewed = !!data.reviewed?.[day.key];
+        return `
+          <div class="admin-import-day ${day.needsCustom && !reviewed ? 'needs-review' : ''}">
+            <div>
+              <div class="admin-import-day-title">${escapeHtml(day.day)}${day.date ? `, ${escapeHtml(day.date)}` : ''}</div>
+              <div class="admin-import-day-detail">${escapeHtml(day.detail)}</div>
+            </div>
+            <div class="admin-import-meta">
+              <span class="admin-import-pill ${day.needsCustom ? 'warning' : 'ok'}">${escapeHtml(day.template)}</span>
+              ${day.modifier ? `<span class="admin-import-pill">${escapeHtml(day.modifier)}</span>` : ''}
+              ${day.note ? `<span class="admin-import-pill">${escapeHtml(day.note)}</span>` : ''}
+              ${day.needsCustom ? `
+                <label class="admin-btn admin-btn-sm">
+                  ${ICON.upload}<span>${upload ? 'Replace file' : 'Attach image/PDF'}</span>
+                  <input type="file" data-upload="${escapeHtml(day.key)}" accept="image/*,.pdf" hidden>
+                </label>
+                ${upload ? `<span class="admin-import-file">${escapeHtml(upload.name)}</span>` : ''}
+                <button type="button" class="admin-btn admin-btn-sm ${reviewed ? 'admin-btn-ghost' : ''}" data-review="${escapeHtml(day.key)}">${reviewed ? 'Reviewed' : 'Mark reviewed'}</button>
+              ` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+      host.innerHTML = `
+        <div class="admin-import-alert ${attention ? 'danger' : 'ok'}">
+          <strong>${attention ? `${attention} custom day${attention === 1 ? '' : 's'} need review` : 'No custom days waiting for review'}</strong>
+          <span>${attention ? 'Attach the adjusted schedule image/PDF, then mark it reviewed before publishing manually.' : 'Default schedules can use the saved templates.'}</span>
+        </div>
+        <div class="admin-field">
+          <div class="admin-field-row"><label>StudentSquare weekly schedule text</label></div>
+          <textarea id="import-source" class="admin-textarea admin-import-textarea" placeholder="Paste the This Week's Schedule section here...">${escapeHtml(data.sourceText || '')}</textarea>
+          <div class="admin-field-help">This stays in your browser for drafting. It is not published or sent to the public site.</div>
+        </div>
+        <div class="row-gap-8 admin-import-actions">
+          <button type="button" class="admin-btn admin-btn-primary" id="parse-import">${ICON.import}<span>Parse weekly post</span></button>
+          <button type="button" class="admin-btn admin-btn-ghost" id="clear-import">Clear draft</button>
+        </div>
+        <hr class="admin-divider">
+        <div class="admin-import-list">${rows || '<div class="admin-field-help">No weekly schedule lines detected yet. Paste text like “Monday, April 27 - Standard Bell Schedule”.</div>'}</div>
+      `;
+
+      host.querySelector('#import-source').addEventListener('input', e => {
+        data.sourceText = e.target.value;
+        saveImportAssistantState();
+      });
+      host.querySelector('#parse-import').addEventListener('click', () => {
+        const nextDays = parseWeeklySchedule(data.sourceText);
+        const oldUploads = data.uploads || {};
+        const oldReviewed = data.reviewed || {};
+        data.days = nextDays;
+        data.uploads = Object.fromEntries(nextDays.filter(d => oldUploads[d.key]).map(d => [d.key, oldUploads[d.key]]));
+        data.reviewed = Object.fromEntries(nextDays.filter(d => oldReviewed[d.key]).map(d => [d.key, oldReviewed[d.key]]));
+        persistAndPaint(nextDays.length ? `Detected ${nextDays.length} schedule day${nextDays.length === 1 ? '' : 's'}.` : 'No schedule lines detected.');
+      });
+      host.querySelector('#clear-import').addEventListener('click', () => {
+        state.importAssistant = { sourceText: '', days: [], uploads: {}, reviewed: {}, updatedAt: Date.now() };
+        saveImportAssistantState();
+        renderSidebar();
+        paint();
+      });
+      host.querySelectorAll('[data-upload]').forEach(input => {
+        input.addEventListener('change', e => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const key = e.target.dataset.upload;
+          data.uploads = data.uploads || {};
+          data.uploads[key] = { name: file.name, type: file.type || 'file', size: file.size, addedAt: Date.now() };
+          persistAndPaint('Attached schedule file to the draft.');
+        });
+      });
+      host.querySelectorAll('[data-review]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const key = e.currentTarget.dataset.review;
+          data.reviewed = data.reviewed || {};
+          data.reviewed[key] = !data.reviewed[key];
+          persistAndPaint(data.reviewed[key] ? 'Marked custom schedule reviewed.' : 'Marked custom schedule as needing review.');
+        });
+      });
+    }
+
+    paint();
+    return host;
+  }
+
   function renderAuditLog() {
     const host = document.createElement('div');
     host.innerHTML = '<div class="admin-field-help">Loading…</div>';
@@ -871,6 +1057,7 @@
       else if (group.custom === 'announcementsEditor')  { card.appendChild(renderAnnouncementsEditor()); anyVisible = true; }
       else if (group.custom === 'scheduleOverrideEditor'){ card.appendChild(renderScheduleOverrideEditor()); anyVisible = true; }
       else if (group.custom === 'bellEditor')           { card.appendChild(renderBellEditor()); anyVisible = true; }
+      else if (group.custom === 'importAssistant')      { card.appendChild(renderImportAssistant()); anyVisible = true; }
       else if (group.custom === 'privacyParagraphsEditor'){ card.appendChild(renderPrivacyParagraphsEditor()); anyVisible = true; }
       else if (group.custom === 'analyticsDashboard')   { card.appendChild(renderAnalyticsDashboard()); anyVisible = true; }
       else if (group.custom === 'auditLog')             { card.appendChild(renderAuditLog()); anyVisible = true; }

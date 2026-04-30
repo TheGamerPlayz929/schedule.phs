@@ -120,6 +120,28 @@ input, textarea, select { font-family: inherit; }
   background: var(--bg-3);
   color: var(--fg-0);
 }
+.admin-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-tab-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--bg-1);
+}
 .admin-tab-icon {
   width: 16px; height: 16px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -338,6 +360,118 @@ input, textarea, select { font-family: inherit; }
 }
 .admin-bell-row .admin-input { padding: 6px 9px; font-size: 12.5px; }
 .admin-bell-row .role { font-size: 11px; color: var(--fg-4); }
+
+/* Schedule import assistant */
+.admin-import-alert {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-0);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: grid;
+  gap: 3px;
+}
+.admin-import-alert strong {
+  font-size: 13px;
+  color: var(--fg-1);
+}
+.admin-import-alert span {
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.admin-import-alert.danger {
+  border-color: rgba(248,113,113,0.42);
+  background: rgba(248,113,113,0.055);
+}
+.admin-import-alert.danger strong { color: #fca5a5; }
+.admin-import-alert.ok {
+  border-color: rgba(74,222,128,0.25);
+  background: rgba(74,222,128,0.045);
+}
+.admin-import-alert.ok strong { color: #86efac; }
+.admin-import-textarea {
+  min-height: 180px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+.admin-import-actions {
+  margin: 2px 0 12px;
+  flex-wrap: wrap;
+}
+.admin-import-list {
+  display: grid;
+  gap: 10px;
+}
+.admin-import-day {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  border-radius: 8px;
+  padding: 13px 14px;
+}
+.admin-import-day.needs-review {
+  border-color: rgba(248,113,113,0.42);
+  background: rgba(248,113,113,0.045);
+}
+.admin-import-day-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+}
+.admin-import-day-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--fg-3);
+}
+.admin-import-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.admin-import-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--fg-2);
+  background: var(--bg-0);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.admin-import-pill.ok {
+  color: #86efac;
+  border-color: rgba(74,222,128,0.28);
+  background: rgba(74,222,128,0.045);
+}
+.admin-import-pill.warning {
+  color: #fca5a5;
+  border-color: rgba(248,113,113,0.36);
+  background: rgba(248,113,113,0.055);
+}
+.admin-import-file {
+  max-width: 180px;
+  color: var(--fg-3);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .admin-import-day {
+    grid-template-columns: 1fr;
+  }
+  .admin-import-meta {
+    justify-content: flex-start;
+  }
+}
 
 /* ── Image upload ────────────────────────────────────────────────── */
 .admin-image-preview {
