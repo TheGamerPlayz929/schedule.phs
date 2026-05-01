@@ -126,22 +126,6 @@ input, textarea, select { font-family: inherit; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.admin-tab-badge {
-  margin-left: auto;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ef4444;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 0 0 2px var(--bg-1);
-}
 .admin-tab-icon {
   width: 16px; height: 16px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -362,33 +346,6 @@ input, textarea, select { font-family: inherit; }
 .admin-bell-row .role { font-size: 11px; color: var(--fg-4); }
 
 /* Schedule import assistant */
-.admin-import-alert {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg-0);
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  display: grid;
-  gap: 3px;
-}
-.admin-import-alert strong {
-  font-size: 13px;
-  color: var(--fg-1);
-}
-.admin-import-alert span {
-  font-size: 12px;
-  color: var(--fg-3);
-}
-.admin-import-alert.danger {
-  border-color: rgba(248,113,113,0.42);
-  background: rgba(248,113,113,0.055);
-}
-.admin-import-alert.danger strong { color: #fca5a5; }
-.admin-import-alert.ok {
-  border-color: rgba(74,222,128,0.25);
-  background: rgba(74,222,128,0.045);
-}
-.admin-import-alert.ok strong { color: #86efac; }
 .admin-import-textarea {
   min-height: 180px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -623,6 +580,129 @@ input, textarea, select { font-family: inherit; }
 .admin-preview-frame {
   flex: 1; width: 100%; border: none;
   background: var(--bg-0);
+}
+
+/* ── Schedule Image Import ───────────────────────────────────────── */
+.admin-import-warn {
+  border: 1px solid rgba(243, 194, 94, 0.45);
+  background: rgba(243, 194, 94, 0.06);
+  color: #f3c25e;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  margin-bottom: 18px;
+}
+.admin-import-warn strong { color: #fbe2a4; margin-right: 4px; }
+
+.admin-ai-dropbox {
+  min-height: 148px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015));
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  align-items: start;
+  font-family: "Aptos", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+.admin-ai-dropbox .admin-btn {
+  width: fit-content;
+}
+.admin-ai-placeholder {
+  color: var(--fg-3);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.admin-ai-dropbox.dragging {
+  border-color: rgba(255,255,255,0.34);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025));
+}
+.admin-image-import-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.admin-image-import-thumb {
+  position: relative;
+  margin: 0;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.admin-image-import-thumb img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  display: block;
+  border-bottom: 1px solid var(--line);
+  background: #000;
+}
+.admin-image-import-thumb figcaption {
+  padding: 7px 9px;
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-image-import-thumb .name {
+  color: var(--fg-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-image-import-thumb .status {
+  color: var(--fg-3);
+  font-size: 11px;
+}
+.admin-image-import-thumb [data-act=rm] {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: white;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.admin-import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.admin-import-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-4);
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 500;
+}
+.admin-import-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.admin-import-table .admin-input-sm {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--fg-1);
+}
+.admin-import-table .admin-input-sm:focus {
+  border-color: var(--line-focus);
+  outline: none;
 }
 
 /* ── Misc ────────────────────────────────────────────────────────── */

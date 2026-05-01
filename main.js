@@ -49,6 +49,18 @@ function _getOverrideData(targetType) {
   return null;
 }
 
+function _todayISODate() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _overrideAppliesToday(override) {
+  return !override?.date || override.date === _todayISODate();
+}
+
 function _isLocalhost() {
   return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 }
@@ -449,9 +461,12 @@ function calculateGoal() {
 
   let arr = data[str];
   // Apply admin schedule override if one is active
-  if (_scheduleOverride && _scheduleOverride.type) {
+  if (_scheduleOverride && _scheduleOverride.type && _overrideAppliesToday(_scheduleOverride)) {
     const overrideArr = _getOverrideData(_scheduleOverride.type);
     if (overrideArr) arr = overrideArr;
+    else if (window.__SITE_SETTINGS__?.bellSchedules?.[_scheduleOverride.type]) {
+      arr = [_scheduleOverride.type, window.__SITE_SETTINGS__.bellSchedules[_scheduleOverride.type]];
+    }
   }
   scheduleType = arr[0];
   let periods = arr[1];

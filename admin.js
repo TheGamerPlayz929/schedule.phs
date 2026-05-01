@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const BACKEND = isLocal ? 'http://localhost:3000' : 'https://phs-grades-backend.onrender.com';
   const TOKEN_KEY = 'phs:admin-token:v1';
   const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
@@ -92,16 +92,12 @@
       groups: [{ title: 'Cards', custom: 'announcementsEditor' }]
     },
     { id: 'bellSchedules',label: 'Bell Schedule',    icon: 'bell',
-      sub: 'Edit individual periods for each schedule type. Empty templates fall back to data.json.',
-      groups: [{ title: 'Templates', custom: 'bellEditor' }]
-    },
-    { id: 'importAssistant', label: 'Import Assistant', icon: 'import',
-      sub: 'Paste a StudentSquare weekly post, detect default schedules, and flag custom days that need review.',
-      groups: [{ title: 'Weekly schedule draft', custom: 'importAssistant' }]
-    },
-    { id: 'schedule',     label: 'Schedule Override',icon: 'schedule',
-      sub: 'Force a schedule type for all users (overrides data.json).',
-      groups: [{ title: 'Override', custom: 'scheduleOverrideEditor' }]
+      sub: 'Use a custom schedule for today, choose the active schedule, and edit reusable schedule types.',
+      groups: [
+        { title: 'Custom schedule from image', custom: 'scheduleImageImport' },
+        { title: 'Active override', custom: 'scheduleOverrideEditor' },
+        { title: 'Reusable schedules', custom: 'bellEditor' }
+      ]
     },
     { id: 'grades',       label: 'Grades Iframe',    icon: 'grades',
       sub: 'Where the embedded GradeMelon iframe loads from.',
@@ -112,8 +108,8 @@
           { path: 'grades.pageTitle',      label: 'Browser-tab title',      kind: 'text' },
         ]}]
     },
-    { id: 'gradeMelon',   label: 'GradeMelon Copy',  icon: 'grademelon',
-      sub: 'Text rendered inside the GradeMelon iframe (privacy FAQ, button labels).',
+    { id: 'gradeMelon',   label: 'GradeViewer FAQ/Privacy',  icon: 'grademelon',
+      sub: 'Privacy FAQ and button text shown in the GradeViewer page.',
       groups: [{
         title: 'Privacy / Safety FAQ', fields: [
           { path: 'gradeMelon.privacyButtonLabel', label: 'Link button label', kind: 'text' },
@@ -187,9 +183,9 @@
   function saveImportAssistantState() {
     localStorage.setItem(IMPORT_STATE_KEY, JSON.stringify(state.importAssistant));
   }
+  // Sidebar badge count: extracted-but-not-yet-applied rows in the Bell Schedule tab.
   function importAttentionCount() {
-    const days = state.importAssistant?.days || [];
-    return days.filter(d => d.needsCustom).length;
+    return 0;
   }
   function scheduleAttentionCount() { return importAttentionCount(); }
   // seconds-from-midnight ⇄ "HH:MM"
@@ -212,7 +208,16 @@
       opts.headers || {},
       opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {});
     if (state.token) init.headers['Authorization'] = 'Bearer ' + state.token;
-    const res = await fetch(BACKEND + path, init);
+    let res;
+    try {
+      res = await fetch(BACKEND + path, init);
+    } catch (e) {
+      const target = new URL(BACKEND).host;
+      if (path.includes('/admin/ai/')) {
+        throw new Error(`Could not reach the backend at ${target}. Make sure the backend is running and GEMINI_API_KEY is set there.`);
+      }
+      throw new Error(`Could not reach the backend at ${target}.`);
+    }
     if (res.status === 401) {
       state.token = null;
       localStorage.removeItem(TOKEN_KEY);
@@ -364,10 +369,7 @@
       const b = document.createElement('button');
       b.className = 'admin-tab-btn' + (tab.id === state.activeTab ? ' active' : '');
       b.dataset.tab = tab.id;
-      const attention = tab.id === 'importAssistant' ? importAttentionCount()
-        : tab.id === 'schedule' ? scheduleAttentionCount()
-        : 0;
-      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span class="admin-tab-label">${escapeHtml(tab.label)}</span>${attention ? `<span class="admin-tab-badge" title="${attention} custom schedule${attention === 1 ? '' : 's'} need review">${attention}</span>` : ''}`;
+      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span class="admin-tab-label">${escapeHtml(tab.label)}</span>`;
       b.addEventListener('click', () => { state.activeTab = tab.id; renderSidebar(); renderActiveTab(); });
       nav.appendChild(b);
     }
@@ -610,22 +612,20 @@
 
   function renderScheduleOverrideEditor() {
     const host = document.createElement('div');
-    const types = ['none', 'Normal Schedule', 'Advisory', 'Early Release', 'No School'];
+    const baseTypes = ['none', 'Normal Schedule', 'Advisory', 'Early Release', 'No School'];
+    const extraTypes = Object.keys(state.draft.bellSchedules || {})
+      .filter(t => t && !baseTypes.includes(t) && Object.keys(state.draft.bellSchedules[t] || {}).length);
+    const types = [...baseTypes, ...extraTypes];
     function curType() { return state.draft.scheduleOverride?.type || 'none'; }
     function paint() {
       const cur = curType();
-      const attention = scheduleAttentionCount();
       host.innerHTML = `
-        ${attention ? `<div class="admin-import-alert danger">
-          <strong>${attention} imported custom schedule${attention === 1 ? '' : 's'} detected</strong>
-          <span>Open Import Assistant to see which day cannot be handled by a saved template. This does not read images or publish automatically.</span>
-        </div>` : ''}
         <div class="admin-field">
           <div class="admin-field-row"><label>Active override</label></div>
           <select class="admin-select" id="sched-override-select">
             ${types.map(t => `<option value="${escapeHtml(t)}" ${t===cur?'selected':''}>${t==='none'?'— No override (use data.json) —':escapeHtml(t)}</option>`).join('')}
           </select>
-          <div class="admin-field-help">Saved overrides take effect for all users within 30 seconds.</div>
+          <div class="admin-field-help">This changes the draft. Click Publish when you are ready for visitors to see it.</div>
         </div>
         ${state.draft.scheduleOverride ? `<div class="admin-field-help">Set at ${new Date(state.draft.scheduleOverride.timestamp).toLocaleString()}.</div>` : ''}`;
       host.querySelector('#sched-override-select').addEventListener('change', (e) => {
@@ -641,7 +641,9 @@
   function renderBellEditor() {
     const host = document.createElement('div');
     state.draft.bellSchedules = state.draft.bellSchedules || {};
-    const types = ['Normal Schedule', 'Advisory', 'Early Release'];
+    const baseTypes = ['Normal Schedule', 'Advisory', 'Early Release'];
+    const extraTypes = Object.keys(state.draft.bellSchedules || {}).filter(t => t && !baseTypes.includes(t));
+    const types = [...baseTypes, ...extraTypes];
     let activeType = types[0];
 
     const tabs = document.createElement('div');
@@ -828,70 +830,343 @@
     return days;
   }
 
-  function renderImportAssistant() {
-    const host = document.createElement('div');
-    state.importAssistant = state.importAssistant || loadImportAssistantState();
+  // ─── Schedule Image Import (AI image extraction) ──────────────────────
+  // Nothing publishes automatically. "Use This Schedule" updates the local
+  // draft; the existing Publish button is the only way to ship changes.
 
-    function persistAndPaint(message) {
-      state.importAssistant.updatedAt = Date.now();
+  const TIME_RANGE_RE = /(\d{1,2}):?(\d{2})?\s*[-–—]\s*(\d{1,2}):?(\d{2})?/;
+
+  // 12-hour → 24-hour using lunch-aware heuristic
+  // Sequence: rebuild row-by-row. Once we cross a "Lunch" or any time that goes
+  // PM (e.g. 12:xx), every following 1-6 hour becomes PM (13-18).
+  function normalizeRowTimes(rows) {
+    let pmMode = false;
+    return rows.map(r => {
+      const startH24 = inferHour24(r.startH, r.startM, r.name, pmMode);
+      pmMode = pmMode || (startH24 >= 12 && startH24 < 19);
+      const endH24 = inferHour24(r.endH, r.endM, r.name, pmMode);
+      pmMode = pmMode || (endH24 >= 12 && endH24 < 19);
+      return {
+        name: r.name,
+        start: `${pad2(startH24)}:${pad2(r.startM)}`,
+        end:   `${pad2(endH24)}:${pad2(r.endM)}`
+      };
+    });
+  }
+  function inferHour24(h, m, name, pmMode) {
+    if (h === 12) return 12;          // 12:xx is always 12 (noon-ish)
+    if (h >= 13)  return h;           // already 24h
+    // Lunch is the canonical PM trigger for school schedules
+    if (/lunch/i.test(name) && h >= 11) return h;   // 11:xx Lunch stays 11
+    if (pmMode && h >= 1 && h <= 6)  return h + 12; // afternoon
+    if (h >= 7 && h <= 11) return h;                // morning
+    if (h >= 0 && h <= 6 && pmMode) return h + 12;
+    return h;
+  }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  // Pull schedule rows out of pasted schedule text. One row per non-empty line.
+  // Recognises: "Period 1 7:45 - 8:35", "1 7:45 – 8:35", "Lunch 11:15-12:00".
+  function parseScheduleText(rawText) {
+    if (!rawText) return [];
+    const lines = String(rawText)
+      .replace(/ /g, ' ')        // nbsp → space
+      .split(/\r?\n/);
+    const rows = [];
+    for (const line of lines) {
+      const m = TIME_RANGE_RE.exec(line);
+      if (!m) continue;
+      const startH = +m[1];
+      const startM = +(m[2] ?? 0);
+      const endH   = +m[3];
+      const endM   = +(m[4] ?? 0);
+      if (startH > 23 || endH > 23) continue;
+      // "name" = everything before the time range, cleaned up
+      let name = line.slice(0, m.index)
+        .replace(/[•·*–—\-]+\s*$/, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!name) continue;
+      // Bare leading "1" / "2" → "Period 1" / "Period 2"
+      if (/^\d{1,2}$/.test(name)) name = `Period ${name}`;
+      // Drop trailing duration column ("50 min") that some lines repeat
+      name = name.replace(/\s*\d+\s*min\s*$/i, '').trim();
+      rows.push({ name, startH, startM, endH, endM });
+    }
+    return normalizeRowTimes(rows);
+  }
+
+  function rowsToBellSchedule(rows) {
+    const out = {};
+    for (const r of rows) {
+      const start = hhmmToSecs(r.start);
+      const end   = hhmmToSecs(r.end);
+      if (start == null || end == null || end <= start) continue;
+      out[String(start)] = [end, r.name];
+    }
+    return out;
+  }
+
+  function defaultImageImportState() {
+    return {
+      images: [],            // [{ id, name, dataUrl, status }]
+      rows: [],              // [{ name, start, end }]  start/end = "HH:MM"
+      targetDate: todayISODate(),
+      customDraft: null,     // last applied custom-adjusted schedule (admin-only)
+      appliedAt: null,
+      updatedAt: null
+    };
+  }
+
+  function todayISODate() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function migrateImportState() {
+    const data = state.importAssistant;
+    if (!data || data.images === undefined) {
+      state.importAssistant = defaultImageImportState();
       saveImportAssistantState();
-      renderSidebar();
-      paint();
-      if (message) toast(message, 'success', 2200);
+    }
+  }
+
+  function renderScheduleImageImport() {
+    migrateImportState();
+    const host = document.createElement('div');
+    const data = state.importAssistant;
+
+    function persist() {
+      data.updatedAt = Date.now();
+      saveImportAssistantState();
     }
 
     function paint() {
-      const data = state.importAssistant;
-      const attention = importAttentionCount();
-      const rows = (data.days || []).map(day => {
-        return `
-          <div class="admin-import-day ${day.needsCustom ? 'needs-review' : ''}">
-            <div>
-              <div class="admin-import-day-title">${escapeHtml(day.day)}${day.date ? `, ${escapeHtml(day.date)}` : ''}</div>
-              <div class="admin-import-day-detail">${escapeHtml(day.detail)}</div>
-            </div>
-            <div class="admin-import-meta">
-              <span class="admin-import-pill ${day.needsCustom ? 'warning' : 'ok'}">${escapeHtml(day.template)}</span>
-              ${day.modifier ? `<span class="admin-import-pill">${escapeHtml(day.modifier)}</span>` : ''}
-              ${day.note ? `<span class="admin-import-pill">${escapeHtml(day.note)}</span>` : ''}
-              ${day.needsCustom ? '<span class="admin-import-pill warning">Needs source monitor</span>' : ''}
-            </div>
-          </div>`;
-      }).join('');
-
+      data.targetDate = data.targetDate || todayISODate();
       host.innerHTML = `
-        <div class="admin-import-alert ${attention ? 'danger' : 'ok'}">
-          <strong>${attention ? `${attention} custom day${attention === 1 ? '' : 's'} detected` : 'No custom days detected'}</strong>
-          <span>${attention ? 'A saved template cannot fully handle this. The next useful step is an automatic source monitor, not image upload.' : 'Default schedules can use the saved templates.'}</span>
+        <div class="admin-import-warn">
+          <strong>Review before publishing.</strong> Upload a custom bell schedule image, check the rows, then choose the day it should be used. Nothing goes live until Publish.
         </div>
+
         <div class="admin-field">
-          <div class="admin-field-row"><label>StudentSquare weekly schedule text</label></div>
-          <textarea id="import-source" class="admin-textarea admin-import-textarea" placeholder="Paste the This Week's Schedule section here...">${escapeHtml(data.sourceText || '')}</textarea>
-          <div class="admin-field-help">This stays in your browser for drafting. It is not published or sent to the public site.</div>
+          <div class="admin-field-row"><label>1 · Upload custom schedule image</label></div>
+          <div class="admin-ai-dropbox" id="oi-drop">
+            <input type="file" id="oi-files" accept="image/*" multiple hidden>
+            <button type="button" class="admin-btn admin-btn-sm" id="oi-pick">${ICON.upload || ''}<span>Add images</span></button>
+            <span class="admin-ai-placeholder">Drop or choose a bell schedule screenshot. The AI will turn it into editable rows below.</span>
+            <div id="oi-thumbs" class="admin-image-import-thumbs"></div>
+          </div>
+          <div class="admin-field-help">Only upload schedule images. Do not upload screenshots with student names, grades, messages, or private info.</div>
         </div>
-        <div class="row-gap-8 admin-import-actions">
-          <button type="button" class="admin-btn admin-btn-primary" id="parse-import">${ICON.import}<span>Parse weekly post</span></button>
-          <button type="button" class="admin-btn admin-btn-ghost" id="clear-import">Clear draft</button>
+
+        <div class="row-gap-8" style="margin-bottom:14px">
+          <button type="button" class="admin-btn admin-btn-primary" id="oi-extract" ${data.images.length ? '' : 'disabled'}>Extract Schedule</button>
+          <button type="button" class="admin-btn admin-btn-sm admin-btn-ghost" id="oi-clear-images" ${data.images.length ? '' : 'disabled'}>Remove all images</button>
+          <span class="admin-field-help" id="oi-status"></span>
         </div>
+
+        <div class="admin-field">
+          <div class="admin-field-row"><label>2 · Preview rows (editable)</label></div>
+          <table class="admin-import-table" id="oi-table"></table>
+          <button type="button" class="admin-btn admin-btn-sm" id="oi-add-row" style="margin-top:8px">+ Add row</button>
+        </div>
+
         <hr class="admin-divider">
-        <div class="admin-import-list">${rows || '<div class="admin-field-help">No weekly schedule lines detected yet. Paste text like “Monday, April 27 - Standard Bell Schedule”.</div>'}</div>
+
+        <div class="admin-field">
+          <div class="admin-field-row"><label>3 · Use this custom schedule</label></div>
+          <input type="date" class="admin-input" id="oi-date" value="${escapeHtml(data.targetDate)}">
+          <div class="admin-field-help" id="oi-target-note"></div>
+        </div>
+        <div class="row-gap-8">
+          <button type="button" class="admin-btn admin-btn-primary" id="oi-apply" ${data.rows.length ? '' : 'disabled'}>Use This Schedule</button>
+          <button type="button" class="admin-btn admin-btn-ghost" id="oi-clear-all">Clear everything</button>
+        </div>
       `;
 
-      host.querySelector('#import-source').addEventListener('input', e => {
-        data.sourceText = e.target.value;
-        saveImportAssistantState();
+      paintThumbs();
+      paintTable();
+      paintTargetNote();
+
+      host.querySelector('#oi-pick').addEventListener('click', () => host.querySelector('#oi-files').click());
+      host.querySelector('#oi-files').addEventListener('change', onFiles);
+      const drop = host.querySelector('#oi-drop');
+      drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragging'); });
+      drop.addEventListener('dragleave', () => drop.classList.remove('dragging'));
+      drop.addEventListener('drop', e => {
+        e.preventDefault();
+        drop.classList.remove('dragging');
+        onFiles({ target: { files: e.dataTransfer.files, value: '' } });
       });
-      host.querySelector('#parse-import').addEventListener('click', () => {
-        const nextDays = parseWeeklySchedule(data.sourceText);
-        data.days = nextDays;
-        persistAndPaint(nextDays.length ? `Detected ${nextDays.length} schedule day${nextDays.length === 1 ? '' : 's'}.` : 'No schedule lines detected.');
+      host.querySelector('#oi-clear-images').addEventListener('click', () => {
+        data.images = [];
+        persist(); paint();
       });
-      host.querySelector('#clear-import').addEventListener('click', () => {
-        state.importAssistant = { sourceText: '', days: [], updatedAt: Date.now() };
-        saveImportAssistantState();
+      host.querySelector('#oi-extract').addEventListener('click', extractScheduleFromImages);
+      host.querySelector('#oi-add-row').addEventListener('click', () => {
+        data.rows.push({ name: 'Period', start: '08:00', end: '08:45' });
+        data.appliedAt = null;
+        persist(); paintTable();
+        host.querySelector('#oi-apply').disabled = !data.rows.length;
+      });
+      host.querySelector('#oi-date').addEventListener('change', e => { data.targetDate = e.target.value || todayISODate(); persist(); paintTargetNote(); });
+      host.querySelector('#oi-apply').addEventListener('click', onApply);
+      host.querySelector('#oi-clear-all').addEventListener('click', () => {
+        if (!confirm('Clear images and drafted rows? Your active schedule is not affected.')) return;
+        Object.assign(data, defaultImageImportState());
+        persist();
         renderSidebar();
         paint();
       });
+    }
+
+    function paintThumbs() {
+      const wrap = host.querySelector('#oi-thumbs');
+      if (!data.images.length) { wrap.innerHTML = ''; return; }
+      wrap.innerHTML = data.images.map(img => `
+        <figure class="admin-image-import-thumb" data-id="${escapeHtml(img.id)}">
+          <img src="${img.dataUrl}" alt="">
+          <figcaption>
+            <div class="name">${escapeHtml(img.name)}</div>
+            <div class="status">${img.status === 'done' ? 'Extracted' :
+                                  img.status === 'running' ? 'Reading…' :
+                                  img.status === 'error' ? `Error: ${escapeHtml(img.error || 'unknown')}` :
+                                  'Ready'}</div>
+          </figcaption>
+          <button class="admin-btn admin-btn-sm admin-btn-ghost" data-act="rm">×</button>
+        </figure>
+      `).join('');
+      wrap.querySelectorAll('[data-act=rm]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = b.closest('[data-id]').dataset.id;
+          data.images = data.images.filter(x => x.id !== id);
+          persist(); paint();
+        });
+      });
+    }
+
+    function paintTable() {
+      const tbl = host.querySelector('#oi-table');
+      if (!data.rows.length) {
+        tbl.innerHTML = `<tbody><tr><td colspan="5" class="admin-field-help" style="padding:14px">No rows yet. Upload schedule images, then click Extract Schedule.</td></tr></tbody>`;
+        return;
+      }
+      tbl.innerHTML = `
+        <thead><tr><th>Period</th><th>Start</th><th>End</th><th>Duration</th><th></th></tr></thead>
+        <tbody>${data.rows.map((r, i) => {
+          const dur = (hhmmToSecs(r.end) ?? 0) - (hhmmToSecs(r.start) ?? 0);
+          return `<tr data-i="${i}">
+            <td><input class="admin-input admin-input-sm" data-f="name" value="${escapeHtml(r.name)}" maxlength="60"></td>
+            <td><input class="admin-input admin-input-sm" data-f="start" value="${escapeHtml(r.start)}" placeholder="HH:MM" maxlength="5"></td>
+            <td><input class="admin-input admin-input-sm" data-f="end" value="${escapeHtml(r.end)}" placeholder="HH:MM" maxlength="5"></td>
+            <td class="muted">${dur > 0 ? Math.round(dur / 60) + ' min' : '—'}</td>
+            <td><button type="button" class="admin-btn admin-btn-sm admin-btn-danger" data-act="del">Delete</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      `;
+      tbl.querySelectorAll('input[data-f]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const tr = inp.closest('tr');
+          const i = +tr.dataset.i;
+          data.rows[i][inp.dataset.f] = inp.value;
+          data.appliedAt = null;
+          persist();
+        });
+        inp.addEventListener('blur', () => paintTable()); // re-render duration
+      });
+      tbl.querySelectorAll('[data-act=del]').forEach(b => {
+        b.addEventListener('click', () => {
+          const i = +b.closest('tr').dataset.i;
+          data.rows.splice(i, 1);
+          data.appliedAt = null;
+          persist(); paintTable();
+          host.querySelector('#oi-apply').disabled = !data.rows.length;
+        });
+      });
+    }
+
+    function paintTargetNote() {
+      const note = host.querySelector('#oi-target-note');
+      const d = data.targetDate || todayISODate();
+      note.textContent = `This will set the active schedule to Custom Adjusted Schedule for ${d}. The Publish button is still required before visitors see it.`;
+    }
+
+    async function onFiles(e) {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      for (const f of files) {
+        if (!f.type.startsWith('image/')) continue;
+        if (f.size > 8 * 1024 * 1024) { toast(`${f.name}: image too large (max 8 MB)`, 'error', 4000); continue; }
+        const dataUrl = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+        data.images.push({ id: 'i_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: f.name, dataUrl, status: 'ready' });
+      }
+      persist(); paint();
+    }
+
+    async function extractScheduleFromImages() {
+      if (!data.images.length) {
+        toast('Add at least one schedule image first.', 'error', 3000);
+        return;
+      }
+      const status = host.querySelector('#oi-status');
+      status.textContent = 'Reading schedule images…';
+      data.images.forEach(img => { img.status = 'running'; img.error = ''; });
+      persist();
+      paintThumbs();
+      try {
+        const resp = await api('/admin/ai/extract-schedule-image', {
+          method: 'POST',
+          body: JSON.stringify({
+            images: data.images.map(({ name, dataUrl }) => ({ name, dataUrl }))
+          })
+        });
+        if (!Array.isArray(resp.rows)) throw new Error('Backend returned unexpected response');
+        data.rows = resp.rows.map(r => ({
+          name: String(r.name || '').slice(0, 60),
+          start: String(r.start || '').slice(0, 5),
+          end:   String(r.end   || '').slice(0, 5)
+        })).filter(r => r.name && /^\d{1,2}:\d{2}$/.test(r.start) && /^\d{1,2}:\d{2}$/.test(r.end));
+        data.appliedAt = null;
+        data.images.forEach(img => { img.status = 'done'; });
+        persist();
+        paintThumbs();
+        paintTable();
+        renderSidebar();
+        host.querySelector('#oi-apply').disabled = !data.rows.length;
+        status.textContent = `Extracted ${data.rows.length} row${data.rows.length === 1 ? '' : 's'}.`;
+        toast('Schedule rows extracted. Review every row before applying.', 'success', 3500);
+      } catch (e) {
+        for (const img of data.images) if (img.status === 'running') { img.status = 'error'; img.error = e.message; }
+        persist();
+        paintThumbs();
+        status.textContent = 'Extraction failed: ' + e.message;
+        toast(e.message, 'error', 5000);
+      }
+    }
+
+    function onApply() {
+      if (!data.rows.length) return;
+      const target = 'Custom Adjusted Schedule';
+      const bs = rowsToBellSchedule(data.rows);
+      if (!Object.keys(bs).length) { toast('No valid rows — fix HH:MM values first.', 'error', 4000); return; }
+      state.draft.bellSchedules = state.draft.bellSchedules || {};
+      state.draft.bellSchedules[target] = bs;
+      state.draft.scheduleOverride = { type: target, date: data.targetDate || todayISODate(), timestamp: Date.now() };
+      data.customDraft = { rows: data.rows.slice(), date: data.targetDate || todayISODate(), savedAt: Date.now() };
+      data.appliedAt = Date.now();
+      persist();
+      markDirty();
+      renderSidebar();
+      pushPreview();
+      toast('Custom schedule is ready in your draft. Click Publish to make it live.', 'success', 4500);
     }
 
     paint();
@@ -1026,7 +1301,7 @@
       else if (group.custom === 'announcementsEditor')  { card.appendChild(renderAnnouncementsEditor()); anyVisible = true; }
       else if (group.custom === 'scheduleOverrideEditor'){ card.appendChild(renderScheduleOverrideEditor()); anyVisible = true; }
       else if (group.custom === 'bellEditor')           { card.appendChild(renderBellEditor()); anyVisible = true; }
-      else if (group.custom === 'importAssistant')      { card.appendChild(renderImportAssistant()); anyVisible = true; }
+      else if (group.custom === 'scheduleImageImport') { card.appendChild(renderScheduleImageImport()); anyVisible = true; }
       else if (group.custom === 'privacyParagraphsEditor'){ card.appendChild(renderPrivacyParagraphsEditor()); anyVisible = true; }
       else if (group.custom === 'analyticsDashboard')   { card.appendChild(renderAnalyticsDashboard()); anyVisible = true; }
       else if (group.custom === 'auditLog')             { card.appendChild(renderAuditLog()); anyVisible = true; }
