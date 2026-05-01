@@ -72,7 +72,9 @@
       heroTitleSize: '--hero-title-size',
       countdownSize: '--countdown-size',
       scheduleTitleSize: '--schedule-title-size',
+      periodTimeSize: '--period-time-size',
       periodNameSize: '--period-name-size',
+      periodDurationSize: '--period-duration-size',
       periodCardPadding: '--period-card-padding',
       periodCardRadius: '--period-card-radius',
       footerSize: '--footer-size'

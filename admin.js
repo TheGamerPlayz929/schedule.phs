@@ -120,21 +120,17 @@
         title: 'Modal paragraphs', custom: 'privacyParagraphsEditor'
       }]
     },
-    { id: 'theme',        label: 'Theme Colors',     icon: 'theme',
-      sub: 'CSS variables applied site-wide (--accent, --bg-1, etc.).',
+    { id: 'appearance',   label: 'Appearance',       icon: 'theme',
+      sub: 'Staff defaults for colors, sizing, and spacing on the public pages.',
       groups: [{
-        title: 'Palette', fields: [
+        title: 'Theme colors', fields: [
           { path: 'theme.accent',  label: 'Accent',           kind: 'color' },
           { path: 'theme.accent2', label: 'Accent (deep)',    kind: 'color' },
           { path: 'theme.bg1',     label: 'Background outer', kind: 'color' },
           { path: 'theme.bg2',     label: 'Background inner', kind: 'color' },
           { path: 'theme.fg1',     label: 'Foreground',       kind: 'color' },
           { path: 'theme.fg2',     label: 'Muted foreground', kind: 'color' },
-        ]}]
-    },
-    { id: 'appearance',   label: 'Appearance',       icon: 'theme',
-      sub: 'Staff defaults for sizing and spacing on the public pages.',
-      groups: [{
+        ]},{
         title: 'Hero and countdown', fields: [
           { path: 'appearance.heroEyebrowSize', label: 'Hero eyebrow size', kind: 'number', min: 28, max: 110, step: 1, unit: 'px' },
           { path: 'appearance.heroTitleSize',   label: 'Hero title size',   kind: 'number', min: 42, max: 160, step: 1, unit: 'px' },
@@ -142,7 +138,9 @@
         ]},{
         title: 'Schedule list', fields: [
           { path: 'appearance.scheduleTitleSize', label: 'Schedule heading size', kind: 'number', min: 14, max: 44, step: 1, unit: 'px' },
+          { path: 'appearance.periodTimeSize',    label: 'Time text size',        kind: 'number', min: 10, max: 24, step: 1, unit: 'px' },
           { path: 'appearance.periodNameSize',    label: 'Period name size',      kind: 'number', min: 11, max: 28, step: 1, unit: 'px' },
+          { path: 'appearance.periodDurationSize', label: 'Duration text size',    kind: 'number', min: 10, max: 24, step: 1, unit: 'px' },
           { path: 'appearance.periodCardPadding', label: 'Period card padding',   kind: 'number', min: 8, max: 34, step: 1, unit: 'px' },
           { path: 'appearance.periodCardRadius',  label: 'Period card radius',    kind: 'number', min: 0, max: 28, step: 1, unit: 'px' },
         ]},{

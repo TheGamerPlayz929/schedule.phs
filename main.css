@@ -528,7 +528,7 @@ ol {
 
 .period-time {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--period-time-size, 13px) * var(--user-text-scale));
   color: var(--fg-3);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -541,7 +541,7 @@ ol {
 }
 
 .period-meta {
-  font-size: 14px;
+  font-size: calc(var(--period-duration-size, 14px) * var(--user-text-scale));
   color: var(--fg-3);
   text-align: right;
 }
@@ -871,7 +871,7 @@ ol {
 
   .period-time {
     grid-column: 1 / -1;
-    font-size: 10px;
+    font-size: calc(var(--period-time-size, 13px) * var(--user-text-scale));
     margin-bottom: 2px;
   }
 
