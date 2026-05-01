@@ -1265,17 +1265,47 @@
         }
       }
 
-      const pageRows = Object.entries(pages)
-        .sort((a, b) => b[1].pageviews - a[1].pageviews)
+      const pageEntries = Object.entries(pages).sort((a, b) => b[1].pageviews - a[1].pageviews);
+      const maxPageViews = Math.max(1, ...pageEntries.map(([, m]) => m.pageviews || 0));
+      const trendDays = keys.slice(-7);
+      const maxDayViews = Math.max(1, ...trendDays.map(key => days[key]?.totals?.pageviews || 0));
+
+      const pageRows = pageEntries
         .map(([page, m]) => `
           <tr>
-            <td class="action">${escapeHtml(pageLabel(page))}</td>
+            <td class="action">
+              <div class="admin-page-cell">
+                <span>${escapeHtml(pageLabel(page))}</span>
+                <span class="admin-page-bar"><i style="width:${Math.round(((m.pageviews || 0) / maxPageViews) * 100)}%"></i></span>
+              </div>
+            </td>
             <td>${formatNumber(m.pageviews)}</td>
             <td>${formatDuration(m.durationSeconds)}</td>
             <td>${formatNumber(j.active?.pages?.[page] || 0)}</td>
           </tr>`).join('');
 
-      const dayRows = last7.reverse().map(key => {
+      const trendBars = trendDays.map(key => {
+        const t = days[key]?.totals || {};
+        const label = key.slice(5).replace('-', '/');
+        const height = Math.max(4, Math.round(((t.pageviews || 0) / maxDayViews) * 100));
+        return `<div class="admin-trend-bar" title="${escapeHtml(key)} · ${formatNumber(t.pageviews)} views">
+          <span style="height:${height}%"></span>
+          <strong>${formatNumber(t.pageviews)}</strong>
+          <em>${escapeHtml(label)}</em>
+        </div>`;
+      }).join('');
+
+      const pageBars = pageEntries.map(([page, m]) => `
+        <div class="admin-rank-row">
+          <div>
+            <strong>${escapeHtml(pageLabel(page))}</strong>
+            <span>${formatDuration(m.durationSeconds)} total time · ${formatNumber(j.active?.pages?.[page] || 0)} active</span>
+          </div>
+          <div class="admin-rank-meter"><span style="width:${Math.round(((m.pageviews || 0) / maxPageViews) * 100)}%"></span></div>
+          <b>${formatNumber(m.pageviews)}</b>
+        </div>`).join('');
+
+      const dayRows = [...last7].reverse().map(key => {
         const t = days[key]?.totals || {};
         return `<tr>
           <td class="action">${escapeHtml(key)}</td>
@@ -1287,15 +1317,31 @@
 
       host.innerHTML = `
         <div class="admin-stat-grid">
-          <div class="admin-stat"><span>GA active users</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.activeUsers || 0) : 'Not set'}</strong></div>
-          <div class="admin-stat"><span>GA 7-day views</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.pageviews || 0) : '—'}</strong></div>
-          <div class="admin-stat"><span>First-party active now</span><strong>${formatNumber(j.active?.total || 0)}</strong></div>
-          <div class="admin-stat"><span>First-party 7-day views</span><strong>${formatNumber(totals.pageviews)}</strong></div>
+          <div class="admin-stat"><span>GA active users</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.activeUsers || 0) : 'Not set'}</strong><small>Google Analytics</small></div>
+          <div class="admin-stat"><span>GA 7-day views</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.pageviews || 0) : '-'}</strong><small>${ga.configured && !ga.error ? `${formatNumber(ga.totals?.sessions || 0)} sessions` : 'Waiting for setup'}</small></div>
+          <div class="admin-stat"><span>Active now</span><strong>${formatNumber(j.active?.total || 0)}</strong><small>First-party live count</small></div>
+          <div class="admin-stat"><span>First-party 7-day views</span><strong>${formatNumber(totals.pageviews)}</strong><small>${formatDuration(totals.durationSeconds)} total time</small></div>
         </div>
         <div class="${ga.configured && !ga.error ? 'admin-privacy-note' : 'admin-setup-note'}">
           ${ga.configured && !ga.error
             ? `Google Analytics connected to property ${escapeHtml(ga.propertyId || '')}. First-party privacy-safe stats remain below as fallback.`
-            : `Google Analytics is not configured yet. Set GA4_PROPERTY_ID and GOOGLE_APPLICATION_CREDENTIALS_JSON on the backend to show GA data here.`}
+            : `Google Analytics is not configured yet. Set GA4_PROPERTY_ID and OAuth analytics env vars on the backend to show GA data here.`}
+        </div>
+        <div class="admin-analytics-grid">
+          <section class="admin-analytics-panel admin-analytics-panel--wide">
+            <div class="admin-panel-heading">
+              <h2>7-day traffic trend</h2>
+              <span>First-party page views</span>
+            </div>
+            <div class="admin-trend-chart">${trendBars || '<div class="admin-field-help">No daily data yet.</div>'}</div>
+          </section>
+          <section class="admin-analytics-panel">
+            <div class="admin-panel-heading">
+              <h2>Top pages</h2>
+              <span>Views by section</span>
+            </div>
+            <div class="admin-rank-list">${pageBars || '<div class="admin-field-help">No page data yet.</div>'}</div>
+          </section>
         </div>
         ${ga.configured && !ga.error ? `<h2 style="margin-top:22px">Google Analytics pages</h2>
         <table class="admin-audit-table">
