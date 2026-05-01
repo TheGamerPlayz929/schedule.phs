@@ -1011,7 +1011,7 @@ ol {
   height: 22px;
   border: 0;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--slider-accent, var(--accent));
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
 }
 .appearance-slider input::-moz-range-thumb {
@@ -1019,7 +1019,7 @@ ol {
   height: 22px;
   border: 0;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--slider-accent, var(--accent));
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
 }
 .appearance-action {

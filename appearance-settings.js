@@ -69,6 +69,9 @@
     root.style.setProperty('--accent', accent);
     root.style.setProperty('--ring-start', mix(accent, 0.28));
     root.style.setProperty('--ring-end', accent);
+    document.querySelectorAll('#ringGradient stop').forEach((stop, index) => {
+      stop.setAttribute('stop-color', index === 0 ? mix(accent, 0.28) : accent);
+    });
     root.style.setProperty('--user-text-scale', String(settings.textScale || 1));
     document.body.classList.remove('user-light-theme');
     document.body.classList.toggle('user-reduce-glow', Boolean(settings.reduceGlow));
@@ -87,9 +90,9 @@
     });
     return `linear-gradient(90deg, ${stops.join(', ')})`;
   }
-  function sliderFill(value, min, max) {
+  function sliderFill(value, min, max, color) {
     const pct = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
-    return `linear-gradient(90deg, var(--accent) 0 ${pct}%, rgba(255,255,255,0.88) ${pct}% 100%)`;
+    return `linear-gradient(90deg, ${color} 0 ${pct}%, rgba(255,255,255,0.88) ${pct}% 100%)`;
   }
 
   function mount() {
@@ -130,8 +133,10 @@
       glow.checked = Boolean(current.reduceGlow);
       intensityValue.textContent = `${current.intensity}%`;
       scaleValue.textContent = `${Math.round(current.textScale * 100)}%`;
-      intensity.style.background = sliderFill(current.intensity, 15, 100);
-      scale.style.background = sliderFill(current.textScale, 0.85, 1.2);
+      intensity.style.setProperty('--slider-accent', current.accent);
+      scale.style.setProperty('--slider-accent', current.accent);
+      intensity.style.background = sliderFill(current.intensity, 15, 100, current.accent);
+      scale.style.background = sliderFill(current.textScale, 0.85, 1.2, current.accent);
       strip.style.background = gradient(current.colors);
       strip.innerHTML = current.colors.map((stop, index) => {
         const raw = current.colors.length === 1 ? 0 : (index / (current.colors.length - 1)) * 100;
@@ -148,6 +153,7 @@
       });
       swatch.style.background = current.accent;
       dot.style.background = current.accent;
+      dot.style.color = current.accent;
       plane.style.setProperty('--plane-color', hslToHex(current.hue || defaults.hue, 78, 55));
       dot.style.left = `${current.planeX || 54}%`;
       dot.style.top = `${current.planeY || 28}%`;
