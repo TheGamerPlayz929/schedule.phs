@@ -57,10 +57,31 @@
     const root = document.documentElement;
     if (theme.accent)  root.style.setProperty('--accent', theme.accent);
     if (theme.accent2) root.style.setProperty('--accent-2', theme.accent2);
-    if (theme.bg1)     root.style.setProperty('--bg-1', theme.bg1);
+    if (theme.bg1) {
+      root.style.setProperty('--bg-1', theme.bg1);
+      root.style.setProperty('--bg-base', theme.bg1);
+      root.style.setProperty('--user-bg-base', theme.bg1);
+    }
     if (theme.bg2)     root.style.setProperty('--bg-2', theme.bg2);
     if (theme.fg1)     root.style.setProperty('--fg-1', theme.fg1);
     if (theme.fg2)     root.style.setProperty('--fg-2', theme.fg2);
+
+    const appearance = settings.appearance || {};
+    const pxVars = {
+      heroEyebrowSize: '--hero-eyebrow-size',
+      heroTitleSize: '--hero-title-size',
+      countdownSize: '--countdown-size',
+      scheduleTitleSize: '--schedule-title-size',
+      periodNameSize: '--period-name-size',
+      periodCardPadding: '--period-card-padding',
+      periodCardRadius: '--period-card-radius',
+      footerSize: '--footer-size'
+    };
+    for (const [key, cssVar] of Object.entries(pxVars)) {
+      const n = Number(appearance[key]);
+      if (Number.isFinite(n)) root.style.setProperty(cssVar, `${n}px`);
+    }
+    if (appearance.footerColor) root.style.setProperty('--footer-color', appearance.footerColor);
 
     const fav = document.querySelector('link[rel="icon"]');
     if (fav && settings.branding?.favicon) fav.setAttribute('href', settings.branding.favicon);

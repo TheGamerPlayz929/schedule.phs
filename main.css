@@ -16,6 +16,8 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --bg-base: #000000;
+  --user-bg-base: var(--bg-base);
+  --user-text-scale: 1;
 
   --fg-1: #ffffff;
   --fg-2: rgba(255, 255, 255, 0.8);
@@ -42,7 +44,7 @@
 body {
   font-family: var(--font-sans);
   color: var(--fg-1);
-  background-color: var(--bg-base);
+  background-color: var(--user-bg-base);
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
@@ -53,7 +55,7 @@ body {
   position: fixed;
   inset: -20vw;
   z-index: -1;
-  background-color: var(--bg-base);
+  background-color: var(--user-bg-base);
   overflow: hidden;
   pointer-events: none;
 }
@@ -290,7 +292,7 @@ ol {
 
 .hero-eyebrow {
   font-family: 'Alex Brush Local', var(--font-serif);
-  font-size: 56px;
+  font-size: calc(var(--hero-eyebrow-size, 56px) * var(--user-text-scale));
   font-style: normal;
   font-weight: 400;
   color: var(--fg-2);
@@ -300,7 +302,7 @@ ol {
 
 .hero-title {
   font-family: 'Alex Brush Local', var(--font-serif);
-  font-size: 90px;
+  font-size: calc(var(--hero-title-size, 90px) * var(--user-text-scale));
   font-weight: 400;
   letter-spacing: 0;
   line-height: 1;
@@ -433,7 +435,7 @@ ol {
 .cd-main {
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  font-size: 58px;
+  font-size: calc(var(--countdown-size, 58px) * var(--user-text-scale));
   font-weight: 500;
   letter-spacing: -0.05em;
   line-height: 0.9;
@@ -491,7 +493,7 @@ ol {
 }
 
 .schedule-header h3 {
-  font-size: 20px;
+  font-size: calc(var(--schedule-title-size, 20px) * var(--user-text-scale));
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--fg-1);
@@ -512,10 +514,10 @@ ol {
   display: grid;
   grid-template-columns: 140px 1fr 80px;
   align-items: center;
-  padding: 16px 24px;
+  padding: var(--period-card-padding, 16px) 24px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
+  border-radius: var(--period-card-radius, 12px);
   transition: all 0.2s ease;
 }
 
@@ -533,7 +535,7 @@ ol {
 }
 
 .period-name {
-  font-size: 15px;
+  font-size: calc(var(--period-name-size, 15px) * var(--user-text-scale));
   font-weight: 500;
   color: var(--fg-2);
 }
@@ -752,9 +754,87 @@ ol {
   margin-top: auto;
   padding: 32px 0;
   text-align: center;
-  font-size: 12px;
-  color: var(--fg-3);
+  font-size: calc(var(--footer-size, 12px) * var(--user-text-scale));
+  color: var(--footer-color, var(--fg-3));
   border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+.nav-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+.appearance-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: var(--fg-1);
+  font: 700 14px/1 var(--font-sans);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.appearance-toggle:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.16);
+  transform: translateY(-1px);
+}
+.appearance-panel {
+  position: fixed;
+  top: 86px;
+  right: max(22px, calc((100vw - 1500px) / 2 + 22px));
+  width: min(280px, calc(100vw - 32px));
+  z-index: 40;
+  display: none;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  background: rgba(12, 8, 24, 0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 22px 50px rgba(0,0,0,0.38);
+}
+.appearance-panel.open {
+  display: grid;
+  gap: 14px;
+}
+.appearance-panel-head,
+.appearance-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.appearance-panel strong {
+  font-size: 14px;
+}
+.appearance-panel span {
+  color: var(--fg-2);
+  font-size: 12.5px;
+}
+.appearance-panel button {
+  border: none;
+  background: transparent;
+  color: var(--fg-3);
+  font: 600 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.appearance-panel input[type="range"] {
+  width: 120px;
+}
+.appearance-panel input[type="color"] {
+  width: 42px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+}
+.appearance-check {
+  justify-content: flex-start !important;
+}
+.user-reduce-glow .ambient-orb,
+.user-reduce-glow .signature-fill,
+.user-reduce-glow .progress-ring__fill {
+  filter: none !important;
 }
 
 /* ==========================================================================

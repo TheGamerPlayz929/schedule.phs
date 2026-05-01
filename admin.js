@@ -132,6 +132,25 @@
           { path: 'theme.fg2',     label: 'Muted foreground', kind: 'color' },
         ]}]
     },
+    { id: 'appearance',   label: 'Appearance',       icon: 'theme',
+      sub: 'Staff defaults for sizing and spacing on the public pages.',
+      groups: [{
+        title: 'Hero and countdown', fields: [
+          { path: 'appearance.heroEyebrowSize', label: 'Hero eyebrow size', kind: 'number', min: 28, max: 110, step: 1, unit: 'px' },
+          { path: 'appearance.heroTitleSize',   label: 'Hero title size',   kind: 'number', min: 42, max: 160, step: 1, unit: 'px' },
+          { path: 'appearance.countdownSize',   label: 'Countdown number size', kind: 'number', min: 32, max: 100, step: 1, unit: 'px' },
+        ]},{
+        title: 'Schedule list', fields: [
+          { path: 'appearance.scheduleTitleSize', label: 'Schedule heading size', kind: 'number', min: 14, max: 44, step: 1, unit: 'px' },
+          { path: 'appearance.periodNameSize',    label: 'Period name size',      kind: 'number', min: 11, max: 28, step: 1, unit: 'px' },
+          { path: 'appearance.periodCardPadding', label: 'Period card padding',   kind: 'number', min: 8, max: 34, step: 1, unit: 'px' },
+          { path: 'appearance.periodCardRadius',  label: 'Period card radius',    kind: 'number', min: 0, max: 28, step: 1, unit: 'px' },
+        ]},{
+        title: 'Footer display', fields: [
+          { path: 'appearance.footerSize',  label: 'Footer text size', kind: 'number', min: 9, max: 24, step: 1, unit: 'px' },
+          { path: 'appearance.footerColor', label: 'Footer text color', kind: 'color' },
+        ]}]
+    },
     { id: 'footer',       label: 'Footer',           icon: 'footer',
       sub: 'Footer copy, feedback link, support contact.',
       groups: [{
@@ -442,6 +461,26 @@
       hex.addEventListener('input', () => { text.value = hex.value; onFieldChange(field.path, hex.value); });
       text.addEventListener('input', () => { if (/^#[0-9a-fA-F]{3,8}$/.test(text.value)) hex.value = text.value.slice(0,7); onFieldChange(field.path, text.value); });
       row.append(hex, text);
+      wrap.appendChild(row);
+    } else if (field.kind === 'number') {
+      const row = document.createElement('div');
+      row.className = 'admin-number-row';
+      const input = document.createElement('input');
+      input.className = 'admin-input mono';
+      input.id = fieldId(field.path);
+      input.type = 'number';
+      if (field.min !== undefined) input.min = field.min;
+      if (field.max !== undefined) input.max = field.max;
+      if (field.step !== undefined) input.step = field.step;
+      input.value = value ?? '';
+      input.addEventListener('input', () => onFieldChange(field.path, Number(input.value)));
+      row.appendChild(input);
+      if (field.unit) {
+        const unit = document.createElement('span');
+        unit.className = 'admin-number-unit';
+        unit.textContent = field.unit;
+        row.appendChild(unit);
+      }
       wrap.appendChild(row);
     } else if (field.kind === 'image') {
       wrap.appendChild(renderImageField(field, value));

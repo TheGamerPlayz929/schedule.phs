@@ -273,6 +273,17 @@ input, textarea, select { font-family: inherit; }
   background: transparent; cursor: pointer;
 }
 .admin-color-row .admin-input { flex: 1; }
+.admin-number-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.admin-number-unit {
+  color: var(--fg-3);
+  font-size: 12px;
+  min-width: 22px;
+}
 
 .admin-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
 .admin-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 14px; }

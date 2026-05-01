@@ -28,8 +28,31 @@
     <div class="nav-links" id="nav-links" data-page="schedule">
       <!-- rendered from settings -->
     </div>
-    <div></div>
+    <div class="nav-actions">
+      <button class="appearance-toggle" id="appearance-toggle" type="button" aria-expanded="false" aria-controls="appearance-panel" title="Appearance settings">
+        <span aria-hidden="true">Aa</span>
+      </button>
+    </div>
   </nav>
+
+  <aside class="appearance-panel" id="appearance-panel" aria-label="Appearance settings">
+    <div class="appearance-panel-head">
+      <strong>Appearance</strong>
+      <button type="button" data-appearance-reset>Reset</button>
+    </div>
+    <label>
+      <span>Background</span>
+      <input type="color" data-appearance="bg" value="#000000">
+    </label>
+    <label>
+      <span>Text size</span>
+      <input type="range" data-appearance="textScale" min="0.85" max="1.2" step="0.05" value="1">
+    </label>
+    <label class="appearance-check">
+      <input type="checkbox" data-appearance="reduceGlow">
+      <span>Reduce glow</span>
+    </label>
+  </aside>
 
   <!-- Hero Section -->
   <main class="hero">
@@ -103,6 +126,7 @@
 <script src="nav-renderer.js"></script>
 <script src="privacy-analytics.js"></script>
 <script src="google-analytics.js"></script>
+<script src="appearance-settings.js"></script>
 <script src="vendor/opentype.min.js"></script>
 <script src="main.js"></script>
 </body>
