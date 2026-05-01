@@ -18,6 +18,7 @@
     settings: null,    // current saved settings (server)
     defaults: null,
     draft: null,       // working copy with unsaved edits
+    identity: null,
     activeTab: 'branding',
     search: '',
     previewMode: 'draft', // 'draft' | 'live'
@@ -108,7 +109,7 @@
           { path: 'grades.pageTitle',      label: 'Browser-tab title',      kind: 'text' },
         ]}]
     },
-    { id: 'gradeMelon',   label: 'GradeViewer FAQ/Privacy',  icon: 'grademelon',
+    { id: 'gradeMelon',   label: 'GradeViewer', title: 'FAQ/Privacy',  icon: 'grademelon',
       sub: 'Privacy FAQ and button text shown in the GradeViewer page.',
       groups: [{
         title: 'Privacy / Safety FAQ', fields: [
@@ -150,10 +151,12 @@
     },
     { id: 'analytics',    label: 'Statistics',       icon: 'analytics',
       sub: 'Privacy-safe aggregate usage data. No personal data is collected.',
+      readOnly: true,
       groups: [{ title: 'Usage overview', custom: 'analyticsDashboard' }]
     },
     { id: 'audit',        label: 'Audit Log',        icon: 'audit',
       sub: 'Recent admin changes — read only.',
+      readOnly: true,
       groups: [{ title: 'Recent events', custom: 'auditLog' }]
     }
   ];
@@ -332,7 +335,8 @@
 
   async function bootApp() {
     try {
-      await api('/admin/whoami');
+      const who = await api('/admin/whoami');
+      state.identity = who.identity || null;
       const [settings, defaults] = await Promise.all([
         fetch(BACKEND + '/site-settings').then(r => r.json()),
         fetch(BACKEND + '/site-settings/defaults').then(r => r.json())
@@ -344,6 +348,7 @@
       showApp();
       renderSidebar();
       renderActiveTab();
+      renderAdminIdentity();
       pingConnection();
     } catch (e) {
       console.warn('boot error', e);
@@ -359,6 +364,25 @@
         else { el.classList.add('offline'); el.textContent = 'Backend reachable but not OK'; }
       })
       .catch(() => { const el = $('#conn-status'); el.classList.add('offline'); el.textContent = 'Backend offline'; });
+  }
+
+  function renderAdminIdentity() {
+    const chip = $('#admin-user-chip');
+    if (!chip) return;
+    const ident = state.identity || {};
+    const label = ident.name || ident.email || 'Local development';
+    chip.title = label;
+    if (ident.picture) {
+      chip.innerHTML = `<img src="${escapeHtml(ident.picture)}" alt="">`;
+      return;
+    }
+    const initials = (ident.name || ident.email || 'LD')
+      .split(/[\s@._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(s => s[0]?.toUpperCase())
+      .join('') || 'LD';
+    chip.textContent = initials;
   }
 
   // ── Sidebar / tabs ─────────────────────────────────────────────────────
@@ -1177,17 +1201,21 @@
     const host = document.createElement('div');
     host.innerHTML = '<div class="admin-field-help">Loading…</div>';
     api('/admin/audit-log?limit=200').then(j => {
-      if (!j.entries?.length) { host.innerHTML = '<div class="admin-field-help">No events yet.</div>'; return; }
+      const storage = j.storage;
+      const storageNote = storage ? `<div class="admin-privacy-note" style="margin-bottom:14px">Audit storage: ${escapeHtml(storage.type)}${storage.durable ? ` · ${escapeHtml(storage.repo || '')}/${escapeHtml(storage.path || '')}` : ' · local development only'}</div>` : '';
+      if (!j.entries?.length) { host.innerHTML = storageNote + '<div class="admin-field-help">No events yet.</div>'; return; }
       host.innerHTML = `
+        ${storageNote}
         <table class="admin-audit-table">
-          <thead><tr><th>When</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
+          <thead><tr><th>When</th><th>Actor</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
           <tbody>
             ${j.entries.map(e => `
               <tr>
                 <td class="muted">${new Date(e.ts).toLocaleString()}</td>
+                <td class="muted">${escapeHtml(e.actor?.email || e.email || e.actor?.name || '—')}</td>
                 <td class="muted">${escapeHtml(e.ip || '—')}</td>
                 <td class="action">${escapeHtml(e.action)}</td>
-                <td class="muted">${escapeHtml([e.sections?.join(','), e.section, e.file, e.type].filter(Boolean).join(' · ') || '—')}</td>
+                <td class="muted">${escapeHtml([e.sections?.join(','), e.patchKeys?.join(','), e.section, e.file, e.type, e.rowCount && `${e.rowCount} rows`, e.imageCount && `${e.imageCount} images`, e.message].filter(Boolean).join(' · ') || '—')}</td>
               </tr>`).join('')}
           </tbody>
         </table>`;
@@ -1208,13 +1236,14 @@
   }
 
   function pageLabel(page) {
-    return ({ schedule: 'Schedule', announcements: 'Announcements', grades: 'Grades' })[page] || page;
+    return ({ schedule: 'Schedule', announcements: 'Announcements', grades: 'GradeViewer' })[page] || page;
   }
 
   function renderAnalyticsDashboard() {
     const host = document.createElement('div');
     host.innerHTML = '<div class="admin-field-help">Loading statistics…</div>';
     api('/admin/analytics').then(j => {
+      const ga = j.googleAnalytics || {};
       const days = j.days || {};
       const keys = Object.keys(days).sort();
       const last7 = keys.slice(-7);
@@ -1258,15 +1287,27 @@
 
       host.innerHTML = `
         <div class="admin-stat-grid">
-          <div class="admin-stat"><span>Active now</span><strong>${formatNumber(j.active?.total || 0)}</strong></div>
-          <div class="admin-stat"><span>7-day page views</span><strong>${formatNumber(totals.pageviews)}</strong></div>
-          <div class="admin-stat"><span>7-day time on site</span><strong>${formatDuration(totals.durationSeconds)}</strong></div>
-          <div class="admin-stat"><span>Privacy status</span><strong>Aggregate only</strong></div>
+          <div class="admin-stat"><span>GA active users</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.activeUsers || 0) : 'Not set'}</strong></div>
+          <div class="admin-stat"><span>GA 7-day views</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.pageviews || 0) : '—'}</strong></div>
+          <div class="admin-stat"><span>First-party active now</span><strong>${formatNumber(j.active?.total || 0)}</strong></div>
+          <div class="admin-stat"><span>First-party 7-day views</span><strong>${formatNumber(totals.pageviews)}</strong></div>
         </div>
-        <div class="admin-privacy-note">
-          No names, emails, IP addresses, user agents, cookies, persistent IDs, grade data, or StudentVue credentials are collected.
+        <div class="${ga.configured && !ga.error ? 'admin-privacy-note' : 'admin-setup-note'}">
+          ${ga.configured && !ga.error
+            ? `Google Analytics connected to property ${escapeHtml(ga.propertyId || '')}. First-party privacy-safe stats remain below as fallback.`
+            : `Google Analytics is not configured yet. Set GA4_PROPERTY_ID and GOOGLE_APPLICATION_CREDENTIALS_JSON on the backend to show GA data here.`}
         </div>
-        <h2 style="margin-top:22px">Pages</h2>
+        ${ga.configured && !ga.error ? `<h2 style="margin-top:22px">Google Analytics pages</h2>
+        <table class="admin-audit-table">
+          <thead><tr><th>Path</th><th>Views</th><th>Users</th><th>Avg session</th></tr></thead>
+          <tbody>${(ga.pages || []).map(p => `<tr>
+            <td class="action">${escapeHtml(p.path)}</td>
+            <td>${formatNumber(p.pageviews)}</td>
+            <td>${formatNumber(p.activeUsers)}</td>
+            <td>${formatDuration(p.averageSessionDuration)}</td>
+          </tr>`).join('') || '<tr><td colspan="4" class="muted">No GA page data yet.</td></tr>'}</tbody>
+        </table>` : ga.error ? `<div class="admin-field-help" style="color:var(--danger);margin-top:12px">${escapeHtml(ga.error)}</div>` : ''}
+        <h2 style="margin-top:22px">First-party pages</h2>
         <table class="admin-audit-table">
           <thead><tr><th>Page</th><th>Views</th><th>Total time</th><th>Active now</th></tr></thead>
           <tbody>${pageRows || '<tr><td colspan="4" class="muted">No page data yet.</td></tr>'}</tbody>
@@ -1283,7 +1324,7 @@
   // ── Tab body render ────────────────────────────────────────────────────
   function renderActiveTab() {
     const tab = SCHEMA.find(t => t.id === state.activeTab) || SCHEMA[0];
-    $('#tab-title').textContent = tab.label;
+    $('#tab-title').textContent = tab.title || tab.label;
     $('#tab-sub').textContent   = tab.sub;
     const panels = $('#panels');
     panels.innerHTML = '';
@@ -1324,10 +1365,15 @@
   // ── Dirty / publish ────────────────────────────────────────────────────
   function refreshDirtyMarkers() {
     const dirty = !eq(state.settings, state.draft);
+    const tab = SCHEMA.find(t => t.id === state.activeTab) || SCHEMA[0];
+    const readOnly = Boolean(tab.readOnly);
+    $('#discard-btn').classList.toggle('hidden', readOnly);
+    $('#publish-btn').classList.toggle('hidden', readOnly);
+    $('#dirty-pill').classList.toggle('hidden', readOnly);
     $('#dirty-pill').classList.toggle('visible', dirty);
     $('#dirty-pill').textContent = dirty ? 'Unsaved changes' : '';
-    $('#publish-btn').disabled = !dirty;
-    $('#discard-btn').disabled = !dirty;
+    $('#publish-btn').disabled = readOnly || !dirty;
+    $('#discard-btn').disabled = readOnly || !dirty;
     $$('.admin-field').forEach(f => {
       const path = f.dataset.path;
       if (path) f.classList.toggle('is-modified', isModified(path));

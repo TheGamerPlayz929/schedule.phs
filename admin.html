@@ -49,7 +49,10 @@
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
         <span>Sign out</span>
       </button>
-      <div class="admin-status-line" id="conn-status">Connecting…</div>
+      <div class="admin-footer-status">
+        <div class="admin-status-line" id="conn-status">Connecting…</div>
+        <div class="admin-user-chip" id="admin-user-chip" title="Admin account"></div>
+      </div>
     </div>
   </aside>
 
@@ -76,8 +79,7 @@
     <div class="row-gap-8">
       <div class="seg" id="preview-page-seg">
         <button data-preview-page="index.html" class="active">Schedule</button>
-        <button data-preview-page="announcements.html">Announcements</button>
-        <button data-preview-page="gradeviewer.html">Grades</button>
+        <button data-preview-page="gradeviewer.html">GradeViewer</button>
       </div>
       <div class="seg" id="preview-mode-seg" style="margin-left:6px">
         <button data-mode="draft" class="active">Draft</button>
