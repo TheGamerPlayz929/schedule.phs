@@ -30,28 +30,56 @@
     </div>
     <div class="nav-actions">
       <button class="appearance-toggle" id="appearance-toggle" type="button" aria-expanded="false" aria-controls="appearance-panel" title="Appearance settings">
-        <span aria-hidden="true">Aa</span>
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
   </nav>
 
   <aside class="appearance-panel" id="appearance-panel" aria-label="Appearance settings">
     <div class="appearance-panel-head">
-      <strong>Appearance</strong>
-      <button type="button" data-appearance-reset>Reset</button>
+      <div>
+        <strong>Appearance</strong>
+        <span>Custom theme</span>
+      </div>
+      <button type="button" class="appearance-close" data-appearance-close aria-label="Close appearance settings">×</button>
     </div>
-    <label>
-      <span>Background</span>
-      <input type="color" data-appearance="bg" value="#000000">
-    </label>
-    <label>
-      <span>Text size</span>
-      <input type="range" data-appearance="textScale" min="0.85" max="1.2" step="0.05" value="1">
-    </label>
-    <label class="appearance-check">
-      <input type="checkbox" data-appearance="reduceGlow">
-      <span>Reduce glow</span>
-    </label>
+    <section class="appearance-section">
+      <h2>Colors</h2>
+      <div class="theme-strip">
+        <div class="theme-gradient-bar" data-theme-strip aria-label="Theme color stops"></div>
+      </div>
+      <button type="button" class="theme-picker-plane" data-appearance-plane aria-label="Choose theme shade">
+        <span data-theme-picker-dot></span>
+      </button>
+      <input class="theme-native-color" type="color" data-appearance="accent" value="#8288d5" aria-label="Accent color">
+      <input class="theme-hue" type="range" data-appearance="hue" min="0" max="360" step="1" value="236" aria-label="Hue">
+      <div class="theme-field">
+        <span class="theme-swatch" data-theme-swatch></span>
+        <input type="text" data-appearance="hex" value="#8288D5" maxlength="7" aria-label="Hex color">
+        <button type="button" data-appearance-eyedropper aria-label="Use browser color picker">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="m16.24 2.56 5.2 5.2a1.9 1.9 0 0 1 0 2.68l-1.08 1.08-1.94-1.94-8.85 8.85a3 3 0 0 1-1.3.76l-4.4 1.18a1 1 0 0 1-1.22-1.22l1.18-4.4a3 3 0 0 1 .76-1.3l8.85-8.85-1.94-1.94 1.08-1.08a1.9 1.9 0 0 1 2.68 0Zm-2.9 6.28-7.34 7.34-.48 1.78 1.78-.48 7.34-7.34-1.3-1.3Zm4.56-.7-2.04-2.04-.82.82 2.04 2.04.82-.82Z"/></svg>
+        </button>
+        <button type="button" data-appearance-remove aria-label="Remove color">−</button>
+      </div>
+      <button type="button" class="appearance-action" data-appearance-add>+ Add Color</button>
+    </section>
+    <section class="appearance-section">
+      <h2>Controls</h2>
+      <label class="appearance-slider">
+        <span>Color Intensity <b data-appearance-intensity-value>60%</b></span>
+        <input type="range" data-appearance="intensity" min="15" max="100" step="1" value="60">
+      </label>
+      <label class="appearance-slider">
+        <span>Text Size <b data-appearance-scale-value>100%</b></span>
+        <input type="range" data-appearance="textScale" min="0.85" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="appearance-check">
+        <input type="checkbox" data-appearance="reduceGlow">
+        <span>Reduce glow</span>
+      </label>
+    </section>
+    <button type="button" class="appearance-action" data-appearance-surprise>Random Theme!</button>
+    <button type="button" class="appearance-action appearance-action--muted" data-appearance-reset>Reset</button>
   </aside>
 
   <!-- Hero Section -->
@@ -73,8 +101,8 @@
       <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
         <defs>
           <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#c084fc"/>
-            <stop offset="100%" stop-color="#7c3aed"/>
+            <stop offset="0%" stop-color="var(--ring-start, #c084fc)"/>
+            <stop offset="100%" stop-color="var(--ring-end, #7c3aed)"/>
           </linearGradient>
         </defs>
         <path
