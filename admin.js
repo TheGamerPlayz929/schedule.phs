@@ -1411,6 +1411,7 @@
     $('#tab-sub').textContent   = tab.sub;
     const panels = $('#panels');
     panels.innerHTML = '';
+    panels.className = tab.id === 'appearance' ? 'admin-panels admin-panels--appearance' : 'admin-panels';
 
     const q = state.search.trim().toLowerCase();
     const matches = (label) => !q || (label || '').toLowerCase().includes(q);
@@ -1419,6 +1420,7 @@
     for (const group of tab.groups) {
       const card = document.createElement('section');
       card.className = 'admin-card';
+      if (tab.id === 'appearance') card.classList.add(`admin-appearance-card-${group.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
       card.innerHTML = `<h2>${escapeHtml(group.title)}</h2>`;
 
       if (group.custom === 'navEditor')                 { card.appendChild(renderNavEditor()); anyVisible = true; }

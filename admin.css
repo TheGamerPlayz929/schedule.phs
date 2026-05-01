@@ -153,10 +153,19 @@ input, textarea, select { font-family: inherit; }
 }
 .admin-status-line.offline::before { background: var(--danger); }
 
+@supports not selector(:has(*)) {
+  .admin-main {
+    max-width: 1320px;
+  }
+}
+
 /* ── Main column ─────────────────────────────────────────────────── */
 .admin-main {
   padding: 36px 56px 80px;
   max-width: 880px;
+}
+.admin-main:has(.admin-panels--appearance) {
+  max-width: 1320px;
 }
 .admin-main-header {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -207,6 +216,39 @@ input, textarea, select { font-family: inherit; }
 .admin-card hr.admin-divider {
   border: none; border-top: 1px solid var(--line);
   margin: 18px 0;
+}
+.admin-panels--appearance {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(320px, 400px);
+  gap: 14px;
+  align-items: start;
+}
+.admin-panels--appearance .admin-card {
+  margin-bottom: 0;
+}
+.admin-panels--appearance .admin-appearance-card-theme-colors {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  position: sticky;
+  top: 24px;
+}
+.admin-panels--appearance .admin-appearance-card-hero-and-countdown,
+.admin-panels--appearance .admin-appearance-card-schedule-list,
+.admin-panels--appearance .admin-appearance-card-footer-display {
+  grid-column: 1;
+}
+@media (max-width: 1100px) {
+  .admin-panels--appearance {
+    grid-template-columns: 1fr;
+  }
+  .admin-panels--appearance .admin-appearance-card-theme-colors,
+  .admin-panels--appearance .admin-appearance-card-hero-and-countdown,
+  .admin-panels--appearance .admin-appearance-card-schedule-list,
+  .admin-panels--appearance .admin-appearance-card-footer-display {
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
+  }
 }
 
 /* ── Fields ──────────────────────────────────────────────────────── */
