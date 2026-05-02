@@ -18,7 +18,7 @@ let _timeOffsetSeconds = 0; // added to real time
 /* --- Schedule override (set by admin panel, synced from backend) --- */
 let _scheduleOverride = null; // { type: string, timestamp: number } | null
 
-const _BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
   ? 'http://localhost:3000'
   : 'https://phs-grades-backend.onrender.com';
 
@@ -62,7 +62,7 @@ function _overrideAppliesToday(override) {
 }
 
 function _isLocalhost() {
-  return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  return ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
 }
 
 function _initAdminPanel() {

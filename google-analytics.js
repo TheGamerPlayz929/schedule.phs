@@ -2,6 +2,9 @@
 (function () {
   const MEASUREMENT_ID = 'G-KGG8T2XRTZ';
   if (!/^G-[A-Z0-9]+$/.test(MEASUREMENT_ID)) return;
+  // Skip GA on local/dev hosts so analytics aren't polluted by development traffic.
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host === '') return;
 
   window.dataLayer = window.dataLayer || [];
   function gtag(){ dataLayer.push(arguments); }

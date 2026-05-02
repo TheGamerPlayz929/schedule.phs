@@ -3,7 +3,7 @@
  * emails, user agents, StudentVue data, or persistent identifiers.
  */
 (function () {
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? 'http://localhost:3000' : 'https://phs-grades-backend.onrender.com';
   const PAGE_MAP = {
     '/': 'schedule',

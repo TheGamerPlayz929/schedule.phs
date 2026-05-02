@@ -270,6 +270,13 @@
   }
 
   apply(read());
+  // Re-apply after admin settings load so admin's theme doesn't overwrite the user's choice.
+  document.addEventListener('site-settings:applied', () => apply(read()));
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY) return;
+    apply(read());
+    document.dispatchEvent(new CustomEvent('phs:appearance-storage-sync'));
+  });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
   else mount();
 })();

@@ -65,8 +65,59 @@
       </div>
     </div>
     <div class="nav-links" id="nav-links" data-page="grades"></div>
-    <div></div>
+    <div class="nav-actions">
+      <button class="appearance-toggle" id="appearance-toggle" type="button" aria-expanded="false" aria-controls="appearance-panel" title="Appearance settings">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
   </nav>
+
+  <aside class="appearance-panel" id="appearance-panel" aria-label="Appearance settings">
+    <div class="appearance-panel-head">
+      <div>
+        <strong>Appearance</strong>
+        <span>Custom theme</span>
+      </div>
+      <button type="button" class="appearance-close" data-appearance-close aria-label="Close appearance settings">×</button>
+    </div>
+    <section class="appearance-section">
+      <h2>Colors</h2>
+      <div class="theme-strip">
+        <div class="theme-gradient-bar" data-theme-strip aria-label="Theme color stops"></div>
+      </div>
+      <button type="button" class="theme-picker-plane" data-appearance-plane aria-label="Choose theme shade">
+        <span data-theme-picker-dot></span>
+      </button>
+      <input class="theme-native-color" type="color" data-appearance="accent" value="#8288d5" aria-label="Accent color">
+      <input class="theme-hue" type="range" data-appearance="hue" min="0" max="360" step="1" value="236" aria-label="Hue">
+      <div class="theme-field">
+        <span class="theme-swatch" data-theme-swatch></span>
+        <input type="text" data-appearance="hex" value="#8288D5" maxlength="7" aria-label="Hex color">
+        <button type="button" data-appearance-eyedropper aria-label="Use browser color picker">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="m16.24 2.56 5.2 5.2a1.9 1.9 0 0 1 0 2.68l-1.08 1.08-1.94-1.94-8.85 8.85a3 3 0 0 1-1.3.76l-4.4 1.18a1 1 0 0 1-1.22-1.22l1.18-4.4a3 3 0 0 1 .76-1.3l8.85-8.85-1.94-1.94 1.08-1.08a1.9 1.9 0 0 1 2.68 0Zm-2.9 6.28-7.34 7.34-.48 1.78 1.78-.48 7.34-7.34-1.3-1.3Zm4.56-.7-2.04-2.04-.82.82 2.04 2.04.82-.82Z"/></svg>
+        </button>
+        <button type="button" data-appearance-remove aria-label="Remove color">−</button>
+      </div>
+      <button type="button" class="appearance-action" data-appearance-add>+ Add Color</button>
+    </section>
+    <section class="appearance-section">
+      <h2>Controls</h2>
+      <label class="appearance-slider">
+        <span>Color Intensity <b data-appearance-intensity-value>60%</b></span>
+        <input type="range" data-appearance="intensity" min="15" max="100" step="1" value="60">
+      </label>
+      <label class="appearance-slider">
+        <span>Text Size <b data-appearance-scale-value>100%</b></span>
+        <input type="range" data-appearance="textScale" min="0.85" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="appearance-check">
+        <input type="checkbox" data-appearance="reduceGlow">
+        <span>Reduce glow</span>
+      </label>
+    </section>
+    <button type="button" class="appearance-action" data-appearance-surprise>Random Theme!</button>
+    <button type="button" class="appearance-action appearance-action--muted" data-appearance-reset>Reset</button>
+  </aside>
 
   <main class="hero hero--compact">
     <div class="hero-title-wrapper fade-up" style="--stagger: 1">
@@ -81,6 +132,7 @@
         src="about:blank"
         scrolling="yes"
         allowtransparency="true"
+        referrerpolicy="strict-origin-when-cross-origin"
         title="GradeMelon Grades"
         style="background: transparent;">
       </iframe>
@@ -102,42 +154,70 @@
   const scaler = document.getElementById('grades-scaler');
   const frame  = document.getElementById('grades-frame');
 
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
 
+  function timeoutSignal(ms) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      try { return AbortSignal.timeout(ms); } catch {}
+    }
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
+  }
   async function reachable(url) {
     try {
-      await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(1500) });
+      await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: timeoutSignal(1500) });
       return true;
     } catch { return false; }
   }
+  function urlsEqual(a, b) {
+    try { return new URL(a, location.href).href === new URL(b, location.href).href; }
+    catch { return a === b; }
+  }
+  // Lock the URL once we've successfully set it — periodic settings refresh
+  // must not yank a logged-in user back to a different origin.
+  let frameUrlLocked = false;
+  let applyToken = 0;
   async function applyIframeUrl(settings) {
+    if (frameUrlLocked) return;
+    const myToken = ++applyToken;
     const localUrl = settings?.grades?.iframeUrlLocal;
     const prodUrl  = settings?.grades?.iframeUrlProd || 'https://schedulephs.web.app/login';
     let url = isLocal ? localUrl : prodUrl;
     if (isLocal && (!localUrl || !(await reachable(localUrl)))) url = prodUrl;
-    if (url && frame.src !== url) frame.src = url;
+    if (myToken !== applyToken) return; // a newer call superseded us
+    if (frameUrlLocked) return;
+    if (url && !urlsEqual(frame.src, url)) {
+      frame.src = url;
+      frameUrlLocked = true;
+    }
   }
   document.addEventListener('site-settings:applied', e => applyIframeUrl(e.detail));
   if (window.__SITE_SETTINGS__) applyIframeUrl(window.__SITE_SETTINGS__);
   // Failsafe in case settings never load
   setTimeout(() => {
-    if (frame.src === 'about:blank') {
+    if (frameUrlLocked) return;
+    if (frame.src === 'about:blank' || frame.src === '') {
       frame.src = 'https://schedulephs.web.app/login';
+      frameUrlLocked = true;
     }
-  }, 1500);
+  }, 2500);
 
   let isFullscreen = false;
   const savedTransforms = [];
+  let savedFrameCss = '';
 
   function setSize() {
     if (isFullscreen) return;
+    const w = scaler.offsetWidth;
+    if (!w) return; // wait for layout
     const top = scaler.getBoundingClientRect().top;
     const h = Math.max(720, window.innerHeight - top - 24);
-    frame.style.width  = scaler.offsetWidth + 'px';
+    frame.style.width  = w + 'px';
     frame.style.height = h + 'px';
     scaler.style.height = h + 'px';
   }
-  setSize();
+  requestAnimationFrame(setSize);
   new ResizeObserver(setSize).observe(scaler);
   window.addEventListener('resize', setSize);
 
@@ -148,6 +228,7 @@
   }
 
   window.addEventListener('message', (event) => {
+    if (event.source !== frame.contentWindow) return;
     if (!isAllowedOrigin(event.origin)) return;
     if (event.data?.type === 'gradeviewer:privacy-modal') {
       document.body.classList.toggle('privacy-modal-open', Boolean(event.data.open));
@@ -156,9 +237,14 @@
     if (event.data?.type === 'modalClose') exitFullscreen();
   });
 
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isFullscreen) exitFullscreen();
+  });
+
   function goFullscreen() {
     if (isFullscreen) return;
     isFullscreen = true;
+    savedFrameCss = frame.style.cssText;
     let el = frame.parentElement;
     while (el && el !== document.body) {
       savedTransforms.push({ el, transform: el.style.transform, willChange: el.style.willChange, animation: el.style.animation, opacity: el.style.opacity });
@@ -166,15 +252,17 @@
       el.style.animation = 'none'; el.style.opacity = '1';
       el = el.parentElement;
     }
-    frame.style.cssText += ';position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;border-radius:0';
+    frame.style.cssText = savedFrameCss + ';position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;border-radius:0';
+    document.body.style.overflow = 'hidden';
   }
   function exitFullscreen() {
     if (!isFullscreen) return;
     isFullscreen = false;
+    document.body.style.overflow = '';
+    frame.style.cssText = savedFrameCss;
+    savedFrameCss = '';
     savedTransforms.forEach(s => { s.el.style.transform = s.transform; s.el.style.willChange = s.willChange; s.el.style.animation = s.animation; s.el.style.opacity = s.opacity; });
     savedTransforms.length = 0;
-    frame.style.position = ''; frame.style.top = ''; frame.style.left = '';
-    frame.style.zIndex = ''; frame.style.borderRadius = '';
     setSize();
   }
 </script>

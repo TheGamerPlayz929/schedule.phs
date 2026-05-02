@@ -249,7 +249,7 @@ ol {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.025) inset,
     0 18px 48px rgba(0, 0, 0, 0.22),
-    0 0 42px rgba(168, 85, 247, 0.12);
+    0 0 42px color-mix(in srgb, var(--accent), transparent 88%);
 }
 
 .status-dot {
@@ -843,6 +843,10 @@ ol {
   border-radius: 10px;
   background: rgba(255,255,255,0.06);
 }
+.appearance-panel button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .appearance-section {
   display: grid;
   gap: 12px;
@@ -1046,10 +1050,19 @@ ol {
   background: var(--accent);
   box-shadow: inset 0 0 0 4px rgba(17,22,38,0.9);
 }
-.user-reduce-glow .ambient-orb,
-.user-reduce-glow .signature-fill,
+.user-reduce-glow .ambient-orb {
+  opacity: 0.18;
+}
+.user-reduce-glow .signature-fill {
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.25));
+}
 .user-reduce-glow .progress-ring__fill {
-  filter: none !important;
+  filter: none;
+}
+.user-reduce-glow .status-badge {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
+    0 12px 32px rgba(0, 0, 0, 0.18);
 }
 /* ==========================================================================
    Responsive
