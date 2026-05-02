@@ -227,6 +227,15 @@
     return list.some(u => { try { return u && new URL(u).origin === origin; } catch { return false; } });
   }
 
+  function readAppearance() {
+    try { return JSON.parse(localStorage.getItem('phs:appearance:v1') || '{}'); }
+    catch { return {}; }
+  }
+  function postThemeToFrame() {
+    if (!frame.contentWindow) return;
+    try { frame.contentWindow.postMessage({ type: 'phs:appearance-settings', settings: readAppearance() }, '*'); }
+    catch {}
+  }
   window.addEventListener('message', (event) => {
     if (event.source !== frame.contentWindow) return;
     if (!isAllowedOrigin(event.origin)) return;
@@ -235,7 +244,15 @@
     }
     if (event.data?.type === 'modalOpen') goFullscreen();
     if (event.data?.type === 'modalClose') exitFullscreen();
+    if (event.data?.type === 'gradeviewer:theme-ready') postThemeToFrame();
   });
+  // Push appearance updates into the iframe whenever the user tweaks the theme.
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'phs:appearance:v1') postThemeToFrame();
+  });
+  document.addEventListener('phs:appearance-storage-sync', postThemeToFrame);
+  // Also push on first iframe load (in case the iframe sends ready before we set up the listener).
+  frame.addEventListener('load', () => setTimeout(postThemeToFrame, 100));
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isFullscreen) exitFullscreen();

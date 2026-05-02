@@ -61,6 +61,7 @@
   }
   function write(settings) {
     try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {}
+    try { document.dispatchEvent(new CustomEvent('phs:appearance-storage-sync', { detail: settings })); } catch {}
   }
   function apply(settings) {
     const root = document.documentElement;
