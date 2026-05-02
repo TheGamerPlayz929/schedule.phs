@@ -104,17 +104,25 @@
 
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-  function applyIframeUrl(settings) {
-    const url = isLocal ? settings?.grades?.iframeUrlLocal : settings?.grades?.iframeUrlProd;
-    if (!url) return;
-    if (frame.src !== url) frame.src = url;
+  async function reachable(url) {
+    try {
+      await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(1500) });
+      return true;
+    } catch { return false; }
+  }
+  async function applyIframeUrl(settings) {
+    const localUrl = settings?.grades?.iframeUrlLocal;
+    const prodUrl  = settings?.grades?.iframeUrlProd || 'https://schedulephs.web.app/login';
+    let url = isLocal ? localUrl : prodUrl;
+    if (isLocal && (!localUrl || !(await reachable(localUrl)))) url = prodUrl;
+    if (url && frame.src !== url) frame.src = url;
   }
   document.addEventListener('site-settings:applied', e => applyIframeUrl(e.detail));
   if (window.__SITE_SETTINGS__) applyIframeUrl(window.__SITE_SETTINGS__);
   // Failsafe in case settings never load
   setTimeout(() => {
     if (frame.src === 'about:blank') {
-      frame.src = isLocal ? 'http://localhost:3001/login' : 'https://schedulephs.web.app/login';
+      frame.src = 'https://schedulephs.web.app/login';
     }
   }, 1500);
 

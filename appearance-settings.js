@@ -21,7 +21,7 @@
     const target = amount >= 0 ? 255 : 0;
     const p = Math.abs(amount);
     const next = [c.r, c.g, c.b].map(v => Math.round(v + (target - v) * p));
-    return `rgb(${next[0]}, ${next[1]}, ${next[2]})`;
+    return rgbToHex(next[0], next[1], next[2]);
   }
   function rgba(hex, alpha) {
     const c = hexToRgb(hex);
@@ -48,8 +48,16 @@
     return rgbToHex(rgb[0], rgb[1], rgb[2]);
   }
   function read() {
-    try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
-    catch { return { ...defaults }; }
+    try {
+      const merged = { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+      const intensity = Number(merged.intensity);
+      const textScale = Number(merged.textScale);
+      merged.intensity = Number.isFinite(intensity) ? Math.max(15, Math.min(100, intensity)) : defaults.intensity;
+      merged.textScale = Number.isFinite(textScale) ? Math.max(0.85, Math.min(1.2, textScale)) : defaults.textScale;
+      merged.accent = clampHex(merged.accent);
+      merged.colors = normalizeColors(merged.colors, merged.accent);
+      return merged;
+    } catch { return { ...defaults, colors: [...defaults.colors] }; }
   }
   function write(settings) {
     try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {}
@@ -72,8 +80,8 @@
     document.querySelectorAll('#ringGradient stop').forEach((stop, index) => {
       stop.setAttribute('stop-color', index === 0 ? mix(accent, 0.28) : accent);
     });
-    root.style.setProperty('--user-text-scale', String(settings.textScale || 1));
-    document.body.classList.remove('user-light-theme');
+    const scale = Number(settings.textScale);
+    root.style.setProperty('--user-text-scale', String(Number.isFinite(scale) ? Math.max(0.85, Math.min(1.2, scale)) : 1));
     document.body.classList.toggle('user-reduce-glow', Boolean(settings.reduceGlow));
   }
   function normalizeColors(colors, fallback) {
@@ -124,20 +132,27 @@
     function paint() {
       current.colors = normalizeColors(current.colors, current.accent);
       current.accent = clampHex(current.accent);
+      if (activeSlot >= current.colors.length || activeSlot < 0) activeSlot = 0;
       current.colors[activeSlot] = current.accent;
+      const safeIntensity = Number.isFinite(Number(current.intensity)) ? Math.max(15, Math.min(100, Number(current.intensity))) : defaults.intensity;
+      const safeScale = Number.isFinite(Number(current.textScale)) ? Math.max(0.85, Math.min(1.2, Number(current.textScale))) : defaults.textScale;
+      current.intensity = safeIntensity;
+      current.textScale = safeScale;
       color.value = current.accent;
-      hex.value = current.accent;
-      hue.value = current.hue || defaults.hue;
-      intensity.value = current.intensity;
-      scale.value = current.textScale;
+      if (document.activeElement !== hex) hex.value = current.accent;
+      hue.value = Number.isFinite(current.hue) ? current.hue : defaults.hue;
+      intensity.value = safeIntensity;
+      scale.value = safeScale;
       glow.checked = Boolean(current.reduceGlow);
-      intensityValue.textContent = `${current.intensity}%`;
-      scaleValue.textContent = `${Math.round(current.textScale * 100)}%`;
+      intensityValue.textContent = `${safeIntensity}%`;
+      scaleValue.textContent = `${Math.round(safeScale * 100)}%`;
       intensity.style.setProperty('--slider-accent', current.accent);
       scale.style.setProperty('--slider-accent', current.accent);
-      intensity.style.background = sliderFill(current.intensity, 15, 100, current.accent);
-      scale.style.background = sliderFill(current.textScale, 0.85, 1.2, current.accent);
+      intensity.style.background = sliderFill(safeIntensity, 15, 100, current.accent);
+      scale.style.background = sliderFill(safeScale, 0.85, 1.2, current.accent);
       strip.style.background = gradient(current.colors);
+      remove.disabled = current.colors.length <= 2;
+      add.disabled = current.colors.length >= MAX_COLORS;
       strip.innerHTML = current.colors.map((stop, index) => {
         const raw = current.colors.length === 1 ? 0 : (index / (current.colors.length - 1)) * 100;
         const left = Math.max(4.5, Math.min(95.5, raw));
@@ -154,9 +169,9 @@
       swatch.style.background = current.accent;
       dot.style.background = current.accent;
       dot.style.color = current.accent;
-      plane.style.setProperty('--plane-color', hslToHex(current.hue || defaults.hue, 78, 55));
-      dot.style.left = `${current.planeX || 54}%`;
-      dot.style.top = `${current.planeY || 28}%`;
+      plane.style.setProperty('--plane-color', hslToHex(Number.isFinite(current.hue) ? current.hue : defaults.hue, 78, 55));
+      dot.style.left = `${Number.isFinite(current.planeX) ? current.planeX : 54}%`;
+      dot.style.top = `${Number.isFinite(current.planeY) ? current.planeY : 28}%`;
       apply(current);
       write(current);
     }
@@ -174,21 +189,37 @@
       openPanel(false);
     });
     color.addEventListener('input', () => { current.accent = color.value; current.colors[activeSlot] = current.accent; paint(); });
-    hex.addEventListener('input', () => { if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) current.accent = hex.value; paint(); });
+    hex.addEventListener('input', () => {
+      let v = hex.value.trim();
+      if (v && !v.startsWith('#')) v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        current.accent = v.toUpperCase();
+        current.colors[activeSlot] = current.accent;
+      }
+      paint();
+    });
+    hex.addEventListener('blur', () => { hex.value = current.accent; });
     hue.addEventListener('input', () => { current.hue = Number(hue.value); current.accent = hslToHex(current.hue); paint(); });
     plane.addEventListener('pointerdown', event => {
       const rect = plane.getBoundingClientRect();
       const move = e => {
         current.planeX = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
         current.planeY = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-        current.accent = planeColor(current.hue || defaults.hue, current.planeX / 100, current.planeY / 100);
+        current.accent = planeColor(Number.isFinite(current.hue) ? current.hue : defaults.hue, current.planeX / 100, current.planeY / 100);
         current.colors[activeSlot] = current.accent;
         paint();
       };
+      const stop = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', stop);
+        window.removeEventListener('pointercancel', stop);
+        try { plane.releasePointerCapture?.(event.pointerId); } catch {}
+      };
       move(event);
-      plane.setPointerCapture?.(event.pointerId);
-      plane.addEventListener('pointermove', move);
-      plane.addEventListener('pointerup', () => plane.removeEventListener('pointermove', move), { once: true });
+      try { plane.setPointerCapture?.(event.pointerId); } catch {}
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', stop);
+      window.addEventListener('pointercancel', stop);
     });
     intensity.addEventListener('input', () => { current.intensity = Number(intensity.value); paint(); });
     scale.addEventListener('input', () => { current.textScale = Number(scale.value); paint(); });
@@ -198,7 +229,7 @@
       if ('EyeDropper' in window) {
         try {
           const picked = await new EyeDropper().open();
-          current.accent = picked.sRGBHex;
+          current.accent = clampHex(picked.sRGBHex);
           current.colors[activeSlot] = current.accent;
           paint();
           return;
@@ -211,7 +242,8 @@
     surprise.addEventListener('click', () => {
       const next = presets[Math.floor(Math.random() * presets.length)];
       current.colors = [next, '#000000', '#40ffce', mix(next, 0.55)];
-      current.accent = current.colors[activeSlot] || next;
+      activeSlot = 0;
+      current.accent = current.colors[0];
       current.hue = Math.floor(Math.random() * 361);
       current.planeX = 55;
       current.planeY = 28;
@@ -232,7 +264,7 @@
       current.accent = current.colors[activeSlot];
       paint();
     });
-    reset.addEventListener('click', () => { current = { ...defaults, colors: [...defaults.colors] }; paint(); write(current); });
+    reset.addEventListener('click', () => { current = { ...defaults, colors: [...defaults.colors] }; activeSlot = 0; paint(); });
 
     paint();
   }
