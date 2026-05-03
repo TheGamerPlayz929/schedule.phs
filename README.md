@@ -1,10 +1,14 @@
 # PHS Student Portal
 
-A student portal for Poolesville High School with three pages, embedding GradeMelon (a StudentVue grade viewer) directly into the site.
+A student portal for Poolesville High School with three pages, embedding GradeViewer (a StudentVue grade viewer) directly into the site.
+
+Current efforts for progress are on implementing applications that help students the most in their classes to *achieve* the grades they desire, rather than provide a vague result of efforts that any provider can do. 
+
+By doing this, we hope to help students with the most challenging classes. Of course, new classes are added every new year, and we cannot add them all, but our focus is on implementing the most difficult classes, and difficult is a perspective that is built and defined rather than a preset to classes. 
 
 ## Live URLs
 - PHS Site → GitHub Pages
-- GradeMelon App → Firebase (`schedulephs.web.app`)
+- GradeViewer App → Firebase (`schedulephs.web.app`)
 
 ## Pages
 - `announcements.html` — school announcements
