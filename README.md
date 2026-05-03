@@ -1,5 +1,7 @@
 # PHS Student Portal
 
+Not Freely Licensed: Under development by Jayaditya Buddan Ramesh and Emir Bakir, Poolesville High School Students, Sophomore and Junior, respectively. 
+
 A student portal for Poolesville High School with three pages, embedding GradeViewer (a StudentVue grade viewer) directly into the site.
 
 Current efforts for progress are on implementing applications that help students the most in their classes to *achieve* the grades they desire, rather than provide a vague result of efforts that any provider can do. 
