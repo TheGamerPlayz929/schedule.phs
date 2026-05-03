@@ -393,6 +393,11 @@ ol {
   justify-content: center;
 }
 
+.ring-wrap[hidden],
+.glass-circle[hidden] {
+  display: none !important;
+}
+
 .progress-ring {
   position: absolute;
   inset: 0;
@@ -534,6 +539,14 @@ ol {
 .period-card:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+.period-card--empty {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  color: var(--fg-2);
+  font-size: 14px;
+  letter-spacing: 0;
 }
 
 .period-time {
@@ -718,6 +731,37 @@ ol {
 .admin-actions {
   display: flex;
   gap: 8px;
+}
+
+.admin-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.admin-select-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.admin-select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+.admin-select option {
+  background: #151426;
+  color: #f7f7ff;
 }
 
 .admin-btn {

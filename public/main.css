@@ -287,6 +287,10 @@ ol {
   box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.02), 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
+.glass-circle[hidden] {
+  display: none !important;
+}
+
 .countdown-wrapper {
   display: flex;
   flex-direction: column;
@@ -373,6 +377,14 @@ ol {
 .period-card:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+.period-card--empty {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  color: var(--fg-2);
+  font-size: 14px;
+  letter-spacing: 0;
 }
 
 .period-time {

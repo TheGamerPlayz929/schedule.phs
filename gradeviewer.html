@@ -140,7 +140,7 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 3">
-    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;"><span data-bind="footer.supportEmail">supportphss@gmail.com</span></a>
+    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:emirbakir523@gmail.com,thegamerp929@gmail.com" style="color:inherit;text-decoration:none;"><span data-bind="footer.supportEmail">emirbakir523@gmail.com and/or thegamerp929@gmail.com</span></a>
   </footer>
 </div>
 
@@ -164,10 +164,11 @@
     setTimeout(() => c.abort(), ms);
     return c.signal;
   }
-  async function reachable(url) {
+  async function localGradeMelonAvailable() {
     try {
-      await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: timeoutSignal(1500) });
-      return true;
+      const res = await fetch('/local-grade-melon-status', { cache: 'no-store', signal: timeoutSignal(1500) });
+      const json = await res.json();
+      return Boolean(json.available);
     } catch { return false; }
   }
   function urlsEqual(a, b) {
@@ -184,7 +185,7 @@
     const localUrl = settings?.grades?.iframeUrlLocal;
     const prodUrl  = settings?.grades?.iframeUrlProd || 'https://schedulephs.web.app/login';
     let url = isLocal ? localUrl : prodUrl;
-    if (isLocal && (!localUrl || !(await reachable(localUrl)))) url = prodUrl;
+    if (isLocal && (!localUrl || !(await localGradeMelonAvailable()))) url = prodUrl;
     if (myToken !== applyToken) return; // a newer call superseded us
     if (frameUrlLocked) return;
     if (url && !urlsEqual(frame.src, url)) {

@@ -8,7 +8,7 @@
  */
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
-  const BACKEND = isLocal ? 'http://localhost:3000' : 'https://phs-grades-backend.onrender.com';
+  const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const CACHE_KEY = 'phs:site-settings:v1';
   const CACHE_TTL_MS = 30 * 1000;
   const isPreviewIframe = (() => {
@@ -44,7 +44,8 @@
       if (mode === 'title')  { el.setAttribute('title',String(val)); return; }
       if (mode === 'mailto') {
         const v = String(val);
-        el.setAttribute('href', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'mailto:' + v : '#');
+        const emails = v.match(/[^\s,@]+@[^\s,@]+\.[^\s,@]+/g) || [];
+        el.setAttribute('href', emails.length ? 'mailto:' + emails.join(',') : '#');
         return;
       }
       if (mode === 'content'){ el.setAttribute('content', String(val)); return; }

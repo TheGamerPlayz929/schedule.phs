@@ -4,7 +4,8 @@
  */
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
-  const BACKEND = isLocal ? 'http://localhost:3000' : 'https://phs-grades-backend.onrender.com';
+  if (isLocal) return;
+  const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const PAGE_MAP = {
     '/': 'schedule',
     '/index.html': 'schedule',

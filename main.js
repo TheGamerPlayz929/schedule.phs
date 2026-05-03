@@ -11,20 +11,35 @@ let periodEndTime = 0;
 let scheduleType = "";
 let isBeforeSchool = false;
 let isTransition = false;
+let isTimerInactive = false;
 
 /* --- Admin time override (localhost only) --- */
 let _timeOffsetSeconds = 0; // added to real time
+let _devScheduleType = null;
 
 /* --- Schedule override (set by admin panel, synced from backend) --- */
 let _scheduleOverride = null; // { type: string, timestamp: number } | null
+let _clockTimerId = null;
+let _clockTickMs = 0;
+
+const ACTIVE_CLOCK_MS = 1000;
+const IDLE_CLOCK_MS = 60000;
+const OVERRIDE_FETCH_TIMEOUT_MS = 1500;
 
 const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
-  ? 'http://localhost:3000'
+  ? location.origin
   : 'https://phs-grades-backend.onrender.com';
 
 async function _pollScheduleOverride() {
+  const previousOverride = JSON.stringify(_scheduleOverride);
   try {
-    const res = await fetch(`${_BACKEND_URL}/schedule-override`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OVERRIDE_FETCH_TIMEOUT_MS);
+    const res = await fetch(`${_BACKEND_URL}/schedule-override`, {
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+    clearTimeout(timeout);
     const json = await res.json();
     _scheduleOverride = json.override || null;
     if (_scheduleOverride) {
@@ -37,6 +52,7 @@ async function _pollScheduleOverride() {
     const stored = localStorage.getItem('phs_schedule_override');
     _scheduleOverride = stored ? JSON.parse(stored) : null;
   }
+  if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
 function _getOverrideData(targetType) {
@@ -63,6 +79,55 @@ function _overrideAppliesToday(override) {
 
 function _isLocalhost() {
   return ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
+}
+
+function _clockSeconds(date = new Date()) {
+  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
+}
+
+function _isNonInstructionalSchedule(type) {
+  return /\b(no school|holiday|closure|closed)\b/i.test(String(type || ''));
+}
+
+function _resetTimerState() {
+  goal = 0;
+  period = "";
+  myArray = [];
+  periodStartTime = 0;
+  periodEndTime = 0;
+  isBeforeSchool = false;
+  isTransition = false;
+  isTimerInactive = true;
+}
+
+function _setClockCadence(active) {
+  const nextMs = active ? ACTIVE_CLOCK_MS : IDLE_CLOCK_MS;
+  if (_clockTimerId && _clockTickMs === nextMs) return;
+  if (_clockTimerId) clearInterval(_clockTimerId);
+  _clockTickMs = nextMs;
+  _clockTimerId = setInterval(updateAll, nextMs);
+}
+
+function _setTimerSurfaceVisible(visible) {
+  const ringWrap = document.querySelector('.ring-wrap');
+  if (!ringWrap) return;
+  ringWrap.hidden = !visible;
+  ringWrap.style.display = visible ? '' : 'none';
+  ringWrap.setAttribute('aria-hidden', String(!visible));
+  const hero = document.querySelector('.hero');
+  if (hero) hero.classList.toggle('hero--compact', !visible);
+}
+
+function _clearCountdownDisplay() {
+  if (_hmEl) _hmEl.textContent = '';
+  if (_sEl) _sEl.textContent = '';
+  _lastHm = '';
+  _lastS = '';
+}
+
+function _setAdminStatus(text) {
+  const status = document.getElementById('admin-status');
+  if (status) status.textContent = text;
 }
 
 function _initAdminPanel() {
@@ -96,6 +161,16 @@ function _initAdminPanel() {
       <div class="admin-actions">
         <button type="button" id="admin-apply" class="admin-btn admin-btn--apply">Apply</button>
         <button type="button" id="admin-reset" class="admin-btn admin-btn--reset">Reset</button>
+      </div>
+      <div class="admin-schedule">
+        <label class="admin-select-label" for="admin-schedule-type">Schedule</label>
+        <select id="admin-schedule-type" class="admin-select">
+          <option value="">Auto / today</option>
+          <option value="Normal Schedule">Force Normal</option>
+          <option value="No School">Force No School</option>
+          <option value="Early Release">Force Early Release</option>
+          <option value="Advisory">Force Advisory</option>
+        </select>
       </div>
       <div class="admin-status" id="admin-status">Real time</div>
     </div>
@@ -134,10 +209,18 @@ function _initAdminPanel() {
 
   document.getElementById('admin-reset').addEventListener('click', () => {
     _timeOffsetSeconds = 0;
+    _devScheduleType = null;
     document.getElementById('admin-h').value = '';
     document.getElementById('admin-m').value = '';
     document.getElementById('admin-s').value = '';
+    document.getElementById('admin-schedule-type').value = '';
     document.getElementById('admin-status').textContent = 'Real time';
+    updateAll();
+  });
+
+  document.getElementById('admin-schedule-type').addEventListener('change', (event) => {
+    _devScheduleType = event.target.value || null;
+    _setAdminStatus(_devScheduleType ? `Testing ${_devScheduleType}` : 'Auto schedule');
     updateAll();
   });
 }
@@ -404,9 +487,6 @@ async function signHeroText(target, text, options = {}) {
 
 async function main() {
   try {
-    const response = await fetch('data.json');
-    data = await response.json();
-
     _hmEl = document.getElementById('cd-hm');
     _sEl = document.getElementById('cd-s');
     _heroTitle = document.getElementById('hero-title');
@@ -419,6 +499,12 @@ async function main() {
     _schedTitle = document.getElementById('schedule-title');
     _schedDate = document.getElementById('schedule-date');
     _periodList = document.getElementById('period-list');
+
+    const isSchedulePage = Boolean(_hmEl && _sEl && _ringFill && _schedTitle && _periodList);
+    if (!isSchedulePage) return;
+
+    const response = await fetch('data.json');
+    data = await response.json();
 
     /* Strip any existing text nodes from #cd-hm (the hardcoded "00 " in HTML),
        then insert a single controlled text node before the MIN span. */
@@ -434,7 +520,6 @@ async function main() {
     await _pollScheduleOverride();
     setInterval(_pollScheduleOverride, 30000); // re-check every 30 s
     updateAll();
-    setInterval(updateAll, 1000);
   } catch (e) {
     console.error("Initialization failed:", e);
   }
@@ -456,20 +541,30 @@ function calculateGoal() {
   if (!data) return;
   const date = new Date();
   let str = `${date.getMonth() + 1}/${date.getDate()}`;
-  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
+  let val = _clockSeconds(date);
   if (!(str in data)) { str = "base"; }
 
   let arr = data[str];
-  // Apply admin schedule override if one is active
-  if (_scheduleOverride && _scheduleOverride.type && _overrideAppliesToday(_scheduleOverride)) {
-    const overrideArr = _getOverrideData(_scheduleOverride.type);
+  const effectiveOverride = _devScheduleType
+    ? { type: _devScheduleType }
+    : (_scheduleOverride && _scheduleOverride.type && _overrideAppliesToday(_scheduleOverride) ? _scheduleOverride : null);
+
+  // Apply local dev or admin schedule override if one is active
+  if (effectiveOverride) {
+    const overrideArr = _getOverrideData(effectiveOverride.type);
     if (overrideArr) arr = overrideArr;
-    else if (window.__SITE_SETTINGS__?.bellSchedules?.[_scheduleOverride.type]) {
-      arr = [_scheduleOverride.type, window.__SITE_SETTINGS__.bellSchedules[_scheduleOverride.type]];
+    else if (window.__SITE_SETTINGS__?.bellSchedules?.[effectiveOverride.type]) {
+      arr = [effectiveOverride.type, window.__SITE_SETTINGS__.bellSchedules[effectiveOverride.type]];
+    } else if (_isNonInstructionalSchedule(effectiveOverride.type)) {
+      arr = [effectiveOverride.type, {}];
     }
   }
   scheduleType = arr[0];
   let periods = arr[1];
+  if (_isNonInstructionalSchedule(scheduleType)) {
+    _resetTimerState();
+    return;
+  }
   // Admin-controlled bell-schedule template overrides for this type, if non-empty.
   const _bs = (window.__SITE_SETTINGS__ && window.__SITE_SETTINGS__.bellSchedules) || null;
   if (_bs && _bs[scheduleType] && Object.keys(_bs[scheduleType]).length) {
@@ -478,6 +573,7 @@ function calculateGoal() {
   let largestUnder = -1;
   let largest = -1;
   myArray = [];
+  isTimerInactive = false;
 
   let schoolStart = 10000000;
   for (let k in periods) {
@@ -528,23 +624,26 @@ function updateAll() {
   calculateGoal();
 
   const date = new Date();
-  let val = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
+  let val = _clockSeconds(date);
   let timeleft = Math.max(0, goal - val);
 
   let h = Math.floor(timeleft / 3600);
   let m = Math.floor((timeleft % 3600) / 60);
   let s = timeleft % 60;
 
-  /* --- Zero Timer if No School --- */
-  const dayIsOver = (timeleft <= 0 && !isBeforeSchool);
-  const noSchool = scheduleType === "No School" || scheduleType === "No School (Most Likely)" || dayIsOver;
+  /* --- Timer terminal states --- */
+  const noSchool = _isNonInstructionalSchedule(scheduleType);
+  const dayIsOver = !noSchool && (timeleft <= 0 && !isBeforeSchool);
+  isTimerInactive = noSchool || dayIsOver;
 
-  if (noSchool) {
+  if (isTimerInactive) {
     h = 0; m = 0; s = 0;
+    _clearCountdownDisplay();
   }
+  _setTimerSurfaceVisible(!isTimerInactive);
 
   /* --- Countdown --- */
-  if (_hmEl) {
+  if (_hmEl && !isTimerInactive) {
     const u = (t) => `<span class="cd-min-label">${t}</span>`;
     const hm = h > 0
       ? `${h}${u('h')}${m > 0 ? (m < 10 ? '&nbsp;' : '') + m + u('m') : ''}`
@@ -558,9 +657,11 @@ function updateAll() {
     }
   }
 
-  document.title = h === 0
-    ? `${m}:${String(s).padStart(2, '0')} PHS`
-    : `${h}:${String(m).padStart(2, '0')} PHS`;
+  document.title = isTimerInactive
+    ? `${noSchool ? scheduleType : 'Done'} | PHS`
+    : (h === 0
+      ? `${m}:${String(s).padStart(2, '0')} PHS`
+      : `${h}:${String(m).padStart(2, '0')} PHS`);
 
   /* --- Hero text & Status --- */
   if (_heroTitle && _heroEyebrow && _statusPill && _statusLabel) {
@@ -571,6 +672,13 @@ function updateAll() {
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
       _statusLabel.textContent = "Enjoy your day \u2728";
+    } else if (dayIsOver) {
+      setHeroLine('eyebrow', '', false);
+      setHeroLine('title', 'School Day Ended', true, { fontSize: 142, revealStroke: 62 });
+
+      _statusPill.style.display = "inline-flex";
+      _statusPill.dataset.status = "off";
+      _statusLabel.textContent = "See you tomorrow";
     } else if (isBeforeSchool) {
       setHeroLine('eyebrow', 'Starts in', true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', '', false);
@@ -616,10 +724,27 @@ function updateAll() {
 
   /* --- Period list --- */
   renderPeriodList(val);
+  _setClockCadence(!isTimerInactive);
 }
 
 function renderPeriodList(currentSeconds) {
   if (!_periodList) return;
+  if (myArray.length === 0) {
+    const emptyLabel = _isNonInstructionalSchedule(scheduleType)
+      ? 'No bell schedule today'
+      : 'No remaining bell schedule';
+    if (_lastPeriodCount !== 0 || _periodList.dataset.emptyLabel !== emptyLabel) {
+      _periodList.innerHTML = '';
+      const li = document.createElement('li');
+      li.className = 'period-card period-card--empty';
+      li.textContent = emptyLabel;
+      _periodList.appendChild(li);
+      _periodList.dataset.emptyLabel = emptyLabel;
+      _lastPeriodCount = 0;
+    }
+    return;
+  }
+  delete _periodList.dataset.emptyLabel;
 
   if (_periodList.children.length === myArray.length && myArray.length === _lastPeriodCount) {
     for (let i = 0; i < myArray.length; i++) {
