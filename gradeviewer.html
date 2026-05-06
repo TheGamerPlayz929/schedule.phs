@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-bind="grades.pageTitle">Grades - PHS</title>
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
-  <link rel="stylesheet" href="main.css?v=20260506-debug3">
+  <link rel="stylesheet" href="main.css?v=20260506-debug4">
   <style>
     html, body { min-height: 100vh; overflow-x: hidden; overflow-y: auto; }
     .app-shell { max-width: none; padding: 0; }
@@ -173,11 +173,11 @@
   </footer>
 </div>
 
-<script src="settings-loader.js?v=20260506-debug3"></script>
-<script src="nav-renderer.js?v=20260506-debug3"></script>
-<script src="privacy-analytics.js?v=20260506-debug3"></script>
-<script src="google-analytics.js?v=20260506-debug3"></script>
-<script src="main.js?v=20260506-debug3"></script>
+<script src="settings-loader.js?v=20260506-debug4"></script>
+<script src="nav-renderer.js?v=20260506-debug4"></script>
+<script src="privacy-analytics.js?v=20260506-debug4"></script>
+<script src="google-analytics.js?v=20260506-debug4"></script>
+<script src="main.js?v=20260506-debug4"></script>
 <script>
   /* ── Iframe sizing ── */
   const scaler = document.getElementById('grades-scaler');
@@ -273,7 +273,7 @@
 
   function readAppearance() {
     try {
-      const raw = JSON.parse(localStorage.getItem('phs:appearance:v1') || '{}');
+      const raw = JSON.parse(localStorage.getItem('phs:appearance:v2') || '{}');
       const isHex = value => /^#[0-9a-fA-F]{6}$/.test(String(value || ''));
       const colors = Array.isArray(raw.colors) ? raw.colors.filter(isHex).slice(0, 5).map(color => color.toUpperCase()) : [];
       while (colors.length < 2) colors.push(colors[0] || '#8288D5');
@@ -304,7 +304,7 @@
   });
   // Push appearance updates into the iframe whenever the user tweaks the theme.
   window.addEventListener('storage', (e) => {
-    if (e.key === 'phs:appearance:v1') postThemeToFrame();
+    if (e.key === 'phs:appearance:v2') postThemeToFrame();
   });
   document.addEventListener('phs:appearance-storage-sync', postThemeToFrame);
   // Also push on first iframe load (in case the iframe sends ready before we set up the listener).
@@ -346,6 +346,6 @@
     setSize();
   }
 </script>
-<script src="appearance-settings.js?v=20260506-debug3"></script>
+<script src="appearance-settings.js?v=20260506-debug4"></script>
 </body>
 </html>

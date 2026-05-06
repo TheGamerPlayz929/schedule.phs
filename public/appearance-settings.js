@@ -1,6 +1,7 @@
 /* Visitor-only appearance controls for the schedule page. */
 (function () {
-  const KEY = 'phs:appearance:v1';
+  const KEY = 'phs:appearance:v2';
+  const OLD_KEYS = ['phs:appearance:v1'];
   const defaults = { accent: '#8288d5', colors: ['#8288d5', '#17173a'], hue: 236, intensity: 60, textScale: 1, reduceGlow: false };
   const MAX_COLORS = 5;
   const presets = ['#8288d5', '#a855f7', '#22c55e', '#38bdf8', '#f97316', '#f43f5e'];
@@ -48,6 +49,9 @@
     return rgbToHex(rgb[0], rgb[1], rgb[2]);
   }
   function read() {
+    OLD_KEYS.forEach(key => {
+      try { localStorage.removeItem(key); } catch {}
+    });
     try {
       const merged = { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
       const intensity = Number(merged.intensity);
