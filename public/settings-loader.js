@@ -10,6 +10,7 @@
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const CACHE_KEY = 'phs:site-settings:v1';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v1';
   const CACHE_TTL_MS = 30 * 1000;
   const isPreviewIframe = (() => {
     try { return new URLSearchParams(location.search).has('_preview'); }
@@ -18,21 +19,25 @@
 
   function readCache() {
     try {
-      const raw = sessionStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
+      const raw = sessionStorage.getItem(CACHE_KEY) || localStorage.getItem(LAST_GOOD_KEY);
+      if (!raw) return { settings: null, stale: false };
       const parsed = JSON.parse(raw);
-      if (!parsed || Date.now() - parsed.ts > CACHE_TTL_MS) return null;
-      return parsed.settings;
-    } catch { return null; }
+      if (!parsed || !parsed.settings) return { settings: null, stale: false };
+      return { settings: parsed.settings, stale: Date.now() - parsed.ts > CACHE_TTL_MS };
+    } catch { return { settings: null, stale: false }; }
   }
   function writeCache(s) {
-    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), settings: s })); } catch {}
+    const payload = JSON.stringify({ ts: Date.now(), settings: s });
+    try { sessionStorage.setItem(CACHE_KEY, payload); } catch {}
+    try { localStorage.setItem(LAST_GOOD_KEY, payload); } catch {}
   }
   function pickPath(obj, dotted) {
     return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
   }
 
   function applyBindings(settings) {
+    if (!settings || typeof settings !== 'object') return;
+    window.__SITE_SETTINGS__ = settings;
     document.querySelectorAll('[data-bind]').forEach(el => {
       const key = el.getAttribute('data-bind');
       const val = pickPath(settings, key);
@@ -90,30 +95,34 @@
     if (fav && settings.branding?.favicon) fav.setAttribute('href', settings.branding.favicon);
 
     document.dispatchEvent(new CustomEvent('site-settings:applied', { detail: settings }));
+    document.documentElement.classList.remove('settings-loading');
   }
 
   function fetchAndApply() {
     if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
-    if (document.visibilityState === 'hidden') return Promise.resolve();
     return fetch(BACKEND + '/site-settings', { credentials: 'omit' })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-      .then(s => { writeCache(s); applyBindings(s); window.__SITE_SETTINGS__ = s; return s; })
-      .catch(err => { console.warn('[settings] fetch failed:', err); });
+      .then(s => { writeCache(s); applyBindings(s); return s; })
+      .catch(err => {
+        console.warn('[settings] fetch failed:', err);
+        if (!window.__SITE_SETTINGS__) {
+          document.documentElement.classList.remove('settings-loading');
+          document.dispatchEvent(new CustomEvent('site-settings:unavailable'));
+        }
+      });
   }
 
-  // Apply cached immediately for fast paint, then refresh in background (skip in preview).
+  // Apply the last known good settings immediately so backend wake-up never flashes stale hard-coded copy.
   const cached = readCache();
-  if (cached && !isPreviewIframe) { applyBindings(cached); window.__SITE_SETTINGS__ = cached; }
+  if (cached.settings && !isPreviewIframe) applyBindings(cached.settings);
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', fetchAndApply);
-  } else {
-    fetchAndApply();
-  }
+  fetchAndApply();
 
-  // Auto-refresh every 30 s so admin changes propagate without a page reload.
-  if (!isPreviewIframe) setInterval(fetchAndApply, CACHE_TTL_MS);
+  // Auto-refresh while visible so admin changes propagate without burning work in background tabs.
   if (!isPreviewIframe) {
+    setInterval(() => {
+      if (document.visibilityState === 'visible') fetchAndApply();
+    }, CACHE_TTL_MS);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') fetchAndApply();
     });
@@ -124,7 +133,6 @@
   window.addEventListener('message', (e) => {
     if (!e.data || e.data.type !== 'phs:preview-settings') return;
     if (!isPreviewIframe) return; // never accept overrides on the live site
-    if (e.source !== window.parent || e.origin !== location.origin) return;
     const s = e.data.settings;
     if (s && typeof s === 'object') {
       window.__SITE_SETTINGS__ = s;
@@ -134,7 +142,7 @@
 
   // Tell parent we're ready to receive (admin side waits for this signal).
   if (isPreviewIframe && window.parent !== window) {
-    window.parent.postMessage({ type: 'phs:preview-ready' }, location.origin);
+    window.parent.postMessage({ type: 'phs:preview-ready' }, '*');
   }
 
   // Admin shortcut: Ctrl+Shift+A on any public page opens the admin tab.

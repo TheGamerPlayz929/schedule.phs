@@ -1,7 +1,7 @@
 /* Visitor-only appearance controls for the schedule page. */
 (function () {
   const KEY = 'phs:appearance:v1';
-  const defaults = { accent: '#8288d5', colors: ['#8288d5', '#17173a'], hue: 236, planeX: 40, planeY: 16, intensity: 60, textScale: 1, reduceGlow: false };
+  const defaults = { accent: '#8288d5', colors: ['#8288d5', '#17173a'], hue: 236, intensity: 60, textScale: 1, reduceGlow: false };
   const MAX_COLORS = 5;
   const presets = ['#8288d5', '#a855f7', '#22c55e', '#38bdf8', '#f97316', '#f43f5e'];
 
@@ -27,58 +27,25 @@
     const c = hexToRgb(hex);
     return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
   }
-  function clamp(n, min, max) {
-    return Math.max(min, Math.min(max, n));
-  }
-  function hexToHsv(hex) {
-    const { r, g, b } = hexToRgb(hex);
-    const nr = r / 255;
-    const ng = g / 255;
-    const nb = b / 255;
-    const max = Math.max(nr, ng, nb);
-    const min = Math.min(nr, ng, nb);
-    const delta = max - min;
-    let h = 0;
-    if (delta) {
-      if (max === nr) h = 60 * (((ng - nb) / delta) % 6);
-      else if (max === ng) h = 60 * ((nb - nr) / delta + 2);
-      else h = 60 * ((nr - ng) / delta + 4);
-    }
-    if (h < 0) h += 360;
-    return {
-      h: Math.round(h),
-      s: max === 0 ? 0 : delta / max,
-      v: max
-    };
-  }
-  function hsvToHex(h, s, v) {
-    const hue = ((Number(h) % 360) + 360) % 360;
-    const sat = clamp(Number(s), 0, 1);
-    const val = clamp(Number(v), 0, 1);
-    const c = val * sat;
-    const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
-    const m = val - c;
-    let rgb = [0, 0, 0];
-    if (hue < 60) rgb = [c, x, 0];
-    else if (hue < 120) rgb = [x, c, 0];
-    else if (hue < 180) rgb = [0, c, x];
-    else if (hue < 240) rgb = [0, x, c];
-    else if (hue < 300) rgb = [x, 0, c];
-    else rgb = [c, 0, x];
-    return rgbToHex((rgb[0] + m) * 255, (rgb[1] + m) * 255, (rgb[2] + m) * 255);
+  function hslToHex(h, s = 62, l = 62) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return '#' + [f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
   }
   function rgbToHex(r, g, b) {
     return '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
   }
   function planeColor(h, x, y) {
-    return hsvToHex(h, clamp(x, 0, 1), 1 - clamp(y, 0, 1));
-  }
-  function syncPickerFromAccent(settings) {
-    const hsv = hexToHsv(settings.accent);
-    settings.hue = hsv.s < 0.03 ? (Number.isFinite(Number(settings.hue)) ? Number(settings.hue) : defaults.hue) : hsv.h;
-    settings.planeX = Math.round(clamp(hsv.s, 0, 1) * 100);
-    settings.planeY = Math.round((1 - clamp(hsv.v, 0, 1)) * 100);
-    return settings;
+    const base = hexToRgb(hslToHex(h, 78, 55));
+    const whiteMix = x;
+    const darkMix = y;
+    const rgb = [base.r, base.g, base.b].map(v => {
+      const withWhite = 255 + (v - 255) * whiteMix;
+      return withWhite * (1 - darkMix);
+    });
+    return rgbToHex(rgb[0], rgb[1], rgb[2]);
   }
   function read() {
     try {
@@ -89,7 +56,7 @@
       merged.textScale = Number.isFinite(textScale) ? Math.max(0.85, Math.min(1.2, textScale)) : defaults.textScale;
       merged.accent = clampHex(merged.accent);
       merged.colors = normalizeColors(merged.colors, merged.accent);
-      syncPickerFromAccent(merged);
+      if (!merged.colors.includes(merged.accent)) merged.accent = merged.colors[0];
       return merged;
     } catch { return { ...defaults, colors: [...defaults.colors] }; }
   }
@@ -100,7 +67,8 @@
   function apply(settings) {
     const root = document.documentElement;
     const colors = normalizeColors(settings.colors, settings.accent);
-    const accent = clampHex(settings.accent || colors[0]);
+    const requestedAccent = clampHex(settings.accent || colors[0]);
+    const accent = colors.includes(requestedAccent) ? requestedAccent : colors[0];
     const darkColor = clampHex(colors[1] || mix(accent, -0.7));
     const intensity = Math.max(15, Math.min(100, Number(settings.intensity) || defaults.intensity)) / 100;
     root.style.setProperty('--user-bg-base', mix(colors[0], -0.9));
@@ -134,43 +102,10 @@
     return `linear-gradient(90deg, ${stops.join(', ')})`;
   }
   function sliderFill(value, min, max, color) {
-    const pct = sliderPercent(value, min, max);
-    return `linear-gradient(90deg, ${rgba(color, 0.86)} 0 ${pct}%, rgba(255,255,255,0.68) ${pct}% 100%)`;
+    const pct = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
+    return `linear-gradient(90deg, ${color} 0 ${pct}%, #2b3244 ${pct}%, #2b3244 100%)`;
   }
-  function sliderPercent(value, min, max) {
-    return Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
-  }
-  function enhanceAppearanceSlider(input) {
-    if (!input || input.closest('.appearance-liquid-range')) return;
-    const wrap = document.createElement('span');
-    wrap.className = 'appearance-liquid-range';
-    const track = document.createElement('span');
-    track.className = 'appearance-liquid-track';
-    track.setAttribute('aria-hidden', 'true');
-    const thumb = document.createElement('span');
-    thumb.className = 'appearance-liquid-thumb';
-    thumb.setAttribute('aria-hidden', 'true');
-    input.parentNode.insertBefore(wrap, input);
-    wrap.append(track, input, thumb);
 
-    const stopDrag = () => wrap.classList.remove('is-dragging');
-    input.addEventListener('pointerdown', () => wrap.classList.add('is-dragging'));
-    window.addEventListener('pointerup', stopDrag);
-    window.addEventListener('pointercancel', stopDrag);
-  }
-  function paintAppearanceSlider(input, value, min, max, color) {
-    const pct = Number(sliderPercent(value, min, max).toFixed(4));
-    const wrap = input.closest('.appearance-liquid-range');
-    const target = wrap || input;
-    target.style.setProperty('--appearance-slider-percent', `${pct}%`);
-    target.style.setProperty('--appearance-slider-accent', color);
-    input.style.setProperty('--slider-accent', color);
-    if (!wrap) input.style.background = sliderFill(value, min, max, color);
-  }
-  function writeLater(settings) {
-    window.clearTimeout(writeLater.timer);
-    writeLater.timer = window.setTimeout(() => write(settings), 120);
-  }
   function mount() {
     const toggle = document.getElementById('appearance-toggle');
     const panel = document.getElementById('appearance-panel');
@@ -194,98 +129,69 @@
     const strip = panel.querySelector('[data-theme-strip]');
     const swatch = panel.querySelector('[data-theme-swatch]');
     const dot = panel.querySelector('[data-theme-picker-dot]');
-    enhanceAppearanceSlider(intensity);
-    enhanceAppearanceSlider(scale);
     let current = read();
     let activeSlot = 0;
-    let stopsLayoutSignature = '';
-    let frame = 0;
+    let paintFrame = 0;
+    let saveTimer = 0;
 
-    function normalizeCurrent(syncPicker) {
+    function commit() {
+      window.clearTimeout(saveTimer);
+      saveTimer = 0;
+      write(current);
+    }
+    function queueSave() {
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(commit, 180);
+    }
+    function schedulePaint(save = true) {
+      if (paintFrame) {
+        if (save) queueSave();
+        return;
+      }
+      paintFrame = window.requestAnimationFrame(() => {
+        paintFrame = 0;
+        paint();
+      });
+      if (save) queueSave();
+    }
+    function paint() {
       current.colors = normalizeColors(current.colors, current.accent);
-      current.accent = clampHex(current.accent);
       if (activeSlot >= current.colors.length || activeSlot < 0) activeSlot = 0;
-      current.colors[activeSlot] = current.accent;
+      current.accent = clampHex(current.colors[activeSlot] || current.accent);
       const safeIntensity = Number.isFinite(Number(current.intensity)) ? Math.max(15, Math.min(100, Number(current.intensity))) : defaults.intensity;
       const safeScale = Number.isFinite(Number(current.textScale)) ? Math.max(0.85, Math.min(1.2, Number(current.textScale))) : defaults.textScale;
       current.intensity = safeIntensity;
       current.textScale = safeScale;
-      if (syncPicker) syncPickerFromAccent(current);
-      current.hue = Number.isFinite(Number(current.hue)) ? clamp(Number(current.hue), 0, 360) : defaults.hue;
-      current.planeX = Number.isFinite(Number(current.planeX)) ? clamp(Number(current.planeX), 0, 100) : defaults.planeX;
-      current.planeY = Number.isFinite(Number(current.planeY)) ? clamp(Number(current.planeY), 0, 100) : defaults.planeY;
-    }
-    function renderStops() {
-      strip.style.background = gradient(current.colors);
-      const signature = `${activeSlot}|${current.colors.length}`;
-      if (signature !== stopsLayoutSignature || strip.children.length !== current.colors.length) {
-        stopsLayoutSignature = signature;
-        strip.innerHTML = current.colors.map((stop, index) => {
-          const raw = current.colors.length === 1 ? 0 : (index / (current.colors.length - 1)) * 100;
-          const left = `calc(${raw}% + ${30 - raw * 0.6}px)`;
-          return `<button type="button" class="theme-stop ${index === activeSlot ? 'active' : ''}" data-theme-slot="${index}" style="left:${left};--stop-color:${stop}" aria-label="Color stop ${index + 1}"></button>`;
-        }).join('');
-        return;
-      }
-      strip.querySelectorAll('[data-theme-slot]').forEach(slot => {
-        const index = Number(slot.dataset.themeSlot) || 0;
-        slot.style.setProperty('--stop-color', current.colors[index]);
-      });
-    }
-    function renderControls() {
       color.value = current.accent;
       if (document.activeElement !== hex) hex.value = current.accent;
-      hue.value = current.hue;
-      intensity.value = current.intensity;
-      scale.value = current.textScale;
+      hue.value = Number.isFinite(current.hue) ? current.hue : defaults.hue;
+      intensity.value = safeIntensity;
+      scale.value = safeScale;
       glow.checked = Boolean(current.reduceGlow);
-      intensityValue.textContent = `${current.intensity}%`;
-      scaleValue.textContent = `${Math.round(current.textScale * 100)}%`;
-      paintAppearanceSlider(intensity, current.intensity, 15, 100, current.accent);
-      paintAppearanceSlider(scale, current.textScale, 0.85, 1.2, current.accent);
+      intensityValue.textContent = `${safeIntensity}%`;
+      scaleValue.textContent = `${Math.round(safeScale * 100)}%`;
+      intensity.style.setProperty('--slider-accent', current.accent);
+      scale.style.setProperty('--slider-accent', current.accent);
+      intensity.style.background = sliderFill(safeIntensity, 15, 100, current.accent);
+      scale.style.background = sliderFill(safeScale, 0.85, 1.2, current.accent);
+      strip.style.background = gradient(current.colors);
       remove.disabled = current.colors.length <= 2;
       add.disabled = current.colors.length >= MAX_COLORS;
-      panel.style.setProperty('--accent', current.accent);
+      strip.innerHTML = current.colors.map((stop, index) => {
+        const raw = current.colors.length === 1 ? 0 : (index / (current.colors.length - 1)) * 100;
+        const left = Math.max(5, Math.min(95, raw));
+        return `<button type="button" class="theme-stop ${index === activeSlot ? 'active' : ''}" data-theme-slot="${index}" style="left:${left}%;--stop-color:${stop}" aria-label="Color stop ${index + 1}"></button>`;
+      }).join('');
       swatch.style.background = current.accent;
       dot.style.background = current.accent;
       dot.style.color = current.accent;
-      plane.style.setProperty('--plane-color', hsvToHex(current.hue, 1, 1));
-      dot.style.left = `clamp(15px, ${current.planeX}%, calc(100% - 15px))`;
-      dot.style.top = `clamp(15px, ${current.planeY}%, calc(100% - 15px))`;
-    }
-    function renderPickerOnly() {
-      color.value = current.accent;
-      if (document.activeElement !== hex) hex.value = current.accent;
-      panel.style.setProperty('--accent', current.accent);
-      swatch.style.background = current.accent;
-      dot.style.background = current.accent;
-      dot.style.color = current.accent;
-      dot.style.left = `clamp(15px, ${current.planeX}%, calc(100% - 15px))`;
-      dot.style.top = `clamp(15px, ${current.planeY}%, calc(100% - 15px))`;
-      strip.style.background = gradient(current.colors);
-      const slot = strip.querySelector(`[data-theme-slot="${activeSlot}"]`);
-      if (slot) slot.style.setProperty('--stop-color', current.accent);
-    }
-    function paint(options = {}) {
-      const syncPicker = options.syncPicker !== false;
-      const persist = options.persist !== false;
-      normalizeCurrent(syncPicker);
-      renderStops();
-      renderControls();
+      plane.style.setProperty('--plane-color', hslToHex(Number.isFinite(current.hue) ? current.hue : defaults.hue, 78, 55));
+      dot.style.left = `${Number.isFinite(current.planeX) ? current.planeX : 54}%`;
+      dot.style.top = `${Number.isFinite(current.planeY) ? current.planeY : 28}%`;
       apply(current);
-      if (persist) writeLater(current);
-    }
-    function fastPaint() {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        normalizeCurrent(false);
-        renderPickerOnly();
-      });
     }
     function openPanel(open) {
       panel.classList.toggle('open', open);
-      document.body.classList.toggle('appearance-open', open);
       toggle.setAttribute('aria-expanded', String(open));
     }
 
@@ -298,14 +204,19 @@
       openPanel(false);
     });
     strip.addEventListener('click', event => {
-      const slot = event.target.closest?.('[data-theme-slot]');
+      const slot = event.target.closest('[data-theme-slot]');
       if (!slot || !strip.contains(slot)) return;
       event.stopPropagation();
       activeSlot = Number(slot.dataset.themeSlot) || 0;
       current.accent = current.colors[activeSlot] || current.accent;
-      paint();
+      schedulePaint();
     });
-    color.addEventListener('input', () => { current.accent = color.value; current.colors[activeSlot] = current.accent; paint(); });
+    color.addEventListener('input', () => {
+      current.accent = color.value;
+      current.colors[activeSlot] = current.accent;
+      schedulePaint();
+    });
+    color.addEventListener('change', commit);
     hex.addEventListener('input', () => {
       let v = hex.value.trim();
       if (v && !v.startsWith('#')) v = '#' + v;
@@ -313,15 +224,16 @@
         current.accent = v.toUpperCase();
         current.colors[activeSlot] = current.accent;
       }
-      paint();
+      schedulePaint();
     });
-    hex.addEventListener('blur', () => { hex.value = current.accent; });
+    hex.addEventListener('blur', () => { hex.value = current.accent; commit(); });
     hue.addEventListener('input', () => {
       current.hue = Number(hue.value);
-      current.accent = planeColor(current.hue, current.planeX / 100, current.planeY / 100);
+      current.accent = hslToHex(current.hue);
       current.colors[activeSlot] = current.accent;
-      paint({ syncPicker: false });
+      schedulePaint();
     });
+    hue.addEventListener('change', commit);
     plane.addEventListener('pointerdown', event => {
       const rect = plane.getBoundingClientRect();
       const move = e => {
@@ -329,18 +241,14 @@
         current.planeY = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
         current.accent = planeColor(Number.isFinite(current.hue) ? current.hue : defaults.hue, current.planeX / 100, current.planeY / 100);
         current.colors[activeSlot] = current.accent;
-        fastPaint();
+        schedulePaint();
       };
       const stop = () => {
-        if (frame) {
-          cancelAnimationFrame(frame);
-          frame = 0;
-        }
-        paint({ syncPicker: false });
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', stop);
         window.removeEventListener('pointercancel', stop);
         try { plane.releasePointerCapture?.(event.pointerId); } catch {}
+        commit();
       };
       move(event);
       try { plane.setPointerCapture?.(event.pointerId); } catch {}
@@ -348,9 +256,11 @@
       window.addEventListener('pointerup', stop);
       window.addEventListener('pointercancel', stop);
     });
-    intensity.addEventListener('input', () => { current.intensity = Number(intensity.value); paint(); });
-    scale.addEventListener('input', () => { current.textScale = Number(scale.value); paint(); });
-    glow.addEventListener('change', () => { current.reduceGlow = glow.checked; paint(); });
+    intensity.addEventListener('input', () => { current.intensity = Number(intensity.value); schedulePaint(); });
+    intensity.addEventListener('change', commit);
+    scale.addEventListener('input', () => { current.textScale = Number(scale.value); schedulePaint(); });
+    scale.addEventListener('change', commit);
+    glow.addEventListener('change', () => { current.reduceGlow = glow.checked; paint(); commit(); });
     eyeDropper.addEventListener('click', async event => {
       event.stopPropagation();
       if ('EyeDropper' in window) {
@@ -359,6 +269,7 @@
           current.accent = clampHex(picked.sRGBHex);
           current.colors[activeSlot] = current.accent;
           paint();
+          commit();
           return;
         } catch {
           return;
@@ -371,8 +282,12 @@
       current.colors = [next, '#000000', '#40ffce', mix(next, 0.55)];
       activeSlot = 0;
       current.accent = current.colors[0];
+      current.hue = Math.floor(Math.random() * 361);
+      current.planeX = 55;
+      current.planeY = 28;
       current.intensity = 45 + Math.floor(Math.random() * 41);
       paint();
+      commit();
     });
     add.addEventListener('click', () => {
       current.colors = normalizeColors(current.colors, current.accent);
@@ -380,6 +295,7 @@
       activeSlot = current.colors.length - 1;
       current.accent = current.colors[activeSlot];
       paint();
+      commit();
     });
     remove.addEventListener('click', () => {
       current.colors = normalizeColors(current.colors, current.accent);
@@ -387,8 +303,9 @@
       activeSlot = Math.max(0, Math.min(activeSlot, current.colors.length - 1));
       current.accent = current.colors[activeSlot];
       paint();
+      commit();
     });
-    reset.addEventListener('click', () => { current = { ...defaults, colors: [...defaults.colors] }; activeSlot = 0; paint(); });
+    reset.addEventListener('click', () => { current = { ...defaults, colors: [...defaults.colors] }; activeSlot = 0; paint(); commit(); });
 
     paint();
   }

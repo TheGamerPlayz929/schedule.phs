@@ -12,6 +12,7 @@ let scheduleType = "";
 let isBeforeSchool = false;
 let isTransition = false;
 let isTimerInactive = false;
+let _overrideInterval = null;
 
 /* --- Admin time override (localhost only) --- */
 let _timeOffsetSeconds = 0; // added to real time
@@ -21,7 +22,6 @@ let _devScheduleType = null;
 let _scheduleOverride = null; // { type: string, timestamp: number } | null
 let _clockTimerId = null;
 let _clockTickMs = 0;
-let _overridePollTimerId = null;
 
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
@@ -30,20 +30,13 @@ const OVERRIDE_FETCH_TIMEOUT_MS = 1500;
 const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
   ? location.origin
   : 'https://phs-grades-backend.onrender.com';
-
-function _readStoredScheduleOverride() {
-  try {
-    const stored = localStorage.getItem('phs_schedule_override');
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (e) {
-    try { localStorage.removeItem('phs_schedule_override'); } catch {}
-    return null;
-  }
-}
+const _IS_ADMIN_PREVIEW = new URLSearchParams(location.search).has('_preview');
 
 async function _pollScheduleOverride() {
+  if (_IS_ADMIN_PREVIEW && window.__SITE_SETTINGS__) {
+    _scheduleOverride = window.__SITE_SETTINGS__.scheduleOverride || null;
+    return;
+  }
   const previousOverride = JSON.stringify(_scheduleOverride);
   try {
     const controller = new AbortController();
@@ -62,19 +55,10 @@ async function _pollScheduleOverride() {
     }
   } catch (e) {
     // Fallback to localStorage when offline
-    _scheduleOverride = _readStoredScheduleOverride();
+    const stored = localStorage.getItem('phs_schedule_override');
+    _scheduleOverride = stored ? JSON.parse(stored) : null;
   }
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
-}
-
-function _startScheduleOverridePolling() {
-  if (_overridePollTimerId) return;
-  _overridePollTimerId = setInterval(() => {
-    if (document.visibilityState !== 'hidden') _pollScheduleOverride();
-  }, 30000);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') _pollScheduleOverride();
-  });
 }
 
 function _getOverrideData(targetType) {
@@ -97,6 +81,13 @@ function _todayISODate() {
 
 function _overrideAppliesToday(override) {
   return !override?.date || override.date === _todayISODate();
+}
+
+function _applySettingsScheduleOverride(settings) {
+  if (!settings || typeof settings !== 'object') return;
+  const previousOverride = JSON.stringify(_scheduleOverride);
+  _scheduleOverride = settings.scheduleOverride || null;
+  if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
 function _isLocalhost() {
@@ -540,8 +531,16 @@ async function main() {
 
     _initAdminPanel();
     await _pollScheduleOverride();
-    _startScheduleOverridePolling();
+    _overrideInterval = setInterval(() => {
+      if (!_IS_ADMIN_PREVIEW && document.visibilityState === 'visible') _pollScheduleOverride();
+    }, 30000); // re-check every 30 s while visible
     updateAll();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (!_IS_ADMIN_PREVIEW) _pollScheduleOverride();
+        updateAll();
+      }
+    });
   } catch (e) {
     console.error("Initialization failed:", e);
   }
@@ -778,7 +777,6 @@ function renderPeriodList(currentSeconds) {
       if (li.className !== expectedClass.trim()) {
         li.className = expectedClass.trim();
       }
-      updatePeriodCard(li, p);
     }
     return;
   }
@@ -791,35 +789,16 @@ function renderPeriodList(currentSeconds) {
 
     const li = document.createElement('li');
     li.className = 'period-card ' + stateClass;
-    li.appendChild(createPeriodCardSection('period-time', p.timeStr));
-    li.appendChild(createPeriodCardSection('period-name', p.name));
-    li.appendChild(createPeriodCardSection('period-meta', `${durationMin} min`));
+
+    li.innerHTML = `
+      <div class="period-time">${p.timeStr}</div>
+      <div class="period-name">${p.name}</div>
+      <div class="period-meta">${durationMin} min</div>
+    `;
 
     _periodList.appendChild(li);
   }
   _lastPeriodCount = myArray.length;
-}
-
-function createPeriodCardSection(className, text) {
-  const div = document.createElement('div');
-  div.className = className;
-  div.textContent = String(text ?? '');
-  return div;
-}
-
-function updatePeriodCard(li, periodData) {
-  const durationMin = Math.round((periodData.endSec - periodData.startSec) / 60);
-  const values = [
-    ['.period-time', periodData.timeStr],
-    ['.period-name', periodData.name],
-    ['.period-meta', `${durationMin} min`]
-  ];
-  for (const [selector, value] of values) {
-    const node = li.querySelector(selector);
-    if (node && node.textContent !== String(value ?? '')) {
-      node.textContent = String(value ?? '');
-    }
-  }
 }
 
 function getStateClass(period, currentSeconds) {
@@ -827,5 +806,9 @@ function getStateClass(period, currentSeconds) {
   if (currentSeconds >= period.startSec && currentSeconds < period.endSec) return 'is-current';
   return '';
 }
+
+document.addEventListener('site-settings:applied', e => {
+  _applySettingsScheduleOverride(e.detail);
+});
 
 window.onload = main;
