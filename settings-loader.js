@@ -9,8 +9,8 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const CACHE_KEY = 'phs:site-settings:v1';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v1';
+  const CACHE_KEY = 'phs:site-settings:v2';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v2';
   const CACHE_TTL_MS = 30 * 1000;
   const isPreviewIframe = (() => {
     try { return new URLSearchParams(location.search).has('_preview'); }
