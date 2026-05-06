@@ -9,7 +9,8 @@
   <title data-bind="branding.siteTitle">PHS Schedule</title>
   <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Beautiful Shader Experiences - PHS Schedule">
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
-  <link rel="stylesheet" href="main.css?v=20260506-tabs1">
+  <script src="theme-primer.js?v=20260506-tabs3"></script>
+  <link rel="stylesheet" href="main.css?v=20260506-tabs3">
 </head>
 <body>
 
@@ -149,6 +150,19 @@
     </ol>
   </section>
 
+  <section class="announcements-view fade-up" id="announcements-view" data-site-view="announcements" hidden aria-hidden="true" style="--stagger: 4">
+    <div class="hero hero--compact announcements-hero">
+      <div class="hero-title-wrapper">
+        <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle">Announcements</h1>
+      </div>
+    </div>
+    <section class="schedule-section announcements-section">
+      <div class="announcements-list" id="announcements-list">
+        <div class="announcements-empty">Loading...</div>
+      </div>
+    </section>
+  </section>
+
   <section class="grades-view fade-up" id="grades-view" data-site-view="grades" hidden aria-hidden="true" style="--stagger: 4">
     <div class="hero hero--compact grades-hero">
       <div class="hero-title-wrapper">
@@ -181,6 +195,6 @@
 <script defer src="google-analytics.js?v=20260506-island1"></script>
 <script defer src="appearance-settings.js?v=20260506-island1"></script>
 <script defer src="vendor/opentype.min.js"></script>
-<script defer src="main.js?v=20260506-tabs2"></script>
+<script defer src="main.js?v=20260506-tabs3"></script>
 </body>
 </html>

@@ -30,6 +30,24 @@ const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
 const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const GRADEVIEWER_DEFAULT_LOCAL_URL = 'http://localhost:3001/login';
 const GRADEVIEWER_DEFAULT_PROD_URL = 'https://schedulephs.web.app/login';
+const FALLBACK_ANNOUNCEMENTS = {
+  announcements: {
+    items: [
+      {
+        title: 'Certificate',
+        bullets: ['Certificate of Authenticity: The new website link is the one you are currently on.']
+      },
+      {
+        title: 'Welcome!',
+        bullets: [
+          'Hello everyone!',
+          'This website was designed in response to the inconveniences students face with modern applications.',
+          'Working on importing GradeViewer for more ease of access.'
+        ]
+      }
+    ]
+  }
+};
 
 const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
   ? location.origin
@@ -37,7 +55,7 @@ const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(loc
 const _IS_ADMIN_PREVIEW = new URLSearchParams(location.search).has('_preview');
 
 let _siteView = 'schedule';
-let _siteViewScroll = { schedule: 0, grades: 0 };
+let _siteViewScroll = { announcements: 0, schedule: 0, grades: 0 };
 let _gradesFrame = null;
 let _gradesScaler = null;
 let _gradesFrameUrlLocked = false;
@@ -222,9 +240,11 @@ function _navHrefKind(href) {
   try {
     const url = new URL(href, location.href);
     const path = url.pathname;
+    if (/\/announcements\.html?$/i.test(path)) return 'announcements';
     if (/\/(?:gradeviewer|grademelon)\.html?$/i.test(path)) return 'grades';
     if (/\/index\.html?$/i.test(path) || path.endsWith('/')) return 'schedule';
   } catch {
+    if (/announcements\.html?/i.test(href)) return 'announcements';
     if (/gradeviewer\.html?|grademelon\.html?/i.test(href)) return 'grades';
     if (/index\.html?/i.test(href) || href === '/') return 'schedule';
   }
@@ -232,10 +252,12 @@ function _navHrefKind(href) {
 }
 
 function _viewFromLocation() {
-  return _navHrefKind(location.pathname) === 'grades' ? 'grades' : 'schedule';
+  const kind = _navHrefKind(location.pathname);
+  return kind === 'announcements' || kind === 'grades' ? kind : 'schedule';
 }
 
 function _routeForView(view) {
+  if (view === 'announcements') return 'announcements.html';
   return view === 'grades' ? 'gradeviewer.html' : 'index.html';
 }
 
@@ -259,11 +281,22 @@ function _updateNavActive(view = _siteView) {
   });
 }
 
+function _titleForView(view) {
+  if (view === 'announcements') return 'Announcements - PHS';
+  if (view === 'grades') return window.__SITE_SETTINGS__?.grades?.pageTitle || 'Grades - PHS';
+  return window.__SITE_SETTINGS__?.branding?.siteTitle || 'PHS Schedule';
+}
+
+function _applyViewTitle(view = _siteView) {
+  document.title = _titleForView(view);
+}
+
 function _showSiteView(view, opts = {}) {
-  const nextView = view === 'grades' ? 'grades' : 'schedule';
+  const nextView = view === 'announcements' || view === 'grades' ? view : 'schedule';
   if (_siteView && _siteView !== nextView) _siteViewScroll[_siteView] = window.scrollY || 0;
   _siteView = nextView;
 
+  document.body.classList.toggle('site-view-announcements', nextView === 'announcements');
   document.body.classList.toggle('site-view-schedule', nextView === 'schedule');
   document.body.classList.toggle('site-view-grades', nextView === 'grades');
   document.querySelectorAll('[data-site-view]').forEach(el => {
@@ -283,11 +316,13 @@ function _showSiteView(view, opts = {}) {
   }
 
   if (nextView === 'grades') {
-    document.title = 'Grades - PHS';
     _ensureGradesFrame();
+  } else if (nextView === 'announcements') {
+    _renderAnnouncements(window.__SITE_SETTINGS__ || null);
   } else if (data) {
     updateAll();
   }
+  _applyViewTitle(nextView);
 
   if (opts.restoreScroll !== false) {
     requestAnimationFrame(() => {
@@ -298,7 +333,7 @@ function _showSiteView(view, opts = {}) {
 }
 
 function _initKeepAliveTabs() {
-  if (!document.getElementById('grades-view')) return;
+  if (!document.querySelector('[data-site-view]')) return;
   _siteView = _viewFromLocation();
   _showSiteView(_siteView, { replace: true, restoreScroll: false });
 
@@ -308,7 +343,7 @@ function _initKeepAliveTabs() {
     const link = target?.closest?.('#nav-links a');
     if (!link || (link.target && link.target !== '_self')) return;
     const kind = _navHrefKind(link.getAttribute('href'));
-    if (kind !== 'schedule' && kind !== 'grades') return;
+    if (kind !== 'announcements' && kind !== 'schedule' && kind !== 'grades') return;
     event.preventDefault();
     _showSiteView(kind);
   });
@@ -320,6 +355,45 @@ function _initKeepAliveTabs() {
   document.addEventListener('site-settings:applied', () => {
     requestAnimationFrame(() => _updateNavActive(_siteView));
   });
+}
+
+function _escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function _renderAnnouncements(settings) {
+  const list = document.getElementById('announcements-list');
+  if (!list) return;
+  const items = settings?.announcements?.items || [];
+  if (!items.length) {
+    list.innerHTML = '<div class="announcements-empty">No announcements yet.</div>';
+    return;
+  }
+  list.innerHTML = items.map(item => {
+    const bullets = (item.bullets || []).map(bullet => `<li>${_escapeHtml(bullet)}</li>`).join('');
+    return `<div class="announcement-card">
+      <div class="announcement-title">${_escapeHtml(item.title || '')}</div>
+      <div class="announcement-content"><ul>${bullets}</ul></div>
+    </div>`;
+  }).join('');
+}
+
+function _initAnnouncementsView() {
+  const list = document.getElementById('announcements-list');
+  if (!list) return;
+  document.addEventListener('site-settings:applied', event => _renderAnnouncements(event.detail));
+  if (window.__SITE_SETTINGS__) _renderAnnouncements(window.__SITE_SETTINGS__);
+  window.setTimeout(() => {
+    if (/Loading/.test(list.textContent || '') && !window.__SITE_SETTINGS__) {
+      _renderAnnouncements(FALLBACK_ANNOUNCEMENTS);
+    }
+  }, 2500);
 }
 
 function _ensureGradesFrame() {
@@ -857,6 +931,7 @@ async function main() {
     _schedTitle = document.getElementById('schedule-title');
     _schedDate = document.getElementById('schedule-date');
     _periodList = document.getElementById('period-list');
+    _initAnnouncementsView();
 
     const isSchedulePage = Boolean(_hmEl && _sEl && _ringFill && _schedTitle && _periodList);
     if (!isSchedulePage) return;
@@ -1165,6 +1240,7 @@ function getStateClass(period, currentSeconds) {
 document.addEventListener('site-settings:applied', e => {
   _applySettingsScheduleOverride(e.detail);
   _applyGradesFrameUrl(e.detail);
+  _applyViewTitle(document.querySelector('[data-site-view]') ? _siteView : _viewFromLocation());
   requestAnimationFrame(() => _updateNavActive(_siteView));
 });
 
