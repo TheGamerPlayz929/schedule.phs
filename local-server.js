@@ -114,6 +114,7 @@ http.createServer((req, res) => {
   }
 
   if (urlPath === "/") urlPath = "/index.html";
+  else if (urlPath.endsWith("/")) urlPath += "index.html";
 
   const filePath = path.join(ROOT, urlPath);
 
