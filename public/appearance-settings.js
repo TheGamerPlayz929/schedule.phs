@@ -3,6 +3,7 @@
   const KEY = 'phs:appearance:v1';
   const defaults = { accent: '#8288d5', colors: ['#8288d5', '#17173a'], hue: 236, planeX: 40, planeY: 16, intensity: 60, textScale: 1, reduceGlow: false };
   const MAX_COLORS = 5;
+  const presets = ['#8288d5', '#a855f7', '#22c55e', '#38bdf8', '#f97316', '#f43f5e'];
 
   function hexToRgb(hex) {
     const clean = String(hex || '').replace('#', '').trim();
@@ -78,34 +79,6 @@
     settings.planeX = Math.round(clamp(hsv.s, 0, 1) * 100);
     settings.planeY = Math.round((1 - clamp(hsv.v, 0, 1)) * 100);
     return settings;
-  }
-  function randomBetween(min, max) {
-    return min + Math.random() * (max - min);
-  }
-  function randomInt(min, max) {
-    return min + Math.floor(Math.random() * (max - min + 1));
-  }
-  function randomThemeColors() {
-    const count = randomInt(3, MAX_COLORS);
-    const baseHue = Math.random() * 360;
-    const spread = randomBetween(82, 224);
-    const direction = Math.random() < 0.5 ? -1 : 1;
-    const darkAnchor = Math.random() < 0.78 ? randomInt(1, count - 1) : -1;
-    const colors = [];
-
-    for (let index = 0; index < count; index += 1) {
-      const t = count === 1 ? 0 : index / (count - 1);
-      const wildcard = Math.random() < 0.22;
-      const hue = wildcard
-        ? Math.random() * 360
-        : baseHue + direction * spread * t + randomBetween(-24, 24);
-      const muted = Math.random() < 0.18;
-      const saturation = muted ? randomBetween(0.34, 0.58) : randomBetween(0.62, 0.96);
-      const value = index === darkAnchor ? randomBetween(0.045, 0.2) : randomBetween(0.74, 0.98);
-      colors.push(hsvToHex(hue, saturation, value));
-    }
-
-    return colors;
   }
   function read() {
     try {
@@ -394,9 +367,10 @@
       color.click();
     });
     surprise.addEventListener('click', () => {
-      current.colors = randomThemeColors();
+      const next = presets[Math.floor(Math.random() * presets.length)];
+      current.colors = [next, '#000000', '#40ffce', mix(next, 0.55)];
       activeSlot = 0;
-      current.accent = current.colors[activeSlot];
+      current.accent = current.colors[0];
       current.intensity = 45 + Math.floor(Math.random() * 41);
       paint();
     });

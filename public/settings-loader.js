@@ -15,7 +15,6 @@
     try { return new URLSearchParams(location.search).has('_preview'); }
     catch { return false; }
   })();
-  let lastAppliedSignature = '';
 
   function readCache() {
     try {
@@ -34,12 +33,6 @@
   }
 
   function applyBindings(settings) {
-    let signature = '';
-    try {
-      signature = JSON.stringify(settings);
-      if (signature && signature === lastAppliedSignature) return;
-    } catch {}
-
     document.querySelectorAll('[data-bind]').forEach(el => {
       const key = el.getAttribute('data-bind');
       const val = pickPath(settings, key);
@@ -97,7 +90,6 @@
     if (fav && settings.branding?.favicon) fav.setAttribute('href', settings.branding.favicon);
 
     document.dispatchEvent(new CustomEvent('site-settings:applied', { detail: settings }));
-    if (signature) lastAppliedSignature = signature;
   }
 
   function fetchAndApply() {

@@ -13,19 +13,98 @@ let isBeforeSchool = false;
 let isTransition = false;
 let isTimerInactive = false;
 
-/* --- Cache DOM refs --- */
-let _hmEl, _sEl, _heroTitle, _heroEyebrow;
-let _progressFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
-let _hmTextNode = null;
-let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
+/* --- Admin time override (localhost only) --- */
+let _timeOffsetSeconds = 0; // added to real time
+let _devScheduleType = null;
+
+/* --- Schedule override (set by admin panel, synced from backend) --- */
+let _scheduleOverride = null; // { type: string, timestamp: number } | null
 let _clockTimerId = null;
 let _clockTickMs = 0;
+let _overridePollTimerId = null;
 
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
+const OVERRIDE_FETCH_TIMEOUT_MS = 1500;
+
+const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
+  ? location.origin
+  : 'https://phs-grades-backend.onrender.com';
+
+function _readStoredScheduleOverride() {
+  try {
+    const stored = localStorage.getItem('phs_schedule_override');
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (e) {
+    try { localStorage.removeItem('phs_schedule_override'); } catch {}
+    return null;
+  }
+}
+
+async function _pollScheduleOverride() {
+  const previousOverride = JSON.stringify(_scheduleOverride);
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OVERRIDE_FETCH_TIMEOUT_MS);
+    const res = await fetch(`${_BACKEND_URL}/schedule-override`, {
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+    clearTimeout(timeout);
+    const json = await res.json();
+    _scheduleOverride = json.override || null;
+    if (_scheduleOverride) {
+      localStorage.setItem('phs_schedule_override', JSON.stringify(_scheduleOverride));
+    } else {
+      localStorage.removeItem('phs_schedule_override');
+    }
+  } catch (e) {
+    // Fallback to localStorage when offline
+    _scheduleOverride = _readStoredScheduleOverride();
+  }
+  if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
+}
+
+function _startScheduleOverridePolling() {
+  if (_overridePollTimerId) return;
+  _overridePollTimerId = setInterval(() => {
+    if (document.visibilityState !== 'hidden') _pollScheduleOverride();
+  }, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _pollScheduleOverride();
+  });
+}
+
+function _getOverrideData(targetType) {
+  if (!data) return null;
+  for (const key of Object.keys(data)) {
+    if (key !== 'base' && Array.isArray(data[key]) && data[key][0] === targetType) {
+      return data[key];
+    }
+  }
+  return null;
+}
+
+function _todayISODate() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _overrideAppliesToday(override) {
+  return !override?.date || override.date === _todayISODate();
+}
+
+function _isLocalhost() {
+  return ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
+}
 
 function _clockSeconds(date = new Date()) {
-  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
 }
 
 function _isNonInstructionalSchedule(type) {
@@ -52,11 +131,13 @@ function _setClockCadence(active) {
 }
 
 function _setTimerSurfaceVisible(visible) {
-  const circle = document.querySelector('.glass-circle');
-  if (!circle) return;
-  circle.hidden = !visible;
-  circle.style.display = visible ? '' : 'none';
-  circle.setAttribute('aria-hidden', String(!visible));
+  const ringWrap = document.querySelector('.ring-wrap');
+  if (!ringWrap) return;
+  ringWrap.hidden = !visible;
+  ringWrap.style.display = visible ? '' : 'none';
+  ringWrap.setAttribute('aria-hidden', String(!visible));
+  const hero = document.querySelector('.hero');
+  if (hero) hero.classList.toggle('hero--compact', !visible);
 }
 
 function _clearCountdownDisplay() {
@@ -66,21 +147,386 @@ function _clearCountdownDisplay() {
   _lastS = '';
 }
 
+function _setAdminStatus(text) {
+  const status = document.getElementById('admin-status');
+  if (status) status.textContent = text;
+}
+
+function _initAdminPanel() {
+  if (!_isLocalhost()) return;
+  if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && !location.pathname.endsWith('/')) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'admin-panel';
+  panel.innerHTML = `
+    <div class="admin-header">
+      <span class="admin-dot"></span>
+      <span>Dev Clock</span>
+      <button type="button" class="admin-collapse-btn" id="admin-collapse">▾</button>
+    </div>
+    <div class="admin-body" id="admin-body">
+      <div class="admin-time-row">
+        <div class="admin-field">
+          <input type="number" id="admin-h" class="admin-seg" min="1" max="12" placeholder="12">
+          <span class="admin-seg-label">h</span>
+        </div>
+        <div class="admin-field">
+          <input type="number" id="admin-m" class="admin-seg" min="0" max="59" placeholder="00">
+          <span class="admin-seg-label">m</span>
+        </div>
+        <div class="admin-field">
+          <input type="number" id="admin-s" class="admin-seg" min="0" max="59" placeholder="00">
+          <span class="admin-seg-label">s</span>
+        </div>
+        <button type="button" id="admin-ampm" class="admin-ampm-btn">AM</button>
+      </div>
+      <div class="admin-actions">
+        <button type="button" id="admin-apply" class="admin-btn admin-btn--apply">Apply</button>
+        <button type="button" id="admin-reset" class="admin-btn admin-btn--reset">Reset</button>
+      </div>
+      <div class="admin-schedule">
+        <label class="admin-select-label" for="admin-schedule-type">Schedule</label>
+        <select id="admin-schedule-type" class="admin-select">
+          <option value="">Auto / today</option>
+          <option value="Normal Schedule">Force Normal</option>
+          <option value="No School">Force No School</option>
+          <option value="Early Release">Force Early Release</option>
+          <option value="Advisory">Force Advisory</option>
+        </select>
+      </div>
+      <div class="admin-status" id="admin-status">Real time</div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  let collapsed = false;
+  document.getElementById('admin-collapse').addEventListener('click', () => {
+    collapsed = !collapsed;
+    document.getElementById('admin-body').style.display = collapsed ? 'none' : 'flex';
+    document.getElementById('admin-collapse').textContent = collapsed ? '▸' : '▾';
+  });
+
+  const ampmBtn = document.getElementById('admin-ampm');
+  ampmBtn.addEventListener('click', () => {
+    ampmBtn.textContent = ampmBtn.textContent === 'AM' ? 'PM' : 'AM';
+    ampmBtn.classList.toggle('admin-ampm-btn--pm', ampmBtn.textContent === 'PM');
+  });
+
+  document.getElementById('admin-apply').addEventListener('click', () => {
+    let h = parseInt(document.getElementById('admin-h').value) || 12;
+    const m = parseInt(document.getElementById('admin-m').value) || 0;
+    const s = parseInt(document.getElementById('admin-s').value) || 0;
+    const isPM = ampmBtn.textContent === 'PM';
+    if (isPM && h !== 12) h += 12;
+    if (!isPM && h === 12) h = 0;
+    const targetSec = h * 3600 + m * 60 + s;
+    const now = new Date();
+    const realSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    _timeOffsetSeconds = targetSec - realSec;
+    const pad = (n) => String(n).padStart(2, '0');
+    const dispH = parseInt(document.getElementById('admin-h').value) || 12;
+    document.getElementById('admin-status').textContent = `Set → ${dispH}:${pad(m)}:${pad(s)} ${ampmBtn.textContent}`;
+    updateAll();
+  });
+
+  document.getElementById('admin-reset').addEventListener('click', () => {
+    _timeOffsetSeconds = 0;
+    _devScheduleType = null;
+    document.getElementById('admin-h').value = '';
+    document.getElementById('admin-m').value = '';
+    document.getElementById('admin-s').value = '';
+    document.getElementById('admin-schedule-type').value = '';
+    document.getElementById('admin-status').textContent = 'Real time';
+    updateAll();
+  });
+
+  document.getElementById('admin-schedule-type').addEventListener('change', (event) => {
+    _devScheduleType = event.target.value || null;
+    _setAdminStatus(_devScheduleType ? `Testing ${_devScheduleType}` : 'Auto schedule');
+    updateAll();
+  });
+}
+
+/* --- Cache DOM refs --- */
+let _hmEl, _sEl, _heroTitle, _heroEyebrow;
+let _signatureTitle, _signatureEyebrow;
+let _ringFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
+let _hmTextNode = null;
+let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
+let _lastSignedTitle = '', _lastSignedEyebrow = '';
+let _signatureFontPromise = null;
+let _signatureId = 0;
+
+function getSignatureFont() {
+  if (_signatureFontPromise) return _signatureFontPromise;
+  if (!window.opentype) return Promise.reject(new Error('opentype.js did not load'));
+
+  _signatureFontPromise = new Promise((resolve, reject) => {
+    opentype.load('assets/fonts/AlexBrush-Regular.ttf', (err, font) => {
+      if (err || !font) reject(err || new Error('Signature font did not load'));
+      else resolve(font);
+    });
+  });
+  return _signatureFontPromise;
+}
+
+function smootherStep(t) {
+  t = Math.max(0, Math.min(1, t));
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+function updateHeroSignatureLayout() {
+  const wrapper = document.querySelector('.hero-title-wrapper');
+  if (!wrapper) return;
+
+  const hasEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-visible') || _signatureEyebrow?.dataset.pendingSignatureText);
+  const hasTitle = Boolean(_signatureTitle?.classList.contains('is-visible') || _signatureTitle?.dataset.pendingSignatureText);
+  const visibleCount = Number(hasEyebrow) + Number(hasTitle);
+
+  wrapper.classList.toggle('signature-ready', visibleCount > 0);
+  wrapper.classList.toggle('signature-single', visibleCount === 1);
+  wrapper.classList.toggle('signature-double', visibleCount === 2);
+}
+
+function setHeroLine(line, text, visible, options = {}) {
+  const isEyebrow = line === 'eyebrow';
+  const fallback = isEyebrow ? _heroEyebrow : _heroTitle;
+  const stage = isEyebrow ? _signatureEyebrow : _signatureTitle;
+
+  if (!fallback) return;
+
+  fallback.textContent = text;
+  fallback.style.display = visible ? 'block' : 'none';
+
+  if (!stage) return;
+  if (!visible) {
+    delete stage.dataset.pendingSignatureText;
+    stage.classList.remove('is-visible');
+    stage.innerHTML = '';
+    if (isEyebrow) _lastSignedEyebrow = '';
+    else _lastSignedTitle = '';
+    updateHeroSignatureLayout();
+    return;
+  }
+
+  const currentText = isEyebrow ? _lastSignedEyebrow : _lastSignedTitle;
+  if (currentText === text && stage.classList.contains('is-visible')) return;
+
+  if (isEyebrow) _lastSignedEyebrow = text;
+  else _lastSignedTitle = text;
+
+  stage.dataset.pendingSignatureText = text;
+  updateHeroSignatureLayout();
+
+  signHeroText(stage, text, options).catch((error) => {
+    console.warn('Signature renderer fallback:', error);
+    stage.classList.remove('is-visible');
+    stage.innerHTML = '';
+    updateHeroSignatureLayout();
+  });
+}
+
+async function signHeroText(target, text, options = {}) {
+  const phrase = String(text || '').trim();
+  if (!target || !phrase) return;
+
+  target.dataset.pendingSignatureText = phrase;
+  const font = await getSignatureFont();
+  if (target.dataset.pendingSignatureText !== phrase) return;
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontSize = options.fontSize || 128;
+  const scale = fontSize / font.unitsPerEm;
+  const glyphs = font.stringToGlyphs(phrase);
+  const glyphPaths = [];
+  let penX = 0;
+  let previousGlyph = null;
+
+  for (const glyph of glyphs) {
+    if (previousGlyph) penX += font.getKerningValue(previousGlyph, glyph) * scale;
+    const path = glyph.getPath(penX, 0, fontSize);
+    if (path.commands.length > 0) {
+      glyphPaths.push(path);
+    }
+    penX += glyph.advanceWidth * scale;
+    previousGlyph = glyph;
+  }
+
+  if (!glyphPaths.length) return;
+
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  glyphPaths.forEach((path) => {
+    const box = path.getBoundingBox();
+    x1 = Math.min(x1, box.x1);
+    y1 = Math.min(y1, box.y1);
+    x2 = Math.max(x2, box.x2);
+    y2 = Math.max(y2, box.y2);
+  });
+
+  const padX = fontSize * 0.28;
+  const padTop = fontSize * 0.72;
+  const padBottom = fontSize * 0.38;
+  const viewX = x1 - padX;
+  const viewY = y1 - padTop;
+  const viewW = (x2 - x1) + padX * 2;
+  const viewH = (y2 - y1) + padTop + padBottom;
+  const viewBox = `${viewX} ${viewY} ${viewW} ${viewH}`;
+  const ns = 'http://www.w3.org/2000/svg';
+  const runId = ++_signatureId;
+  const maskId = `signature-mask-${runId}`;
+  const gradId = `signature-brush-${runId}`;
+
+  if (target._signatureRaf) cancelAnimationFrame(target._signatureRaf);
+  target.innerHTML = '';
+  target.dataset.signatureText = phrase;
+  delete target.dataset.pendingSignatureText;
+  target.classList.add('is-visible');
+  updateHeroSignatureLayout();
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', viewBox);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('role', 'presentation');
+
+  const defs = document.createElementNS(ns, 'defs');
+  const gradient = document.createElementNS(ns, 'linearGradient');
+  gradient.setAttribute('id', gradId);
+  gradient.setAttribute('x1', '0%');
+  gradient.setAttribute('x2', '100%');
+  gradient.setAttribute('y1', '0%');
+  gradient.setAttribute('y2', '0%');
+
+  [
+    ['0%', 'white', '1'],
+    ['72%', 'white', '1'],
+    ['100%', 'white', '0']
+  ].forEach(([offset, color, opacity]) => {
+    const stop = document.createElementNS(ns, 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('stop-color', color);
+    stop.setAttribute('stop-opacity', opacity);
+    gradient.appendChild(stop);
+  });
+  defs.appendChild(gradient);
+
+  const mask = document.createElementNS(ns, 'mask');
+  mask.setAttribute('id', maskId);
+  mask.setAttribute('maskUnits', 'userSpaceOnUse');
+  mask.setAttribute('x', String(viewX));
+  mask.setAttribute('y', String(viewY));
+  mask.setAttribute('width', String(viewW));
+  mask.setAttribute('height', String(viewH));
+
+  const maskBg = document.createElementNS(ns, 'rect');
+  maskBg.setAttribute('x', String(viewX));
+  maskBg.setAttribute('y', String(viewY));
+  maskBg.setAttribute('width', String(viewW));
+  maskBg.setAttribute('height', String(viewH));
+  maskBg.setAttribute('fill', 'black');
+  mask.appendChild(maskBg);
+
+  const brushWidth = viewW * 0.34;
+  const brush = document.createElementNS(ns, 'rect');
+  brush.setAttribute('x', String(viewX));
+  brush.setAttribute('y', String(viewY));
+  brush.setAttribute('width', '0');
+  brush.setAttribute('height', String(viewH));
+  brush.setAttribute('fill', `url(#${gradId})`);
+  mask.appendChild(brush);
+
+  const fillGroup = document.createElementNS(ns, 'g');
+  fillGroup.setAttribute('mask', `url(#${maskId})`);
+  const glintGroup = document.createElementNS(ns, 'g');
+
+  glyphPaths.forEach((path) => {
+    const d = path.toPathData(2);
+
+    const fillPath = document.createElementNS(ns, 'path');
+    fillPath.setAttribute('d', d);
+    fillPath.setAttribute('class', 'signature-fill');
+    fillGroup.appendChild(fillPath);
+
+    const glintPath = document.createElementNS(ns, 'path');
+    glintPath.setAttribute('d', d);
+    glintPath.setAttribute('class', 'signature-glint');
+    glintGroup.appendChild(glintPath);
+  });
+
+  defs.appendChild(mask);
+  svg.appendChild(defs);
+  svg.appendChild(fillGroup);
+  svg.appendChild(glintGroup);
+  target.appendChild(svg);
+
+  const glintWidth = viewW * 0.08;
+  const glintClipId = `signature-glint-clip-${runId}`;
+  const clipPath = document.createElementNS(ns, 'clipPath');
+  clipPath.setAttribute('id', glintClipId);
+  clipPath.setAttribute('clipPathUnits', 'userSpaceOnUse');
+  const glintRect = document.createElementNS(ns, 'rect');
+  glintRect.setAttribute('x', String(viewX - glintWidth));
+  glintRect.setAttribute('y', String(viewY));
+  glintRect.setAttribute('width', String(glintWidth));
+  glintRect.setAttribute('height', String(viewH));
+  clipPath.appendChild(glintRect);
+  defs.appendChild(clipPath);
+  glintGroup.setAttribute('clip-path', `url(#${glintClipId})`);
+
+  const totalDuration = Math.min(1750, Math.max(950, viewW * 1.18));
+
+  if (reduceMotion) {
+    brush.setAttribute('width', String(viewW + brushWidth));
+    glintGroup.style.opacity = '0';
+    return;
+  }
+
+  const startTime = performance.now();
+  const animate = (now) => {
+    const elapsed = now - startTime;
+    const progress = smootherStep(elapsed / totalDuration);
+    const brushReach = Math.max(0, (viewW + brushWidth) * progress);
+    const glintX = viewX - glintWidth + (viewW + glintWidth) * Math.min(1, Math.max(0, (elapsed - 120) / (totalDuration * 0.86)));
+
+    brush.setAttribute('width', String(brushReach));
+    glintRect.setAttribute('x', String(glintX));
+    glintGroup.style.opacity = String(Math.sin(Math.min(1, elapsed / totalDuration) * Math.PI) * 0.58);
+
+    if (elapsed < totalDuration) {
+      target._signatureRaf = requestAnimationFrame(animate);
+    } else {
+      brush.setAttribute('width', String(viewW + brushWidth));
+      glintGroup.style.opacity = '0';
+    }
+  };
+
+  target._signatureRaf = requestAnimationFrame(animate);
+  setTimeout(() => {
+    if (target.dataset.signatureText !== phrase) return;
+    brush.setAttribute('width', String(viewW + brushWidth));
+    glintGroup.style.opacity = '0';
+  }, totalDuration + 350);
+}
+
 async function main() {
   try {
-    const response = await fetch('data.json');
-    data = await response.json();
-
     _hmEl = document.getElementById('cd-hm');
     _sEl = document.getElementById('cd-s');
     _heroTitle = document.getElementById('hero-title');
     _heroEyebrow = document.querySelector('.hero-eyebrow');
-    _progressFill = document.getElementById('progress-fill');
+    _signatureTitle = document.getElementById('signature-title');
+    _signatureEyebrow = document.getElementById('signature-eyebrow');
+    _ringFill = document.getElementById('ring-fill');
     _statusPill = document.getElementById('status-pill');
     _statusLabel = document.getElementById('status-label');
     _schedTitle = document.getElementById('schedule-title');
     _schedDate = document.getElementById('schedule-date');
     _periodList = document.getElementById('period-list');
+
+    const isSchedulePage = Boolean(_hmEl && _sEl && _ringFill && _schedTitle && _periodList);
+    if (!isSchedulePage) return;
+
+    const response = await fetch('data.json');
+    data = await response.json();
 
     /* Strip any existing text nodes from #cd-hm (the hardcoded "00 " in HTML),
        then insert a single controlled text node before the MIN span. */
@@ -92,6 +538,9 @@ async function main() {
       _hmEl.insertBefore(_hmTextNode, _hmEl.firstChild);
     }
 
+    _initAdminPanel();
+    await _pollScheduleOverride();
+    _startScheduleOverridePolling();
     updateAll();
   } catch (e) {
     console.error("Initialization failed:", e);
@@ -118,11 +567,30 @@ function calculateGoal() {
   if (!(str in data)) { str = "base"; }
 
   let arr = data[str];
+  const effectiveOverride = _devScheduleType
+    ? { type: _devScheduleType }
+    : (_scheduleOverride && _scheduleOverride.type && _overrideAppliesToday(_scheduleOverride) ? _scheduleOverride : null);
+
+  // Apply local dev or admin schedule override if one is active
+  if (effectiveOverride) {
+    const overrideArr = _getOverrideData(effectiveOverride.type);
+    if (overrideArr) arr = overrideArr;
+    else if (window.__SITE_SETTINGS__?.bellSchedules?.[effectiveOverride.type]) {
+      arr = [effectiveOverride.type, window.__SITE_SETTINGS__.bellSchedules[effectiveOverride.type]];
+    } else if (_isNonInstructionalSchedule(effectiveOverride.type)) {
+      arr = [effectiveOverride.type, {}];
+    }
+  }
   scheduleType = arr[0];
   let periods = arr[1];
   if (_isNonInstructionalSchedule(scheduleType)) {
     _resetTimerState();
     return;
+  }
+  // Admin-controlled bell-schedule template overrides for this type, if non-empty.
+  const _bs = (window.__SITE_SETTINGS__ && window.__SITE_SETTINGS__.bellSchedules) || null;
+  if (_bs && _bs[scheduleType] && Object.keys(_bs[scheduleType]).length) {
+    periods = _bs[scheduleType];
   }
   let largestUnder = -1;
   let largest = -1;
@@ -152,7 +620,7 @@ function calculateGoal() {
     periodStartTime = 0;
     periodEndTime = schoolStart;
     isBeforeSchool = true;
-  } else if (periods[largestUnder][0] - val < 0 && largestUnder != largest) {
+  } else if (periods[largestUnder][0] - val <= 0 && largestUnder != largest) {
     for (let k in periods) {
       let key = parseInt(k);
       if (key > largestUnder) { goal = key; break; }
@@ -197,17 +665,18 @@ function updateAll() {
   _setTimerSurfaceVisible(!isTimerInactive);
 
   /* --- Countdown --- */
-  if (_hmEl && _hmTextNode && !isTimerInactive) {
+  if (_hmEl && !isTimerInactive) {
+    const u = (t) => `<span class="cd-min-label">${t}</span>`;
     const hm = h > 0
-      ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      : `${String(m).padStart(2, '0')}`;
-    const ss = String(s).padStart(2, '0');
+      ? `${h}${u('h')}${m > 0 ? (m < 10 ? '&nbsp;' : '') + m + u('m') : ''}`
+      : `${m}${u('m')}`;
+    if (hm !== _lastHm) { _hmEl.innerHTML = hm; _lastHm = hm; }
 
-    if (hm !== _lastHm) {
-      _hmTextNode.textContent = hm + ' ';
-      _lastHm = hm;
+    const ss = String(s).padStart(2, '0');
+    if (ss !== _lastS && _sEl) {
+      _sEl.innerHTML = `${ss}<span class="cd-sec-label" style="margin-left:3px">s</span>`;
+      _lastS = ss;
     }
-    if (ss !== _lastS) { _sEl.textContent = ss; _lastS = ss; }
   }
 
   document.title = isTimerInactive
@@ -219,31 +688,26 @@ function updateAll() {
   /* --- Hero text & Status --- */
   if (_heroTitle && _heroEyebrow && _statusPill && _statusLabel) {
     if (noSchool) {
-      _heroEyebrow.style.display = "none";
-      _heroTitle.style.display = "block";
-      _heroTitle.textContent = "No School";
+      setHeroLine('eyebrow', '', false);
+      setHeroLine('title', 'No School', true, { fontSize: 142, revealStroke: 62 });
 
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
       _statusLabel.textContent = "Enjoy your day \u2728";
     } else if (dayIsOver) {
-      _heroEyebrow.style.display = "none";
-      _heroTitle.style.display = "block";
-      _heroTitle.textContent = "School Day Ended";
+      setHeroLine('eyebrow', '', false);
+      setHeroLine('title', 'School Day Ended', true, { fontSize: 142, revealStroke: 62 });
 
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
       _statusLabel.textContent = "See you tomorrow";
     } else if (isBeforeSchool) {
-      _heroEyebrow.style.display = "block";
-      _heroEyebrow.textContent = "Starts in";
-      _heroTitle.style.display = "none";
+      setHeroLine('eyebrow', 'Starts in', true, { fontSize: 112, revealStroke: 52 });
+      setHeroLine('title', '', false);
       _statusPill.style.display = "none";
     } else {
-      _heroEyebrow.style.display = "block";
-      _heroEyebrow.textContent = isTransition ? "Passing" : "Current";
-      _heroTitle.style.display = "block";
-      _heroTitle.textContent = period;
+      setHeroLine('eyebrow', isTransition ? "Passing" : "Currently in", true, { fontSize: 112, revealStroke: 52 });
+      setHeroLine('title', period, true, { fontSize: 142, revealStroke: 62 });
 
       _statusPill.style.display = "inline-flex";
       if (isTransition) {
@@ -259,12 +723,17 @@ function updateAll() {
     }
   }
 
-  /* --- Progress bar --- */
-  if (_progressFill && periodEndTime > periodStartTime) {
+  /* --- Ring --- */
+  if (_ringFill && periodEndTime > periodStartTime) {
     const elapsed = val - periodStartTime;
     const total = periodEndTime - periodStartTime;
-    const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
-    _progressFill.style.width = pct + '%';
+    const pctRemaining = Math.min(1, Math.max(0, 1 - elapsed / total));
+    const arcLen = pctRemaining * 100;
+    _ringFill.style.strokeDasharray = `${arcLen} 100`;
+    _ringFill.style.strokeDashoffset = '0';
+  } else if (_ringFill) {
+    _ringFill.style.strokeDasharray = '0 100';
+    _ringFill.style.strokeDashoffset = '0';
   }
 
   /* --- Schedule header --- */
@@ -309,6 +778,7 @@ function renderPeriodList(currentSeconds) {
       if (li.className !== expectedClass.trim()) {
         li.className = expectedClass.trim();
       }
+      updatePeriodCard(li, p);
     }
     return;
   }
@@ -321,16 +791,35 @@ function renderPeriodList(currentSeconds) {
 
     const li = document.createElement('li');
     li.className = 'period-card ' + stateClass;
-
-    li.innerHTML = `
-      <div class="period-time">${p.timeStr}</div>
-      <div class="period-name">${p.name}</div>
-      <div class="period-meta">${durationMin} min</div>
-    `;
+    li.appendChild(createPeriodCardSection('period-time', p.timeStr));
+    li.appendChild(createPeriodCardSection('period-name', p.name));
+    li.appendChild(createPeriodCardSection('period-meta', `${durationMin} min`));
 
     _periodList.appendChild(li);
   }
   _lastPeriodCount = myArray.length;
+}
+
+function createPeriodCardSection(className, text) {
+  const div = document.createElement('div');
+  div.className = className;
+  div.textContent = String(text ?? '');
+  return div;
+}
+
+function updatePeriodCard(li, periodData) {
+  const durationMin = Math.round((periodData.endSec - periodData.startSec) / 60);
+  const values = [
+    ['.period-time', periodData.timeStr],
+    ['.period-name', periodData.name],
+    ['.period-meta', `${durationMin} min`]
+  ];
+  for (const [selector, value] of values) {
+    const node = li.querySelector(selector);
+    if (node && node.textContent !== String(value ?? '')) {
+      node.textContent = String(value ?? '');
+    }
+  }
 }
 
 function getStateClass(period, currentSeconds) {

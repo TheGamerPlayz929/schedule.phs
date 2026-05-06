@@ -3,12 +3,6 @@
  * controls which item is marked active.
  */
 (function () {
-  const FALLBACK_ITEMS = [
-    { label: 'Announcements', href: 'announcements.html' },
-    { label: 'Schedule', href: 'index.html' },
-    { label: 'Grades', href: 'gradeviewer.html' }
-  ];
-
   function pageMatches(href, page) {
     if (!href) return false;
     if (page === 'schedule')      return /(^|\/)index\.html?$/i.test(href) || href === 'index.html';
@@ -21,8 +15,7 @@
     const wrap = document.getElementById('nav-links');
     if (!wrap) return;
     const page = wrap.getAttribute('data-page') || '';
-    const configuredItems = settings?.nav?.items;
-    const items = Array.isArray(configuredItems) && configuredItems.length ? configuredItems : FALLBACK_ITEMS;
+    const items = settings?.nav?.items || [];
     wrap.innerHTML = '';
     for (const it of items) {
       const a = document.createElement('a');
@@ -34,7 +27,7 @@
   }
 
   function tryRender() {
-    render(window.__SITE_SETTINGS__ || null);
+    if (window.__SITE_SETTINGS__) render(window.__SITE_SETTINGS__);
   }
 
   document.addEventListener('site-settings:applied', e => render(e.detail));

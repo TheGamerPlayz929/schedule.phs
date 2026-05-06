@@ -3,9 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PHS Schedule</title>
-  <meta name="description" content="PHS Schedule">
-  <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
+
+  <meta name="google-site-verification" content="8Zxv2gF9pWq9mWpM6Uhl2qUUUKUzTzohabLAoEfYpxg" />
+
+  <title data-bind="branding.siteTitle">PHS Schedule</title>
+  <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Beautiful Shader Experiences - PHS Schedule">
+  <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
@@ -21,37 +24,115 @@
   <!-- Navigation -->
   <nav class="glass-nav fade-up" style="--stagger: 0">
     <div class="brand-icon">
-      <a href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
-        <img src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
+      <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
+        <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
       </a>
     </div>
-    <div class="nav-links">
-      <a href="announcements.html" class="nav-btn">Announcements</a>
-      <a href="index.html" class="nav-btn active">Schedule</a>
-      <a href="grademelon.html" class="nav-btn">Grades</a>
+    <div class="nav-links" id="nav-links" data-page="schedule">
+      <!-- rendered from settings -->
     </div>
-    <div></div> <!-- Empty div for 3-column grid alignment -->
+    <div class="nav-actions">
+      <button class="appearance-toggle" id="appearance-toggle" type="button" aria-expanded="false" aria-controls="appearance-panel" title="Appearance settings">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
   </nav>
+
+  <aside class="appearance-panel" id="appearance-panel" aria-label="Appearance settings">
+    <div class="glass-filter" aria-hidden="true"><div class="glass-distortion-overlay"></div></div>
+    <div class="glass-overlay" aria-hidden="true"></div>
+    <div class="glass-specular" aria-hidden="true"></div>
+    <div class="appearance-panel-head">
+      <div>
+        <strong>Appearance</strong>
+        <span>Custom theme</span>
+      </div>
+      <button type="button" class="appearance-close" data-appearance-close aria-label="Close appearance settings">×</button>
+    </div>
+    <section class="appearance-section">
+      <h2>Colors</h2>
+      <div class="theme-strip">
+        <div class="theme-gradient-bar" data-theme-strip aria-label="Theme color stops"></div>
+      </div>
+      <button type="button" class="theme-picker-plane" data-appearance-plane aria-label="Choose theme shade">
+        <span data-theme-picker-dot></span>
+      </button>
+      <input class="theme-native-color" type="color" data-appearance="accent" value="#8288d5" aria-label="Accent color">
+      <input class="theme-hue" type="range" data-appearance="hue" min="0" max="360" step="1" value="236" aria-label="Hue">
+      <div class="theme-field">
+        <span class="theme-swatch" data-theme-swatch></span>
+        <input type="text" data-appearance="hex" value="#8288D5" maxlength="7" aria-label="Hex color">
+        <button type="button" data-appearance-eyedropper aria-label="Use browser color picker">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="m16.24 2.56 5.2 5.2a1.9 1.9 0 0 1 0 2.68l-1.08 1.08-1.94-1.94-8.85 8.85a3 3 0 0 1-1.3.76l-4.4 1.18a1 1 0 0 1-1.22-1.22l1.18-4.4a3 3 0 0 1 .76-1.3l8.85-8.85-1.94-1.94 1.08-1.08a1.9 1.9 0 0 1 2.68 0Zm-2.9 6.28-7.34 7.34-.48 1.78 1.78-.48 7.34-7.34-1.3-1.3Zm4.56-.7-2.04-2.04-.82.82 2.04 2.04.82-.82Z"/></svg>
+        </button>
+        <button type="button" data-appearance-remove aria-label="Remove color">−</button>
+      </div>
+      <button type="button" class="appearance-action" data-appearance-add>+ Add Color</button>
+    </section>
+    <section class="appearance-section">
+      <h2>Controls</h2>
+      <label class="appearance-slider">
+        <span>Color Intensity <b data-appearance-intensity-value>60%</b></span>
+        <input type="range" data-appearance="intensity" min="15" max="100" step="1" value="60">
+      </label>
+      <label class="appearance-slider">
+        <span>Text Size <b data-appearance-scale-value>100%</b></span>
+        <input type="range" data-appearance="textScale" min="0.85" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="appearance-check">
+        <input type="checkbox" data-appearance="reduceGlow">
+        <span>Reduce glow</span>
+      </label>
+    </section>
+    <button type="button" class="appearance-action" data-appearance-surprise>Random Theme!</button>
+    <button type="button" class="appearance-action appearance-action--muted" data-appearance-reset>Reset</button>
+  </aside>
 
   <!-- Hero Section -->
   <main class="hero">
     <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off">
       <span class="status-dot"></span>
-      <span id="status-label">Loading...</span>
+      <span id="status-label" data-bind="hero.schedulePageStatusFallback">Loading...</span>
     </div>
 
     <div class="hero-title-wrapper fade-up" style="--stagger: 2">
-      <h2 class="hero-eyebrow" id="hero-eyebrow">Currently in</h2>
+      <h2 class="hero-eyebrow" id="hero-eyebrow" data-bind="hero.schedulePageEyebrow">Currently in</h2>
+      <div class="signature-stage signature-stage--eyebrow" id="signature-eyebrow" aria-hidden="true"></div>
       <h1 class="hero-title" id="hero-title">—</h1>
+      <div class="signature-stage signature-stage--title" id="signature-title" aria-hidden="true"></div>
     </div>
 
     <!-- Glass Countdown Panel -->
-    <div class="glass-circle fade-up" style="--stagger: 3">
-      <div class="countdown-wrapper" aria-live="polite">
-        <div class="cd-main" id="cd-hm">00 <span class="cd-min-label">m</span></div>
-        <div class="cd-sub">
-          <span class="cd-sec" id="cd-s">00</span>
-          <span class="cd-sec-label">SEC</span>
+    <div class="ring-wrap fade-up" style="--stagger: 3">
+      <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
+        <defs>
+          <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="var(--ring-start, #c084fc)"/>
+            <stop offset="100%" stop-color="var(--ring-end, #7c3aed)"/>
+          </linearGradient>
+        </defs>
+        <path
+          class="progress-ring__track"
+          d="M 110 14
+             A 96 96 0 1 0 110 206
+             A 96 96 0 1 0 110 14"
+          pathLength="100"
+        />
+        <path
+          class="progress-ring__fill"
+          id="ring-fill"
+          d="M 110 14
+             A 96 96 0 1 0 110 206
+             A 96 96 0 1 0 110 14"
+          pathLength="100"
+        />
+      </svg>
+      <div class="glass-circle">
+        <div class="countdown-wrapper" aria-live="polite">
+          <div class="cd-main" id="cd-hm">0<span class="cd-min-label" data-bind="countdown.minSuffix">m</span></div>
+          <div class="cd-sub" id="cd-sub">
+            <span class="cd-sec" id="cd-s">0</span>
+          </div>
         </div>
       </div>
     </div>
@@ -69,10 +150,18 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 5">
-    © Jayaditya & Emir / Poolesville High School
+    <span data-bind="footer.copyright">© Jayaditya & Emir / Poolesville High School</span> /
+    <a data-bind="footer.feedbackUrl" data-bind-attr="href" href="https://forms.gle/UrULj3gWiL9eqeif9" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;"><span data-bind="footer.feedbackLabel">Feedback Form</span></a><br>
+    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:emirbakir523@gmail.com,thegamerp929@gmail.com" style="color:inherit;text-decoration:none;">✉ <span data-bind="footer.supportEmail">emirbakir523@gmail.com and/or thegamerp929@gmail.com</span></a>
   </footer>
 </div>
 
+<script src="settings-loader.js"></script>
+<script src="nav-renderer.js"></script>
+<script src="privacy-analytics.js"></script>
+<script src="google-analytics.js"></script>
+<script src="appearance-settings.js"></script>
+<script src="vendor/opentype.min.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

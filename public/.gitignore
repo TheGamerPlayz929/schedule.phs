@@ -1,6 +1,0 @@
-temp_zip_extract/
-.claude/
-*.zip
-node_modules/
-__pycache__/
-*.pyc
