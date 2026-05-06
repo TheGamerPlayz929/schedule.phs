@@ -21,6 +21,7 @@
     .slice(0, 80);
   let visibleSince = document.visibilityState === 'visible' ? Date.now() : 0;
   let sentFinal = false;
+  let heartbeatTimer = 0;
 
   function post(payload, beacon = false) {
     const body = JSON.stringify({ page, tabId, ...payload });
@@ -46,13 +47,25 @@
 
   post({ type: 'pageview' });
 
-  setInterval(() => {
-    if (document.visibilityState === 'visible') post({ type: 'heartbeat' });
-  }, 30000);
+  function startHeartbeat() {
+    if (heartbeatTimer || document.visibilityState !== 'visible') return;
+    heartbeatTimer = setInterval(() => post({ type: 'heartbeat' }), 30000);
+  }
+  function stopHeartbeat() {
+    if (!heartbeatTimer) return;
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = 0;
+  }
+  startHeartbeat();
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') sendDuration(true);
-    else visibleSince = Date.now();
+    if (document.visibilityState === 'hidden') {
+      stopHeartbeat();
+      sendDuration(true);
+    } else {
+      visibleSince = Date.now();
+      startHeartbeat();
+    }
   });
 
   window.addEventListener('pagehide', () => {

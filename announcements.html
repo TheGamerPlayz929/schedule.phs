@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="settings-loading">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +17,10 @@
       border: 1px solid rgba(255, 255, 255, 0.04);
       border-radius: 12px;
       padding: 24px 32px;
-      transition: all 0.2s ease;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      contain: layout paint;
+      content-visibility: auto;
+      contain-intrinsic-size: 180px;
     }
     .announcement-card:hover {
       background: rgba(255, 255, 255, 0.04);
@@ -47,7 +50,7 @@
       color: var(--accent);
       text-decoration: underline;
       text-decoration-color: color-mix(in srgb, var(--accent), transparent 60%);
-      transition: all 0.2s;
+      transition: color 0.2s ease, text-decoration-color 0.2s ease;
     }
     .announcement-content a:hover { text-decoration-color: var(--accent); }
     .announcements-empty {

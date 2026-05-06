@@ -12,6 +12,7 @@ let scheduleType = "";
 let isBeforeSchool = false;
 let isTransition = false;
 let isTimerInactive = false;
+let _overrideInterval = null;
 
 /* --- Admin time override (localhost only) --- */
 let _timeOffsetSeconds = 0; // added to real time
@@ -21,7 +22,6 @@ let _devScheduleType = null;
 let _scheduleOverride = null; // { type: string, timestamp: number } | null
 let _clockTimerId = null;
 let _clockTickMs = 0;
-let _overridePollTimerId = null;
 
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
@@ -30,20 +30,13 @@ const OVERRIDE_FETCH_TIMEOUT_MS = 1500;
 const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
   ? location.origin
   : 'https://phs-grades-backend.onrender.com';
-
-function _readStoredScheduleOverride() {
-  try {
-    const stored = localStorage.getItem('phs_schedule_override');
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (e) {
-    try { localStorage.removeItem('phs_schedule_override'); } catch {}
-    return null;
-  }
-}
+const _IS_ADMIN_PREVIEW = new URLSearchParams(location.search).has('_preview');
 
 async function _pollScheduleOverride() {
+  if (_IS_ADMIN_PREVIEW && window.__SITE_SETTINGS__) {
+    _scheduleOverride = window.__SITE_SETTINGS__.scheduleOverride || null;
+    return;
+  }
   const previousOverride = JSON.stringify(_scheduleOverride);
   try {
     const controller = new AbortController();
@@ -62,19 +55,10 @@ async function _pollScheduleOverride() {
     }
   } catch (e) {
     // Fallback to localStorage when offline
-    _scheduleOverride = _readStoredScheduleOverride();
+    const stored = localStorage.getItem('phs_schedule_override');
+    _scheduleOverride = stored ? JSON.parse(stored) : null;
   }
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
-}
-
-function _startScheduleOverridePolling() {
-  if (_overridePollTimerId) return;
-  _overridePollTimerId = setInterval(() => {
-    if (document.visibilityState !== 'hidden') _pollScheduleOverride();
-  }, 30000);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') _pollScheduleOverride();
-  });
 }
 
 function _getOverrideData(targetType) {
@@ -97,6 +81,13 @@ function _todayISODate() {
 
 function _overrideAppliesToday(override) {
   return !override?.date || override.date === _todayISODate();
+}
+
+function _applySettingsScheduleOverride(settings) {
+  if (!settings || typeof settings !== 'object') return;
+  const previousOverride = JSON.stringify(_scheduleOverride);
+  _scheduleOverride = settings.scheduleOverride || null;
+  if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
 function _isLocalhost() {
@@ -131,13 +122,13 @@ function _setClockCadence(active) {
 }
 
 function _setTimerSurfaceVisible(visible) {
-  if (!_ringWrap) return;
-  if (_lastTimerSurfaceVisible === visible) return;
-  _lastTimerSurfaceVisible = visible;
-  _ringWrap.hidden = !visible;
-  _ringWrap.style.display = visible ? '' : 'none';
-  _ringWrap.setAttribute('aria-hidden', String(!visible));
-  if (_heroEl) _heroEl.classList.toggle('hero--compact', !visible);
+  const ringWrap = document.querySelector('.ring-wrap');
+  if (!ringWrap) return;
+  ringWrap.hidden = !visible;
+  ringWrap.style.display = visible ? '' : 'none';
+  ringWrap.setAttribute('aria-hidden', String(!visible));
+  const hero = document.querySelector('.hero');
+  if (hero) hero.classList.toggle('hero--compact', !visible);
 }
 
 function _clearCountdownDisplay() {
@@ -251,10 +242,8 @@ function _initAdminPanel() {
 let _hmEl, _sEl, _heroTitle, _heroEyebrow;
 let _signatureTitle, _signatureEyebrow;
 let _ringFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
-let _ringWrap, _heroEl, _heroTitleWrapper;
 let _hmTextNode = null;
 let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
-let _lastScheduleTitle = '', _lastScheduleDate = '', _lastTimerSurfaceVisible = null;
 let _lastSignedTitle = '', _lastSignedEyebrow = '';
 let _signatureFontPromise = null;
 let _signatureId = 0;
@@ -278,15 +267,16 @@ function smootherStep(t) {
 }
 
 function updateHeroSignatureLayout() {
-  if (!_heroTitleWrapper) return;
+  const wrapper = document.querySelector('.hero-title-wrapper');
+  if (!wrapper) return;
 
   const hasEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-visible') || _signatureEyebrow?.dataset.pendingSignatureText);
   const hasTitle = Boolean(_signatureTitle?.classList.contains('is-visible') || _signatureTitle?.dataset.pendingSignatureText);
   const visibleCount = Number(hasEyebrow) + Number(hasTitle);
 
-  _heroTitleWrapper.classList.toggle('signature-ready', visibleCount > 0);
-  _heroTitleWrapper.classList.toggle('signature-single', visibleCount === 1);
-  _heroTitleWrapper.classList.toggle('signature-double', visibleCount === 2);
+  wrapper.classList.toggle('signature-ready', visibleCount > 0);
+  wrapper.classList.toggle('signature-single', visibleCount === 1);
+  wrapper.classList.toggle('signature-double', visibleCount === 2);
 }
 
 function setHeroLine(line, text, visible, options = {}) {
@@ -296,14 +286,11 @@ function setHeroLine(line, text, visible, options = {}) {
 
   if (!fallback) return;
 
-  if (fallback.textContent !== text) fallback.textContent = text;
-  const display = visible ? 'block' : 'none';
-  if (fallback.style.display !== display) fallback.style.display = display;
+  fallback.textContent = text;
+  fallback.style.display = visible ? 'block' : 'none';
 
   if (!stage) return;
   if (!visible) {
-    const alreadyHidden = !stage.classList.contains('is-visible') && !stage.dataset.pendingSignatureText && stage.innerHTML === '';
-    if (alreadyHidden) return;
     delete stage.dataset.pendingSignatureText;
     stage.classList.remove('is-visible');
     stage.innerHTML = '';
@@ -525,9 +512,6 @@ async function main() {
     _schedTitle = document.getElementById('schedule-title');
     _schedDate = document.getElementById('schedule-date');
     _periodList = document.getElementById('period-list');
-    _ringWrap = document.querySelector('.ring-wrap');
-    _heroEl = document.querySelector('.hero');
-    _heroTitleWrapper = document.querySelector('.hero-title-wrapper');
 
     const isSchedulePage = Boolean(_hmEl && _sEl && _ringFill && _schedTitle && _periodList);
     if (!isSchedulePage) return;
@@ -547,8 +531,16 @@ async function main() {
 
     _initAdminPanel();
     await _pollScheduleOverride();
-    _startScheduleOverridePolling();
+    _overrideInterval = setInterval(() => {
+      if (!_IS_ADMIN_PREVIEW && document.visibilityState === 'visible') _pollScheduleOverride();
+    }, 30000); // re-check every 30 s while visible
     updateAll();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (!_IS_ADMIN_PREVIEW) _pollScheduleOverride();
+        updateAll();
+      }
+    });
   } catch (e) {
     console.error("Initialization failed:", e);
   }
@@ -648,13 +640,6 @@ function calculateGoal() {
    Render layer
    -------------------------------------------------------------------------- */
 
-function setStatusPill(display, status, text) {
-  if (!_statusPill || !_statusLabel) return;
-  if (_statusPill.style.display !== display) _statusPill.style.display = display;
-  if (status && _statusPill.dataset.status !== status) _statusPill.dataset.status = status;
-  if (text != null && _statusLabel.textContent !== text) _statusLabel.textContent = text;
-}
-
 function updateAll() {
   if (!data) return;
   calculateGoal();
@@ -705,26 +690,34 @@ function updateAll() {
       setHeroLine('eyebrow', '', false);
       setHeroLine('title', 'No School', true, { fontSize: 142, revealStroke: 62 });
 
-      setStatusPill("inline-flex", "off", "Enjoy your day \u2728");
+      _statusPill.style.display = "inline-flex";
+      _statusPill.dataset.status = "off";
+      _statusLabel.textContent = "Enjoy your day \u2728";
     } else if (dayIsOver) {
       setHeroLine('eyebrow', '', false);
       setHeroLine('title', 'School Day Ended', true, { fontSize: 142, revealStroke: 62 });
 
-      setStatusPill("inline-flex", "off", "See you tomorrow");
+      _statusPill.style.display = "inline-flex";
+      _statusPill.dataset.status = "off";
+      _statusLabel.textContent = "See you tomorrow";
     } else if (isBeforeSchool) {
       setHeroLine('eyebrow', 'Starts in', true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', '', false);
-      setStatusPill("none");
+      _statusPill.style.display = "none";
     } else {
       setHeroLine('eyebrow', isTransition ? "Passing" : "Currently in", true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', period, true, { fontSize: 142, revealStroke: 62 });
 
+      _statusPill.style.display = "inline-flex";
       if (isTransition) {
-        setStatusPill("inline-flex", "passing", "Next period soon");
+        _statusPill.dataset.status = "passing";
+        _statusLabel.textContent = "Next period soon";
       } else if (timeleft <= 60 && timeleft > 0) {
-        setStatusPill("inline-flex", "urgent", "Ending Soon");
+        _statusPill.dataset.status = "urgent";
+        _statusLabel.textContent = "Ending Soon";
       } else {
-        setStatusPill("inline-flex", "live", "In Session");
+        _statusPill.dataset.status = "live";
+        _statusLabel.textContent = "In Session";
       }
     }
   }
@@ -743,18 +736,11 @@ function updateAll() {
   }
 
   /* --- Schedule header --- */
-  if (_schedTitle && _lastScheduleTitle !== scheduleType) {
-    _schedTitle.textContent = scheduleType;
-    _lastScheduleTitle = scheduleType;
-  }
+  if (_schedTitle) _schedTitle.textContent = scheduleType;
   if (_schedDate) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
-    const nextDateLabel = `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-    if (_lastScheduleDate !== nextDateLabel) {
-      _schedDate.textContent = nextDateLabel;
-      _lastScheduleDate = nextDateLabel;
-    }
+    _schedDate.textContent = `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
   }
 
   /* --- Period list --- */
@@ -791,7 +777,6 @@ function renderPeriodList(currentSeconds) {
       if (li.className !== expectedClass.trim()) {
         li.className = expectedClass.trim();
       }
-      updatePeriodCard(li, p);
     }
     return;
   }
@@ -804,44 +789,16 @@ function renderPeriodList(currentSeconds) {
 
     const li = document.createElement('li');
     li.className = 'period-card ' + stateClass;
-    const timeNode = createPeriodCardSection('period-time', p.timeStr);
-    const nameNode = createPeriodCardSection('period-name', p.name);
-    const metaNode = createPeriodCardSection('period-meta', `${durationMin} min`);
-    li._periodNodes = { time: timeNode, name: nameNode, meta: metaNode };
-    li.appendChild(timeNode);
-    li.appendChild(nameNode);
-    li.appendChild(metaNode);
+
+    li.innerHTML = `
+      <div class="period-time">${p.timeStr}</div>
+      <div class="period-name">${p.name}</div>
+      <div class="period-meta">${durationMin} min</div>
+    `;
 
     _periodList.appendChild(li);
   }
   _lastPeriodCount = myArray.length;
-}
-
-function createPeriodCardSection(className, text) {
-  const div = document.createElement('div');
-  div.className = className;
-  div.textContent = String(text ?? '');
-  return div;
-}
-
-function updatePeriodCard(li, periodData) {
-  const durationMin = Math.round((periodData.endSec - periodData.startSec) / 60);
-  const nodes = li._periodNodes || {
-    time: li.querySelector('.period-time'),
-    name: li.querySelector('.period-name'),
-    meta: li.querySelector('.period-meta')
-  };
-  li._periodNodes = nodes;
-  const values = [
-    [nodes.time, periodData.timeStr],
-    [nodes.name, periodData.name],
-    [nodes.meta, `${durationMin} min`]
-  ];
-  for (const [node, value] of values) {
-    if (node && node.textContent !== String(value ?? '')) {
-      node.textContent = String(value ?? '');
-    }
-  }
 }
 
 function getStateClass(period, currentSeconds) {
@@ -849,5 +806,9 @@ function getStateClass(period, currentSeconds) {
   if (currentSeconds >= period.startSec && currentSeconds < period.endSec) return 'is-current';
   return '';
 }
+
+document.addEventListener('site-settings:applied', e => {
+  _applySettingsScheduleOverride(e.detail);
+});
 
 window.onload = main;

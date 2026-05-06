@@ -3,104 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin · PHS Schedule</title>
+  <title>Not Found</title>
   <meta name="robots" content="noindex,nofollow">
-  <link rel="icon" href="Icons8-Windows-8-Animals-Falcon.ico">
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
-
-<!-- ── Login screen ── -->
-<div id="login-shell" class="admin-login-shell">
-  <div class="admin-login-card" id="login-card">
-    <h1>Sign in</h1>
-    <p>Use an approved Google account to manage the PHS site.</p>
-    <div id="google-login-wrap" class="admin-google-login hidden">
-      <div id="google-login-btn"></div>
-    </div>
-    <div id="google-login-loading" class="admin-field-help">Loading Google sign-in...</div>
-    <div id="login-error" class="admin-field-help" style="color:var(--danger);min-height:16px"></div>
-  </div>
-</div>
-
-<!-- ── Main shell ── -->
-<div id="app-shell" class="admin-shell hidden">
-  <aside class="admin-sidebar">
-    <div class="admin-sidebar-brand">
-      <img src="phs-logo.png" alt="" class="admin-sidebar-brand-img">
-      <span class="admin-sidebar-brand-text">PHS Admin</span>
-      <span class="admin-sidebar-brand-tag">v1</span>
-    </div>
-
-    <div class="admin-sidebar-search">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></svg>
-      <input id="search-input" type="search" placeholder="Search settings…" autocomplete="off">
-    </div>
-
-    <div class="admin-sidebar-section-label">Site</div>
-    <nav id="tabs"></nav>
-
-    <div class="admin-sidebar-footer">
-      <button id="open-preview-btn" class="admin-btn">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span>Open preview</span>
-      </button>
-      <button id="logout-btn" class="admin-btn">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
-        <span>Sign out</span>
-      </button>
-      <div class="admin-footer-status">
-        <div class="admin-status-line" id="conn-status">Connecting…</div>
-        <div class="admin-user-chip" id="admin-user-chip" title="Admin account"></div>
-      </div>
-    </div>
-  </aside>
-
-  <main class="admin-main">
-    <header class="admin-main-header">
-      <div>
-        <h1 id="tab-title">Branding</h1>
-        <div class="sub" id="tab-sub">Identity & visual basics for the public site.</div>
-      </div>
-      <div class="admin-actions">
-        <span id="dirty-pill" class="admin-dirty-pill">Unsaved changes</span>
-        <button id="discard-btn" class="admin-btn admin-btn-ghost" disabled>Discard</button>
-        <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish</button>
-      </div>
-    </header>
-
-    <div id="panels"></div>
+  <main class="not-found-shell">
+    <h1>404</h1>
+    <p>Not found.</p>
   </main>
-</div>
-
-<!-- ── Live preview overlay ── -->
-<div id="preview-host" class="admin-preview-host">
-  <div class="admin-preview-bar">
-    <div class="row-gap-8">
-      <div class="seg" id="preview-page-seg">
-        <button data-preview-page="index.html" class="active">Schedule</button>
-        <button data-preview-page="gradeviewer.html">GradeViewer</button>
-      </div>
-      <div class="seg" id="preview-mode-seg" style="margin-left:6px">
-        <button data-mode="draft" class="active">Draft</button>
-        <button data-mode="live">Published</button>
-      </div>
-      <span class="mode-pill draft" id="preview-mode-pill" style="margin-left:6px">Showing draft (un-published)</span>
-    </div>
-    <div class="row-gap-8">
-      <button id="preview-refresh-btn" class="admin-btn admin-btn-sm">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0115-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15 6.7L3 16M3 21v-5h5"/></svg>
-        Refresh
-      </button>
-      <button id="preview-close-btn" class="admin-btn admin-btn-sm admin-btn-ghost">Close</button>
-    </div>
-  </div>
-  <iframe id="preview-frame" class="admin-preview-frame" src="about:blank" title="Preview"></iframe>
-</div>
-
-<div class="admin-toast-host" id="toast-host"></div>
-
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="admin.js"></script>
 </body>
 </html>
