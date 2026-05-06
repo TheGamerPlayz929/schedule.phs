@@ -9,7 +9,7 @@
   <title data-bind="branding.siteTitle">PHS Schedule</title>
   <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Beautiful Shader Experiences - PHS Schedule">
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
-  <link rel="stylesheet" href="main.css?v=20260506-glass1">
+  <link rel="stylesheet" href="main.css?v=20260506-tabs1">
 </head>
 <body>
 
@@ -89,7 +89,7 @@
   </aside>
 
   <!-- Hero Section -->
-  <main class="hero">
+  <main class="hero" data-site-view="schedule">
     <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off">
       <span class="status-dot"></span>
       <span id="status-label" data-bind="hero.schedulePageStatusFallback">Loading...</span>
@@ -129,9 +129,9 @@
       </svg>
       <div class="glass-circle">
         <div class="countdown-wrapper" aria-live="polite">
-          <div class="cd-main" id="cd-hm">0<span class="cd-min-label" data-bind="countdown.minSuffix">m</span></div>
+          <div class="cd-main" id="cd-hm"><span class="cd-min-label" data-bind="countdown.minSuffix">m</span></div>
           <div class="cd-sub" id="cd-sub">
-            <span class="cd-sec" id="cd-s">0</span>
+            <span class="cd-sec" id="cd-s"></span>
           </div>
         </div>
       </div>
@@ -139,7 +139,7 @@
   </main>
 
   <!-- Schedule Section -->
-  <section class="schedule-section fade-up" style="--stagger: 4">
+  <section class="schedule-section fade-up" data-site-view="schedule" style="--stagger: 4">
     <div class="schedule-header">
       <h3 id="schedule-title">Normal Schedule</h3>
       <span class="date" id="schedule-date"></span>
@@ -149,17 +149,38 @@
     </ol>
   </section>
 
+  <section class="grades-view fade-up" id="grades-view" data-site-view="grades" hidden aria-hidden="true" style="--stagger: 4">
+    <div class="hero hero--compact grades-hero">
+      <div class="hero-title-wrapper">
+        <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.gradesPageTitle">Grades</h1>
+      </div>
+    </div>
+    <section class="grades-wrap" id="grades-wrap">
+      <div class="grades-scaler" id="grades-scaler">
+        <iframe
+          id="grades-frame"
+          src="about:blank"
+          scrolling="yes"
+          allowtransparency="true"
+          referrerpolicy="strict-origin-when-cross-origin"
+          title="GradeMelon Grades"
+          style="background: transparent;">
+        </iframe>
+      </div>
+    </section>
+  </section>
+
   <footer class="app-footer fade-up" style="--stagger: 5">
     <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:emirbakir523@gmail.com,thegamerp929@gmail.com" style="color:inherit;text-decoration:none;"><span data-bind="footer.supportEmail">For all inquiries, support, or removal requests, please contact us at emirbakir523@gmail.com or thegamerp929@gmail.com</span></a>
   </footer>
 </div>
 
-<script defer src="settings-loader.js?v=20260506-glass1"></script>
-<script defer src="nav-renderer.js?v=20260506-glass1"></script>
-<script defer src="privacy-analytics.js?v=20260506-glass1"></script>
-<script defer src="google-analytics.js?v=20260506-glass1"></script>
-<script defer src="appearance-settings.js?v=20260506-glass1"></script>
+<script defer src="settings-loader.js?v=20260506-island1"></script>
+<script defer src="nav-renderer.js?v=20260506-island1"></script>
+<script defer src="privacy-analytics.js?v=20260506-island1"></script>
+<script defer src="google-analytics.js?v=20260506-island1"></script>
+<script defer src="appearance-settings.js?v=20260506-island1"></script>
 <script defer src="vendor/opentype.min.js"></script>
-<script defer src="main.js?v=20260506-glass1"></script>
+<script defer src="main.js?v=20260506-tabs1"></script>
 </body>
 </html>

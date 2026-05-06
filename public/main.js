@@ -26,11 +26,28 @@ let _clockTickMs = 0;
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
 const OVERRIDE_FETCH_TIMEOUT_MS = 1500;
+const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
+const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const GRADEVIEWER_DEFAULT_LOCAL_URL = 'http://localhost:3001/login';
+const GRADEVIEWER_DEFAULT_PROD_URL = 'https://schedulephs.web.app/login';
 
 const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname)
   ? location.origin
   : 'https://phs-grades-backend.onrender.com';
 const _IS_ADMIN_PREVIEW = new URLSearchParams(location.search).has('_preview');
+
+let _siteView = 'schedule';
+let _siteViewScroll = { schedule: 0, grades: 0 };
+let _gradesFrame = null;
+let _gradesScaler = null;
+let _gradesFrameUrlLocked = false;
+let _gradesFrameApplyToken = 0;
+let _gradesFrameSizeRaf = 0;
+let _gradesFrameBridgeReady = false;
+let _gradesIsFullscreen = false;
+let _gradesSavedFrameCss = '';
+let _gradesSavedScalerCss = '';
+const _gradesSavedTransforms = [];
 
 async function _pollScheduleOverride() {
   if (_IS_ADMIN_PREVIEW && window.__SITE_SETTINGS__) {
@@ -138,6 +155,334 @@ function _clearCountdownDisplay() {
   _lastS = '';
 }
 
+function _prepareCountdownDisplay() {
+  if (_hmEl) {
+    Array.from(_hmEl.childNodes)
+      .filter(n => n.nodeType === Node.TEXT_NODE)
+      .forEach(n => n.remove());
+    if (!_hmEl.querySelector('.cd-min-label')) {
+      const label = document.createElement('span');
+      label.className = 'cd-min-label';
+      label.textContent = 'm';
+      _hmEl.appendChild(label);
+    }
+  }
+  if (_sEl) _sEl.textContent = '';
+  _lastHm = '';
+  _lastS = '';
+}
+
+function _readScheduleDataCache() {
+  try {
+    const raw = sessionStorage.getItem(SCHEDULE_DATA_CACHE_KEY) || localStorage.getItem(SCHEDULE_DATA_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') return null;
+    if (Date.now() - Number(parsed.ts || 0) > SCHEDULE_DATA_CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function _writeScheduleDataCache(nextData) {
+  try {
+    const payload = JSON.stringify({ ts: Date.now(), data: nextData });
+    sessionStorage.setItem(SCHEDULE_DATA_CACHE_KEY, payload);
+    localStorage.setItem(SCHEDULE_DATA_CACHE_KEY, payload);
+  } catch {}
+}
+
+function _timeoutSignal(ms) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    try { return AbortSignal.timeout(ms); } catch {}
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
+async function _localGradeMelonAvailable() {
+  try {
+    const res = await fetch('/local-grade-melon-status', { cache: 'no-store', signal: _timeoutSignal(1500) });
+    const json = await res.json();
+    return Boolean(json.available);
+  } catch {
+    return false;
+  }
+}
+
+function _urlsEqual(a, b) {
+  try { return new URL(a, location.href).href === new URL(b, location.href).href; }
+  catch { return a === b; }
+}
+
+function _navHrefKind(href) {
+  if (!href) return '';
+  try {
+    const url = new URL(href, location.href);
+    const path = url.pathname;
+    if (/\/(?:gradeviewer|grademelon)\.html?$/i.test(path)) return 'grades';
+    if (/\/index\.html?$/i.test(path) || path.endsWith('/')) return 'schedule';
+  } catch {
+    if (/gradeviewer\.html?|grademelon\.html?/i.test(href)) return 'grades';
+    if (/index\.html?/i.test(href) || href === '/') return 'schedule';
+  }
+  return '';
+}
+
+function _viewFromLocation() {
+  return _navHrefKind(location.pathname) === 'grades' ? 'grades' : 'schedule';
+}
+
+function _routeForView(view) {
+  return view === 'grades' ? 'gradeviewer.html' : 'index.html';
+}
+
+function _urlForView(view) {
+  const url = new URL(location.href);
+  const parts = url.pathname.split('/');
+  parts[parts.length - 1] = _routeForView(view);
+  url.pathname = parts.join('/');
+  url.search = '';
+  url.hash = '';
+  return url.href;
+}
+
+function _updateNavActive(view = _siteView) {
+  const wrap = document.getElementById('nav-links');
+  if (!wrap) return;
+  wrap.setAttribute('data-page', view);
+  wrap.querySelectorAll('a').forEach(link => {
+    const kind = _navHrefKind(link.getAttribute('href'));
+    link.classList.toggle('active', kind === view);
+  });
+}
+
+function _showSiteView(view, opts = {}) {
+  const nextView = view === 'grades' ? 'grades' : 'schedule';
+  if (_siteView && _siteView !== nextView) _siteViewScroll[_siteView] = window.scrollY || 0;
+  _siteView = nextView;
+
+  document.body.classList.toggle('site-view-schedule', nextView === 'schedule');
+  document.body.classList.toggle('site-view-grades', nextView === 'grades');
+  document.querySelectorAll('[data-site-view]').forEach(el => {
+    const visible = el.getAttribute('data-site-view') === nextView;
+    el.hidden = !visible;
+    el.setAttribute('aria-hidden', String(!visible));
+  });
+  _updateNavActive(nextView);
+
+  if (!opts.skipHistory) {
+    const method = opts.replace ? 'replaceState' : 'pushState';
+    if (_viewFromLocation() !== nextView || opts.replace) {
+      history[method]({ siteView: nextView }, '', _urlForView(nextView));
+    } else {
+      history.replaceState({ siteView: nextView }, '', location.href);
+    }
+  }
+
+  if (nextView === 'grades') {
+    document.title = 'Grades - PHS';
+    _ensureGradesFrame();
+  } else if (data) {
+    updateAll();
+  }
+
+  if (opts.restoreScroll !== false) {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: _siteViewScroll[nextView] || 0, left: 0, behavior: 'auto' });
+      if (nextView === 'grades') _scheduleGradesFrameSize();
+    });
+  }
+}
+
+function _initKeepAliveTabs() {
+  if (!document.getElementById('grades-view')) return;
+  _siteView = _viewFromLocation();
+  _showSiteView(_siteView, { replace: true, restoreScroll: false });
+
+  document.addEventListener('click', event => {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest?.('#nav-links a');
+    if (!link || (link.target && link.target !== '_self')) return;
+    const kind = _navHrefKind(link.getAttribute('href'));
+    if (kind !== 'schedule' && kind !== 'grades') return;
+    event.preventDefault();
+    _showSiteView(kind);
+  });
+
+  window.addEventListener('popstate', () => {
+    _showSiteView(_viewFromLocation(), { skipHistory: true });
+  });
+
+  document.addEventListener('site-settings:applied', () => {
+    requestAnimationFrame(() => _updateNavActive(_siteView));
+  });
+}
+
+function _ensureGradesFrame() {
+  _gradesFrame = _gradesFrame || document.getElementById('grades-frame');
+  _gradesScaler = _gradesScaler || document.getElementById('grades-scaler');
+  if (!_gradesFrame || !_gradesScaler) return;
+  if (!_gradesFrameBridgeReady) _initGradesFrameBridge();
+  _applyGradesFrameUrl(window.__SITE_SETTINGS__ || {});
+  _scheduleGradesFrameSize();
+}
+
+async function _applyGradesFrameUrl(settings) {
+  if (_gradesFrameUrlLocked || !_gradesFrame) return;
+  const token = ++_gradesFrameApplyToken;
+  const localUrl = settings?.grades?.iframeUrlLocal || (_isLocalhost() ? GRADEVIEWER_DEFAULT_LOCAL_URL : '');
+  const prodUrl = settings?.grades?.iframeUrlProd || GRADEVIEWER_DEFAULT_PROD_URL;
+  let url = _isLocalhost() ? localUrl : prodUrl;
+  if (_isLocalhost() && (!localUrl || !(await _localGradeMelonAvailable()))) url = prodUrl;
+  if (token !== _gradesFrameApplyToken || _gradesFrameUrlLocked) return;
+  if (url && !_urlsEqual(_gradesFrame.src, url)) {
+    _gradesFrame.src = url;
+    _gradesFrameUrlLocked = true;
+  }
+}
+
+function _scheduleGradesFrameSize() {
+  if (!_gradesScaler || !_gradesFrame || _gradesIsFullscreen) return;
+  if (_gradesFrameSizeRaf) return;
+  _gradesFrameSizeRaf = requestAnimationFrame(() => {
+    _gradesFrameSizeRaf = 0;
+    _setGradesFrameSize();
+  });
+}
+
+function _setGradesFrameSize() {
+  if (!_gradesScaler || !_gradesFrame || _gradesIsFullscreen) return;
+  const w = _gradesScaler.offsetWidth;
+  if (!w) return;
+  const top = _gradesScaler.getBoundingClientRect().top;
+  const h = Math.max(720, window.innerHeight - top - 24);
+  _gradesFrame.style.width = w + 'px';
+  _gradesFrame.style.height = h + 'px';
+  _gradesScaler.style.height = h + 'px';
+}
+
+function _isAllowedGradesOrigin(origin) {
+  if (!_gradesFrame) return false;
+  try {
+    if (origin === new URL(_gradesFrame.src, location.href).origin) return true;
+  } catch {}
+  const settings = window.__SITE_SETTINGS__ || {};
+  const list = [
+    settings?.grades?.iframeUrlLocal,
+    settings?.grades?.iframeUrlProd,
+    GRADEVIEWER_DEFAULT_LOCAL_URL,
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    GRADEVIEWER_DEFAULT_PROD_URL
+  ];
+  return list.some(url => {
+    try { return url && new URL(url).origin === origin; }
+    catch { return false; }
+  });
+}
+
+function _readAppearanceForGrades() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('phs:appearance:v2') || '{}');
+    const isHex = value => /^#[0-9a-fA-F]{6}$/.test(String(value || ''));
+    const colors = Array.isArray(raw.colors) ? raw.colors.filter(isHex).slice(0, 5).map(color => color.toUpperCase()) : [];
+    while (colors.length < 2) colors.push(colors[0] || '#8288D5');
+    const requestedAccent = isHex(raw.accent) ? String(raw.accent).toUpperCase() : colors[0];
+    return { ...raw, colors, accent: colors.includes(requestedAccent) ? requestedAccent : colors[0] };
+  } catch {
+    return {};
+  }
+}
+
+function _gradesFrameTargetOrigin() {
+  if (!_gradesFrame) return null;
+  try { return new URL(_gradesFrame.src, location.href).origin; }
+  catch { return null; }
+}
+
+function _postThemeToGradesFrame() {
+  if (!_gradesFrame?.contentWindow) return;
+  const targetOrigin = _gradesFrameTargetOrigin();
+  if (!targetOrigin || targetOrigin === 'null') return;
+  try {
+    _gradesFrame.contentWindow.postMessage({ type: 'phs:appearance-settings', settings: _readAppearanceForGrades() }, targetOrigin);
+  } catch {}
+}
+
+function _initGradesFrameBridge() {
+  if (!_gradesFrame || !_gradesScaler) return;
+  _gradesFrameBridgeReady = true;
+
+  if ('ResizeObserver' in window) new ResizeObserver(_scheduleGradesFrameSize).observe(_gradesScaler);
+  window.addEventListener('resize', _scheduleGradesFrameSize, { passive: true });
+
+  window.addEventListener('message', event => {
+    if (event.source !== _gradesFrame.contentWindow) return;
+    if (!_isAllowedGradesOrigin(event.origin)) return;
+    if (event.data?.type === 'gradeviewer:privacy-modal') {
+      document.body.classList.toggle('privacy-modal-open', Boolean(event.data.open));
+    }
+    if (event.data?.type === 'modalOpen') _goGradesFullscreen();
+    if (event.data?.type === 'modalClose') _exitGradesFullscreen();
+    if (event.data?.type === 'gradeviewer:theme-ready') _postThemeToGradesFrame();
+  });
+
+  window.addEventListener('storage', event => {
+    if (event.key === 'phs:appearance:v2') _postThemeToGradesFrame();
+  });
+  document.addEventListener('phs:appearance-storage-sync', _postThemeToGradesFrame);
+  _gradesFrame.addEventListener('load', () => {
+    setTimeout(_postThemeToGradesFrame, 100);
+    _scheduleGradesFrameSize();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && _gradesIsFullscreen) _exitGradesFullscreen();
+  });
+}
+
+function _goGradesFullscreen() {
+  if (_gradesIsFullscreen || !_gradesFrame || !_gradesScaler) return;
+  _gradesIsFullscreen = true;
+  _gradesSavedFrameCss = _gradesFrame.style.cssText;
+  _gradesSavedScalerCss = _gradesScaler.style.cssText;
+  let el = _gradesFrame.parentElement;
+  while (el && el !== document.body) {
+    _gradesSavedTransforms.push({ el, transform: el.style.transform, willChange: el.style.willChange, animation: el.style.animation, opacity: el.style.opacity });
+    el.style.transform = 'none';
+    el.style.willChange = 'auto';
+    el.style.animation = 'none';
+    el.style.opacity = '1';
+    el = el.parentElement;
+  }
+  document.body.classList.add('gradeviewer-modal-open');
+  _gradesScaler.classList.add('is-modal-fullscreen');
+  _gradesFrame.style.cssText = _gradesSavedFrameCss + ';width:100vw;height:100vh;border-radius:0;background:transparent';
+  document.body.style.overflow = 'hidden';
+}
+
+function _exitGradesFullscreen() {
+  if (!_gradesIsFullscreen || !_gradesFrame || !_gradesScaler) return;
+  _gradesIsFullscreen = false;
+  document.body.classList.remove('gradeviewer-modal-open');
+  document.body.style.overflow = '';
+  _gradesScaler.classList.remove('is-modal-fullscreen');
+  _gradesScaler.style.cssText = _gradesSavedScalerCss;
+  _gradesFrame.style.cssText = _gradesSavedFrameCss;
+  _gradesSavedScalerCss = '';
+  _gradesSavedFrameCss = '';
+  _gradesSavedTransforms.forEach(saved => {
+    saved.el.style.transform = saved.transform;
+    saved.el.style.willChange = saved.willChange;
+    saved.el.style.animation = saved.animation;
+    saved.el.style.opacity = saved.opacity;
+  });
+  _gradesSavedTransforms.length = 0;
+  _setGradesFrameSize();
+}
+
 function _setAdminStatus(text) {
   const status = document.getElementById('admin-status');
   if (status) status.textContent = text;
@@ -242,7 +587,6 @@ function _initAdminPanel() {
 let _hmEl, _sEl, _heroTitle, _heroEyebrow;
 let _signatureTitle, _signatureEyebrow;
 let _ringFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
-let _hmTextNode = null;
 let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
 let _lastSignedTitle = '', _lastSignedEyebrow = '';
 let _signatureFontPromise = null;
@@ -516,17 +860,25 @@ async function main() {
     const isSchedulePage = Boolean(_hmEl && _sEl && _ringFill && _schedTitle && _periodList);
     if (!isSchedulePage) return;
 
-    const response = await fetch('data.json');
-    data = await response.json();
+    _initKeepAliveTabs();
+    _prepareCountdownDisplay();
 
-    /* Strip any existing text nodes from #cd-hm (the hardcoded "00 " in HTML),
-       then insert a single controlled text node before the MIN span. */
-    if (_hmEl) {
-      Array.from(_hmEl.childNodes)
-        .filter(n => n.nodeType === Node.TEXT_NODE)
-        .forEach(n => n.remove());
-      _hmTextNode = document.createTextNode('');
-      _hmEl.insertBefore(_hmTextNode, _hmEl.firstChild);
+    const cachedData = _readScheduleDataCache();
+    if (cachedData) {
+      data = cachedData;
+      updateAll();
+    }
+
+    try {
+      const response = await fetch('data.json');
+      const freshData = await response.json();
+      if (freshData && typeof freshData === 'object') {
+        data = freshData;
+        _writeScheduleDataCache(freshData);
+      }
+    } catch (fetchError) {
+      if (!data) throw fetchError;
+      console.warn('Using cached schedule data:', fetchError);
     }
 
     _initAdminPanel();
@@ -678,11 +1030,13 @@ function updateAll() {
     }
   }
 
-  document.title = isTimerInactive
-    ? `${noSchool ? scheduleType : 'Done'} | PHS`
-    : (h === 0
-      ? `${m}:${String(s).padStart(2, '0')} PHS`
-      : `${h}:${String(m).padStart(2, '0')} PHS`);
+  if (_siteView !== 'grades') {
+    document.title = isTimerInactive
+      ? `${noSchool ? scheduleType : 'Done'} | PHS`
+      : (h === 0
+        ? `${m}:${String(s).padStart(2, '0')} PHS`
+        : `${h}:${String(m).padStart(2, '0')} PHS`);
+  }
 
   /* --- Hero text & Status --- */
   if (_heroTitle && _heroEyebrow && _statusPill && _statusLabel) {
@@ -809,6 +1163,8 @@ function getStateClass(period, currentSeconds) {
 
 document.addEventListener('site-settings:applied', e => {
   _applySettingsScheduleOverride(e.detail);
+  _applyGradesFrameUrl(e.detail);
+  requestAnimationFrame(() => _updateNavActive(_siteView));
 });
 
 window.onload = main;

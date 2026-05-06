@@ -190,6 +190,56 @@ ol {
   min-height: 100vh;
 }
 
+[data-site-view][hidden],
+.grades-view[hidden] {
+  display: none !important;
+}
+
+body.site-view-grades .app-shell {
+  max-width: none;
+  padding: 0;
+}
+
+body.site-view-grades .glass-nav,
+body.site-view-grades .grades-hero {
+  width: min(900px, calc(100% - 48px));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.site-view-grades .app-footer {
+  position: static;
+  padding: 14px 16px 22px;
+  text-align: center;
+  z-index: 50;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+body.gradeviewer-modal-open .glass-nav,
+body.gradeviewer-modal-open .grades-hero,
+body.gradeviewer-modal-open .app-footer,
+body.privacy-modal-open .glass-nav,
+body.privacy-modal-open .grades-hero,
+body.privacy-modal-open .app-footer {
+  filter: blur(14px) saturate(85%);
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+body.gradeviewer-modal-open::before,
+body.privacy-modal-open::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background: transparent;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 /* ==========================================================================
    Navigation
    ========================================================================== */
@@ -517,6 +567,61 @@ ol {
 .hero--compact + .schedule-section,
 .hero--compact + .grades-wrap {
   margin-top: 0;
+}
+
+.grades-view {
+  display: block;
+  width: 100%;
+  position: relative;
+  z-index: 30;
+}
+
+.grades-wrap {
+  display: block;
+  width: 100%;
+  padding-bottom: 8px;
+  position: relative;
+  z-index: 30;
+}
+
+.grades-scaler {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100vw, 1500px);
+  max-width: 100vw;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  contain: layout paint;
+}
+
+#grades-frame {
+  border: none;
+  display: block;
+}
+
+.grades-scaler.is-modal-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  transform: none !important;
+  contain: none !important;
+  overflow: visible !important;
+  z-index: 80 !important;
+  background: transparent !important;
+}
+
+.grades-scaler.is-modal-fullscreen #grades-frame {
+  position: static !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
 
 .schedule-header {
@@ -856,17 +961,18 @@ ol {
 }
 .appearance-panel {
   --appearance-font: var(--font-ui);
-  --appearance-glass-radius: 18px 0 0 18px;
+  --appearance-glass-radius: 24px;
   --appearance-glass-edge: rgba(255, 255, 255, 0.19);
-  --appearance-glass-shadow: rgba(0, 0, 0, 0.16);
+  --appearance-glass-shadow: rgba(0, 0, 0, 0.22);
   --appearance-control-bg: rgba(255, 255, 255, 0.014);
   --appearance-control-bg-hover: rgba(255, 255, 255, 0.028);
   --appearance-control-border: rgba(255, 255, 255, 0.1);
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(380px, 100vw);
+  top: 86px;
+  right: 24px;
+  bottom: auto;
+  width: min(380px, calc(100vw - 48px));
+  max-height: calc(100vh - 110px);
   z-index: 10050;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -881,25 +987,25 @@ ol {
   font-family: var(--appearance-font);
   font-optical-sizing: auto;
   border: 1px solid var(--appearance-glass-edge);
-  border-right: 0;
   border-radius: var(--appearance-glass-radius);
   background: rgba(255,255,255,0.004);
   backdrop-filter: blur(3px) saturate(104%) brightness(1.03);
   -webkit-backdrop-filter: blur(3px) saturate(104%) brightness(1.03);
   box-shadow:
-    inset 1px 0 0 rgba(255,255,255,0.2),
+    inset 1px 0 0 rgba(255,255,255,0.16),
     inset 0 1px 0 rgba(255,255,255,0.14),
     inset 0 -1px 0 rgba(0,0,0,0.08),
-    -14px 0 36px var(--appearance-glass-shadow);
+    0 24px 70px var(--appearance-glass-shadow),
+    0 6px 18px rgba(0,0,0,0.12);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translate3d(calc(100% + 42px), 0, 0) scale(0.985);
+  transform: translate3d(14px, -8px, 0) scale(0.96);
   transform-origin: top right;
   transition:
-    transform 240ms var(--ease-out-expo),
-    opacity 180ms ease,
-    visibility 0s linear 240ms,
+    transform 220ms var(--ease-out-expo),
+    opacity 160ms ease,
+    visibility 0s linear 220ms,
     box-shadow 180ms ease;
 }
 .glass-filter,
@@ -968,10 +1074,10 @@ ol {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transform: translateX(0);
+  transform: translate3d(0, 0, 0) scale(1);
   transition:
-    transform 240ms var(--ease-out-expo),
-    opacity 180ms ease,
+    transform 220ms var(--ease-out-expo),
+    opacity 160ms ease,
     visibility 0s,
     box-shadow 180ms ease;
 }
@@ -1566,13 +1672,16 @@ ol {
   }
 
   .appearance-panel {
-    --appearance-glass-radius: 0;
-    inset: 0;
+    --appearance-glass-radius: 22px;
+    top: 82px;
+    right: 14px;
+    bottom: 14px;
+    left: 14px;
     width: auto;
-    max-height: none;
+    max-height: calc(100vh - 96px);
     gap: 16px;
     padding: 20px 16px;
-    border: 0;
+    border: 1px solid var(--appearance-glass-edge);
   }
 
   .appearance-panel strong {
