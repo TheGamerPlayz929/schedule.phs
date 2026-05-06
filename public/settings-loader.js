@@ -149,7 +149,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
       e.preventDefault();
-      window.open('admin.html', '_blank', 'noopener');
+      window.open('https://phs-grades-backend.onrender.com/admin', '_blank', 'noopener');
     }
   });
 
