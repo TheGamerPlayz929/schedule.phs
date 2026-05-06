@@ -304,7 +304,8 @@ function _initKeepAliveTabs() {
 
   document.addEventListener('click', event => {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const link = event.target.closest?.('#nav-links a');
+    const target = event.target?.nodeType === Node.ELEMENT_NODE ? event.target : event.target?.parentElement;
+    const link = target?.closest?.('#nav-links a');
     if (!link || (link.target && link.target !== '_self')) return;
     const kind = _navHrefKind(link.getAttribute('href'));
     if (kind !== 'schedule' && kind !== 'grades') return;
