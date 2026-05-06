@@ -16,21 +16,56 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
 }
 
-.not-found-shell {
+.not-found-shell,
+.admin-redirect-shell {
   min-height: 100vh;
   display: grid;
   place-content: center;
   justify-items: center;
   gap: 8px;
+  padding: 24px;
+  text-align: center;
 }
 
-.not-found-shell h1 {
+.not-found-shell h1,
+.admin-redirect-shell h1 {
   margin: 0;
   font-size: 28px;
   font-weight: 650;
 }
 
-.not-found-shell p {
+.not-found-shell p,
+.admin-redirect-shell p {
   margin: 0;
   color: var(--muted);
+}
+
+.admin-redirect-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.9) 0 5px, transparent 6px),
+    conic-gradient(from 0deg, rgba(255,255,255,0.9), rgba(255,255,255,0.1), rgba(255,255,255,0.9));
+  box-shadow: 0 0 32px rgba(255,255,255,0.16);
+  animation: admin-redirect-spin 1.25s linear infinite;
+}
+
+.admin-redirect-shell a {
+  margin-top: 10px;
+  color: var(--fg);
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.06);
+}
+
+.admin-redirect-shell a:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+@keyframes admin-redirect-spin {
+  to { transform: rotate(360deg); }
 }

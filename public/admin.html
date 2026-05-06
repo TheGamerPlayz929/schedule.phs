@@ -3,14 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Not Found</title>
+  <title>Admin Redirect · PHS Schedule</title>
   <meta name="robots" content="noindex,nofollow">
-  <link rel="stylesheet" href="admin.css">
+  <meta http-equiv="refresh" content="0; url=https://phs-grades-backend.onrender.com/admin">
+  <link rel="stylesheet" href="admin.css?v=20260506-jarvis2">
 </head>
 <body>
-  <main class="not-found-shell">
-    <h1>404</h1>
-    <p>Not found.</p>
+  <main class="admin-redirect-shell">
+    <div class="admin-redirect-mark" aria-hidden="true"></div>
+    <h1>Opening admin...</h1>
+    <p>The admin panel now runs from the protected backend.</p>
+    <a href="https://phs-grades-backend.onrender.com/admin">Open admin</a>
   </main>
+  <script>
+    window.location.replace('https://phs-grades-backend.onrender.com/admin');
+  </script>
 </body>
 </html>
