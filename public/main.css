@@ -504,6 +504,34 @@ body.privacy-modal-open::before {
   margin-top: -8px;
 }
 
+body.site-view-schedule.schedule-terminal-state .hero[data-site-view="schedule"] {
+  flex: 1 1 auto;
+  min-height: calc(100vh - 118px);
+  justify-content: center;
+  margin: 0;
+  padding: clamp(40px, 7vh, 90px) 0 clamp(82px, 12vh, 150px);
+}
+
+body.site-view-schedule.schedule-terminal-state .status-badge {
+  margin-bottom: clamp(12px, 2vh, 24px);
+}
+
+body.site-view-schedule.schedule-terminal-state .hero-title-wrapper {
+  width: min(100%, 1180px);
+  min-height: clamp(150px, 18vw, 260px);
+  margin-bottom: 0;
+}
+
+body.site-view-schedule.schedule-terminal-state .signature-stage--title {
+  height: clamp(132px, 17vw, 242px);
+}
+
+body.site-view-schedule.schedule-terminal-state .ring-wrap,
+body.site-view-schedule.schedule-terminal-state .schedule-section[data-site-view="schedule"],
+body.site-view-schedule.schedule-terminal-state .app-footer {
+  display: none !important;
+}
+
 .signature-stage svg {
   display: block;
   width: 100%;

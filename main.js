@@ -1084,6 +1084,9 @@ function updateAll() {
   const noSchool = _isNonInstructionalSchedule(scheduleType);
   const dayIsOver = !noSchool && (timeleft <= 0 && !isBeforeSchool);
   isTimerInactive = noSchool || dayIsOver;
+  document.body.classList.toggle('schedule-terminal-state', isTimerInactive);
+  document.body.classList.toggle('schedule-no-school-state', noSchool);
+  document.body.classList.toggle('schedule-ended-state', dayIsOver);
 
   if (isTimerInactive) {
     h = 0; m = 0; s = 0;
@@ -1118,14 +1121,14 @@ function updateAll() {
   if (_heroTitle && _heroEyebrow && _statusPill && _statusLabel) {
     if (noSchool) {
       setHeroLine('eyebrow', '', false);
-      setHeroLine('title', 'No School', true, { fontSize: 142, revealStroke: 62 });
+      setHeroLine('title', 'No School', true, { fontSize: 178, revealStroke: 78 });
 
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
-      _statusLabel.textContent = "Enjoy your day \u2728";
+      _statusLabel.textContent = "Enjoy your day";
     } else if (dayIsOver) {
       setHeroLine('eyebrow', '', false);
-      setHeroLine('title', 'School Day Ended', true, { fontSize: 142, revealStroke: 62 });
+      setHeroLine('title', 'School Day Ended', true, { fontSize: 178, revealStroke: 78 });
 
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
