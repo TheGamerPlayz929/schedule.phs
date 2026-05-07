@@ -637,5 +637,135 @@
       "scheduleOverride": null,
       "updatedAt": 1778157829277
     }
+  },
+  {
+    "id": "movhwb3w-la8ti1r",
+    "ts": 1778158898492,
+    "action": "pre_publish",
+    "source": "jarvis",
+    "actor": {
+      "email": "thegamerp929@gmail.com",
+      "name": "TheGamer Playz",
+      "method": "session"
+    },
+    "ip": "173.230.137.77",
+    "sections": [
+      "announcements"
+    ],
+    "patchKeys": [
+      "announcements"
+    ],
+    "message": "Before Jarvis publish",
+    "settings": {
+      "version": 1,
+      "branding": {
+        "siteTitle": "PHS Schedule",
+        "siteDescription": "PHS Schedule",
+        "logoSrc": "phs-logo.png",
+        "logoAlt": "PHS Logo",
+        "logoLink": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/",
+        "favicon": "Icons8-Windows-8-Animals-Falcon.ico"
+      },
+      "nav": {
+        "items": [
+          {
+            "label": "Announcements",
+            "href": "announcements.html"
+          },
+          {
+            "label": "Schedule",
+            "href": "index.html"
+          },
+          {
+            "label": "Grades",
+            "href": "gradeviewer.html"
+          }
+        ]
+      },
+      "hero": {
+        "schedulePageEyebrow": "Currently in",
+        "schedulePageStatusFallback": "Loading...",
+        "announcementsPageTitle": "Announcements",
+        "gradesPageTitle": "Grades"
+      },
+      "countdown": {
+        "minSuffix": "m",
+        "secondsAriaLabel": "seconds remaining"
+      },
+      "footer": {
+        "copyright": "© Jayaditya & Emir / Poolesville High School",
+        "feedbackUrl": "https://forms.gle/UrULj3gWiL9eqeif9",
+        "feedbackLabel": "Feedback Form",
+        "supportEmail": "For all inquiries, support, or removal requests, please contact us at emirbakir523@gmail.com or thegamerp929@gmail.com",
+        "gradesPageOnlyEmail": true
+      },
+      "grades": {
+        "iframeUrlLocal": "http://localhost:3001/login",
+        "iframeUrlProd": "https://schedulephs.web.app/login",
+        "pageTitle": "Grades - PHS"
+      },
+      "theme": {
+        "accent": "#8288d5",
+        "accent2": "#17173a",
+        "bg1": "#000000",
+        "bg2": "#101124",
+        "fg1": "#ffffff",
+        "fg2": "#a7abbf"
+      },
+      "appearance": {
+        "heroEyebrowSize": 56,
+        "heroTitleSize": 90,
+        "countdownSize": 58,
+        "scheduleTitleSize": 20,
+        "periodTimeSize": 13,
+        "periodNameSize": 15,
+        "periodDurationSize": 14,
+        "periodCardPadding": 16,
+        "periodCardRadius": 12,
+        "footerSize": 12,
+        "footerColor": "#a7abbf"
+      },
+      "announcements": {
+        "items": [
+          {
+            "title": "Certificate",
+            "bullets": [
+              "Certificate of Authenticity: The new website link is the one you are currently on."
+            ]
+          },
+          {
+            "title": "Welcome!",
+            "bullets": [
+              "Hello everyone!",
+              "This website was designed in response to the inconveniences students face with modern applications.",
+              "Working on importing GradeViewer™ for more ease of access."
+            ]
+          },
+          {
+            "title": "This is a test announcement!",
+            "bullets": [
+              "…"
+            ]
+          },
+          {
+            "title": "new update incoming!",
+            "bullets": []
+          }
+        ]
+      },
+      "privacy": {
+        "faqTitle": "Privacy & Safety FAQ",
+        "faqBody": "Your StudentVue credentials are sent directly from your browser to your school district's servers. They are never stored or logged on this site."
+      },
+      "bellSchedules": {},
+      "gradeMelon": {
+        "privacyButtonLabel": "Privacy & Safety FAQ",
+        "privacyTitle": "Privacy & Safety FAQ",
+        "privacyDoneLabel": "Done",
+        "privacyParagraphs": []
+      },
+      "scheduleOverride": null,
+      "updatedAt": 1778158683753
+    }
   }
 ]
