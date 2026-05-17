@@ -19,13 +19,15 @@ let _timeOffsetSeconds = 0; // added to real time
 let _devScheduleType = null;
 
 /* --- Schedule override (set by admin panel, synced from backend) --- */
-let _scheduleOverride = null; // { type: string, timestamp: number } | null
+let _scheduleOverride = null; // { type: string, timestamp: number, date: string } | null
 let _clockTimerId = null;
 let _clockTickMs = 0;
 
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
-const OVERRIDE_FETCH_TIMEOUT_MS = 1500;
+const OVERRIDE_FETCH_TIMEOUT_MS = 5000;
+const OVERRIDE_POLL_INTERVAL_MS = 5000;
+const OVERRIDE_CACHE_FALLBACK_TTL_MS = OVERRIDE_POLL_INTERVAL_MS;
 const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
 const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const GRADEVIEWER_DEFAULT_LOCAL_URL = 'http://localhost:3001/login';
@@ -69,7 +71,7 @@ const _gradesSavedTransforms = [];
 
 async function _pollScheduleOverride() {
   if (_IS_ADMIN_PREVIEW && window.__SITE_SETTINGS__) {
-    _scheduleOverride = window.__SITE_SETTINGS__.scheduleOverride || null;
+    _scheduleOverride = _normalizeScheduleOverride(window.__SITE_SETTINGS__.scheduleOverride || null);
     return;
   }
   const previousOverride = JSON.stringify(_scheduleOverride);
@@ -82,16 +84,14 @@ async function _pollScheduleOverride() {
     });
     clearTimeout(timeout);
     const json = await res.json();
-    _scheduleOverride = json.override || null;
+    _scheduleOverride = _normalizeScheduleOverride(json.override || null);
     if (_scheduleOverride) {
-      localStorage.setItem('phs_schedule_override', JSON.stringify(_scheduleOverride));
+      localStorage.setItem('phs_schedule_override', JSON.stringify({ ..._scheduleOverride, fetchedAt: Date.now() }));
     } else {
       localStorage.removeItem('phs_schedule_override');
     }
   } catch (e) {
-    // Fallback to localStorage when offline
-    const stored = localStorage.getItem('phs_schedule_override');
-    _scheduleOverride = stored ? JSON.parse(stored) : null;
+    _scheduleOverride = _readStoredScheduleOverride();
   }
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
@@ -106,22 +106,57 @@ function _getOverrideData(targetType) {
   return null;
 }
 
-function _todayISODate() {
-  const d = new Date();
+function _dateToISODate(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
+function _todayISODate() {
+  return _dateToISODate(new Date());
+}
+
+function _timestampToISODate(timestamp) {
+  const value = Number(timestamp);
+  return Number.isFinite(value) ? _dateToISODate(new Date(value)) : '';
+}
+
 function _overrideAppliesToday(override) {
-  return !override?.date || override.date === _todayISODate();
+  if (!override || !override.type) return false;
+  const today = _todayISODate();
+  if (override.date) return String(override.date) === today;
+  if (override.timestamp) return _timestampToISODate(override.timestamp) === today;
+  return false;
+}
+
+function _normalizeScheduleOverride(override) {
+  return _overrideAppliesToday(override) ? override : null;
+}
+
+function _readStoredScheduleOverride() {
+  try {
+    const stored = localStorage.getItem('phs_schedule_override');
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    const fetchedAt = Number(parsed?.fetchedAt || 0);
+    if (!Number.isFinite(fetchedAt) || Date.now() - fetchedAt > OVERRIDE_CACHE_FALLBACK_TTL_MS) {
+      localStorage.removeItem('phs_schedule_override');
+      return null;
+    }
+    delete parsed.fetchedAt;
+    return _normalizeScheduleOverride(parsed);
+  } catch {
+    localStorage.removeItem('phs_schedule_override');
+    return null;
+  }
 }
 
 function _applySettingsScheduleOverride(settings) {
   if (!settings || typeof settings !== 'object') return;
   const previousOverride = JSON.stringify(_scheduleOverride);
-  _scheduleOverride = settings.scheduleOverride || null;
+  _scheduleOverride = _normalizeScheduleOverride(settings.scheduleOverride || null);
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
@@ -133,8 +168,47 @@ function _clockSeconds(date = new Date()) {
   return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
 }
 
+function _scheduleKeyForDate(date) {
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function _isWeekendDate(date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function _startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function _getScheduleDataForDate(date) {
+  const key = _scheduleKeyForDate(date);
+  if (key in data) return data[key];
+  return _isWeekendDate(date) ? ['No School', {}] : data.base;
+}
+
 function _isNonInstructionalSchedule(type) {
   return /\b(no school|holiday|closure|closed)\b/i.test(String(type || ''));
+}
+
+function _nextInstructionalDate(from = new Date()) {
+  if (!data) return null;
+  const cursor = _startOfDay(from);
+  for (let i = 1; i <= 30; i += 1) {
+    cursor.setDate(cursor.getDate() + 1);
+    const arr = _getScheduleDataForDate(cursor);
+    if (arr && !_isNonInstructionalSchedule(arr[0])) return new Date(cursor);
+  }
+  return null;
+}
+
+function _getNextSchoolDayLabel(from = new Date()) {
+  const next = _nextInstructionalDate(from);
+  if (!next) return 'See you next school day';
+  const diffDays = Math.round((_startOfDay(next) - _startOfDay(from)) / 86400000);
+  if (diffDays === 1) return 'See you tomorrow';
+  const weekday = next.toLocaleDateString(undefined, { weekday: 'long' });
+  return weekday ? `See you ${weekday}` : 'See you next school day';
 }
 
 function _resetTimerState() {
@@ -233,6 +307,16 @@ async function _localGradeMelonAvailable() {
 function _urlsEqual(a, b) {
   try { return new URL(a, location.href).href === new URL(b, location.href).href; }
   catch { return a === b; }
+}
+
+function _safeFrameUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim(), location.href);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    return url.href;
+  } catch {
+    return '';
+  }
 }
 
 function _navHrefKind(href) {
@@ -410,8 +494,9 @@ async function _applyGradesFrameUrl(settings) {
   const token = ++_gradesFrameApplyToken;
   const localUrl = settings?.grades?.iframeUrlLocal || (_isLocalhost() ? GRADEVIEWER_DEFAULT_LOCAL_URL : '');
   const prodUrl = settings?.grades?.iframeUrlProd || GRADEVIEWER_DEFAULT_PROD_URL;
-  let url = _isLocalhost() ? localUrl : prodUrl;
+  let url = _safeFrameUrl(_isLocalhost() ? localUrl : prodUrl);
   if (_isLocalhost() && (!localUrl || !(await _localGradeMelonAvailable()))) url = prodUrl;
+  url = _safeFrameUrl(url);
   if (token !== _gradesFrameApplyToken || _gradesFrameUrlLocked) return;
   if (url && !_urlsEqual(_gradesFrame.src, url)) {
     _gradesFrame.src = url;
@@ -446,8 +531,8 @@ function _isAllowedGradesOrigin(origin) {
   } catch {}
   const settings = window.__SITE_SETTINGS__ || {};
   const list = [
-    settings?.grades?.iframeUrlLocal,
-    settings?.grades?.iframeUrlProd,
+    _safeFrameUrl(settings?.grades?.iframeUrlLocal),
+    _safeFrameUrl(settings?.grades?.iframeUrlProd),
     GRADEVIEWER_DEFAULT_LOCAL_URL,
     'http://localhost:3001',
     'http://127.0.0.1:3001',
@@ -946,7 +1031,7 @@ async function main() {
     }
 
     try {
-      const response = await fetch('data.json');
+      const response = await fetch('data.json', { cache: 'no-store' });
       const freshData = await response.json();
       if (freshData && typeof freshData === 'object') {
         data = freshData;
@@ -961,7 +1046,7 @@ async function main() {
     await _pollScheduleOverride();
     _overrideInterval = setInterval(() => {
       if (!_IS_ADMIN_PREVIEW && document.visibilityState === 'visible') _pollScheduleOverride();
-    }, 30000); // re-check every 30 s while visible
+    }, OVERRIDE_POLL_INTERVAL_MS);
     updateAll();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
@@ -989,11 +1074,9 @@ const proccessTime = function (time) {
 function calculateGoal() {
   if (!data) return;
   const date = new Date();
-  let str = `${date.getMonth() + 1}/${date.getDate()}`;
   let val = _clockSeconds(date);
-  if (!(str in data)) { str = "base"; }
 
-  let arr = data[str];
+  let arr = _getScheduleDataForDate(date);
   const effectiveOverride = _devScheduleType
     ? { type: _devScheduleType }
     : (_scheduleOverride && _scheduleOverride.type && _overrideAppliesToday(_scheduleOverride) ? _scheduleOverride : null);
@@ -1132,7 +1215,7 @@ function updateAll() {
 
       _statusPill.style.display = "inline-flex";
       _statusPill.dataset.status = "off";
-      _statusLabel.textContent = "See you tomorrow";
+      _statusLabel.textContent = _getNextSchoolDayLabel(date);
     } else if (isBeforeSchool) {
       setHeroLine('eyebrow', 'Starts in', true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', '', false);
