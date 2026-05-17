@@ -11,7 +11,7 @@
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const CACHE_KEY = 'phs:site-settings:v2';
   const LAST_GOOD_KEY = 'phs:site-settings:last-good:v2';
-  const CACHE_TTL_MS = 30 * 1000;
+  const CACHE_TTL_MS = 5 * 1000;
   const isPreviewIframe = (() => {
     try { return new URLSearchParams(location.search).has('_preview'); }
     catch { return false; }
@@ -31,8 +31,29 @@
     try { sessionStorage.setItem(CACHE_KEY, payload); } catch {}
     try { localStorage.setItem(LAST_GOOD_KEY, payload); } catch {}
   }
+  function withoutCachedScheduleOverride(settings) {
+    if (!settings || typeof settings !== 'object' || !settings.scheduleOverride) return settings;
+    return { ...settings, scheduleOverride: null };
+  }
   function pickPath(obj, dotted) {
     return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+  }
+  function safeUrl(value, options = {}) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    try {
+      const url = new URL(raw, location.href);
+      const isHttp = url.protocol === 'http:' || url.protocol === 'https:';
+      const isMail = options.allowMailto && url.protocol === 'mailto:';
+      if (!isHttp && !isMail) return null;
+      return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw) || raw.startsWith('//') ? url.href : raw;
+    } catch {
+      return null;
+    }
+  }
+  function safeHex(value) {
+    const raw = String(value || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toUpperCase() : null;
   }
 
   function applyBindings(settings) {
@@ -43,8 +64,8 @@
       const val = pickPath(settings, key);
       if (val == null) return;
       const mode = el.getAttribute('data-bind-attr');
-      if (mode === 'href')   { el.setAttribute('href', String(val)); return; }
-      if (mode === 'src')    { el.setAttribute('src',  String(val)); return; }
+      if (mode === 'href')   { const safe = safeUrl(val, { allowMailto: true }); if (safe) el.setAttribute('href', safe); return; }
+      if (mode === 'src')    { const safe = safeUrl(val); if (safe) el.setAttribute('src', safe); return; }
       if (mode === 'alt')    { el.setAttribute('alt',  String(val)); return; }
       if (mode === 'title')  { el.setAttribute('title',String(val)); return; }
       if (mode === 'mailto') {
@@ -61,16 +82,22 @@
     // Theme: write CSS custom properties so existing styles can react.
     const theme = settings.theme || {};
     const root = document.documentElement;
-    if (theme.accent)  root.style.setProperty('--accent', theme.accent);
-    if (theme.accent2) root.style.setProperty('--accent-2', theme.accent2);
-    if (theme.bg1) {
-      root.style.setProperty('--bg-1', theme.bg1);
-      root.style.setProperty('--bg-base', theme.bg1);
-      root.style.setProperty('--user-bg-base', theme.bg1);
+    const accent = safeHex(theme.accent);
+    const accent2 = safeHex(theme.accent2);
+    const bg1 = safeHex(theme.bg1);
+    const bg2 = safeHex(theme.bg2);
+    const fg1 = safeHex(theme.fg1);
+    const fg2 = safeHex(theme.fg2);
+    if (accent)  root.style.setProperty('--accent', accent);
+    if (accent2) root.style.setProperty('--accent-2', accent2);
+    if (bg1) {
+      root.style.setProperty('--bg-1', bg1);
+      root.style.setProperty('--bg-base', bg1);
+      root.style.setProperty('--user-bg-base', bg1);
     }
-    if (theme.bg2)     root.style.setProperty('--bg-2', theme.bg2);
-    if (theme.fg1)     root.style.setProperty('--fg-1', theme.fg1);
-    if (theme.fg2)     root.style.setProperty('--fg-2', theme.fg2);
+    if (bg2) root.style.setProperty('--bg-2', bg2);
+    if (fg1) root.style.setProperty('--fg-1', fg1);
+    if (fg2) root.style.setProperty('--fg-2', fg2);
 
     const appearance = settings.appearance || {};
     const pxVars = {
@@ -89,10 +116,14 @@
       const n = Number(appearance[key]);
       if (Number.isFinite(n)) root.style.setProperty(cssVar, `${n}px`);
     }
-    if (appearance.footerColor) root.style.setProperty('--footer-color', appearance.footerColor);
+    const footerColor = safeHex(appearance.footerColor);
+    if (footerColor) root.style.setProperty('--footer-color', footerColor);
 
     const fav = document.querySelector('link[rel="icon"]');
-    if (fav && settings.branding?.favicon) fav.setAttribute('href', settings.branding.favicon);
+    if (fav && settings.branding?.favicon) {
+      const safe = safeUrl(settings.branding.favicon);
+      if (safe) fav.setAttribute('href', safe);
+    }
 
     document.dispatchEvent(new CustomEvent('site-settings:applied', { detail: settings }));
     document.documentElement.classList.remove('settings-loading');
@@ -100,7 +131,7 @@
 
   function fetchAndApply() {
     if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
-    return fetch(BACKEND + '/site-settings', { credentials: 'omit' })
+    return fetch(BACKEND + '/site-settings', { credentials: 'omit', cache: 'no-store' })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
       .then(s => { writeCache(s); applyBindings(s); return s; })
       .catch(err => {
@@ -112,9 +143,9 @@
       });
   }
 
-  // Apply the last known good settings immediately so backend wake-up never flashes stale hard-coded copy.
+  // Apply cached copy/theme settings immediately, but never replay a cached schedule override.
   const cached = readCache();
-  if (cached.settings && !isPreviewIframe) applyBindings(cached.settings);
+  if (cached.settings && !isPreviewIframe) applyBindings(withoutCachedScheduleOverride(cached.settings));
 
   fetchAndApply();
 

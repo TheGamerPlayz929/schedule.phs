@@ -174,11 +174,11 @@
   </footer>
 </div>
 
-<script src="settings-loader.js?v=20260506-island1"></script>
+<script src="settings-loader.js?v=20260517-schedfix1"></script>
 <script src="nav-renderer.js?v=20260506-island1"></script>
 <script src="privacy-analytics.js?v=20260506-island1"></script>
 <script src="google-analytics.js?v=20260506-island1"></script>
-<script src="main.js?v=20260506-tabs3"></script>
+<script src="main.js?v=20260517-schedfix1"></script>
 <script>
   /* ── Iframe sizing ── */
   const scaler = document.getElementById('grades-scaler');
@@ -205,6 +205,15 @@
     try { return new URL(a, location.href).href === new URL(b, location.href).href; }
     catch { return a === b; }
   }
+  function safeFrameUrl(value) {
+    try {
+      const url = new URL(String(value || '').trim(), location.href);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+      return url.href;
+    } catch {
+      return '';
+    }
+  }
   const defaultLocalUrl = 'http://localhost:3001/login';
 
   // Lock the URL once we've successfully set it — periodic settings refresh
@@ -216,8 +225,9 @@
     const myToken = ++applyToken;
     const localUrl = settings?.grades?.iframeUrlLocal || (isLocal ? defaultLocalUrl : '');
     const prodUrl  = settings?.grades?.iframeUrlProd || 'https://schedulephs.web.app/login';
-    let url = isLocal ? localUrl : prodUrl;
+    let url = safeFrameUrl(isLocal ? localUrl : prodUrl);
     if (isLocal && (!localUrl || !(await localGradeMelonAvailable()))) url = prodUrl;
+    url = safeFrameUrl(url);
     if (myToken !== applyToken) return; // a newer call superseded us
     if (frameUrlLocked) return;
     if (url && !urlsEqual(frame.src, url)) {
@@ -268,7 +278,7 @@
       if (origin === new URL(frame.src, location.href).origin) return true;
     } catch {}
     const s = window.__SITE_SETTINGS__ || {};
-    const list = [s?.grades?.iframeUrlLocal, s?.grades?.iframeUrlProd, defaultLocalUrl, 'http://localhost:3001', 'http://127.0.0.1:3001', 'https://schedulephs.web.app'];
+    const list = [safeFrameUrl(s?.grades?.iframeUrlLocal), safeFrameUrl(s?.grades?.iframeUrlProd), defaultLocalUrl, 'http://localhost:3001', 'http://127.0.0.1:3001', 'https://schedulephs.web.app'];
     return list.some(u => { try { return u && new URL(u).origin === origin; } catch { return false; } });
   }
 
