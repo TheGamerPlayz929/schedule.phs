@@ -147,6 +147,15 @@
     const current = window.__SITE_SETTINGS__;
     if (!current) return backendSettings;
 
+    const currentVersion = Number(current.version || 0);
+    const backendVersion = Number(backendSettings.version || 0);
+    if (currentVersion && backendVersion && backendVersion < currentVersion) {
+      if (backendSettings.scheduleOverride) {
+        return { ...current, scheduleOverride: backendSettings.scheduleOverride };
+      }
+      return null;
+    }
+
     const currentUpdated = Number(current.updatedAt || 0);
     const backendUpdated = Number(backendSettings.updatedAt || 0);
     if (!currentUpdated || !backendUpdated || backendUpdated >= currentUpdated) return backendSettings;
