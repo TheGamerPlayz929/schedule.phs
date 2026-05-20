@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "start": "node local-server.js"
+    "start": "node local-server.js",
+    "sync:public-settings": "node scripts/sync-public-settings.js"
   },
   "dependencies": {
     "express": "^4.19.2"

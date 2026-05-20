@@ -27,7 +27,7 @@ const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
 const OVERRIDE_FETCH_TIMEOUT_MS = 5000;
 const OVERRIDE_POLL_INTERVAL_MS = 5000;
-const OVERRIDE_CACHE_FALLBACK_TTL_MS = OVERRIDE_POLL_INTERVAL_MS;
+const OVERRIDE_CACHE_FALLBACK_TTL_MS = 24 * 60 * 60 * 1000;
 const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
 const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const GRADEVIEWER_DEFAULT_LOCAL_URL = 'http://localhost:3001/login';
@@ -86,12 +86,12 @@ async function _pollScheduleOverride() {
     const json = await res.json();
     _scheduleOverride = _normalizeScheduleOverride(json.override || null);
     if (_scheduleOverride) {
-      localStorage.setItem('phs_schedule_override', JSON.stringify({ ..._scheduleOverride, fetchedAt: Date.now() }));
+      _writeStoredScheduleOverride(_scheduleOverride);
     } else {
       localStorage.removeItem('phs_schedule_override');
     }
   } catch (e) {
-    _scheduleOverride = _readStoredScheduleOverride();
+    _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
   }
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
@@ -135,6 +135,16 @@ function _normalizeScheduleOverride(override) {
   return _overrideAppliesToday(override) ? override : null;
 }
 
+function _writeStoredScheduleOverride(override) {
+  try {
+    localStorage.setItem('phs_schedule_override', JSON.stringify({ ...override, fetchedAt: Date.now() }));
+  } catch {}
+}
+
+function _readSettingsScheduleOverride() {
+  return _normalizeScheduleOverride(window.__SITE_SETTINGS__?.scheduleOverride || null);
+}
+
 function _readStoredScheduleOverride() {
   try {
     const stored = localStorage.getItem('phs_schedule_override');
@@ -157,6 +167,7 @@ function _applySettingsScheduleOverride(settings) {
   if (!settings || typeof settings !== 'object') return;
   const previousOverride = JSON.stringify(_scheduleOverride);
   _scheduleOverride = _normalizeScheduleOverride(settings.scheduleOverride || null);
+  if (_scheduleOverride) _writeStoredScheduleOverride(_scheduleOverride);
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
@@ -1043,7 +1054,9 @@ async function main() {
     }
 
     _initAdminPanel();
-    await _pollScheduleOverride();
+    _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
+    updateAll();
+    _pollScheduleOverride();
     _overrideInterval = setInterval(() => {
       if (!_IS_ADMIN_PREVIEW && document.visibilityState === 'visible') _pollScheduleOverride();
     }, OVERRIDE_POLL_INTERVAL_MS);
@@ -1306,11 +1319,19 @@ function renderPeriodList(currentSeconds) {
     const li = document.createElement('li');
     li.className = 'period-card ' + stateClass;
 
-    li.innerHTML = `
-      <div class="period-time">${p.timeStr}</div>
-      <div class="period-name">${p.name}</div>
-      <div class="period-meta">${durationMin} min</div>
-    `;
+    const time = document.createElement('div');
+    time.className = 'period-time';
+    time.textContent = p.timeStr;
+
+    const name = document.createElement('div');
+    name.className = 'period-name';
+    name.textContent = p.name;
+
+    const meta = document.createElement('div');
+    meta.className = 'period-meta';
+    meta.textContent = `${durationMin} min`;
+
+    li.append(time, name, meta);
 
     _periodList.appendChild(li);
   }

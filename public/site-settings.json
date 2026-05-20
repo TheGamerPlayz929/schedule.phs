@@ -1,0 +1,205 @@
+{
+  "version": 2,
+  "branding": {
+    "siteTitle": "PHS Schedule",
+    "siteDescription": "Beautiful Shader Experiences - PHS Schedule",
+    "logoSrc": "phs-logo.png",
+    "logoAlt": "PHS Logo",
+    "logoLink": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/",
+    "favicon": "Icons8-Windows-8-Animals-Falcon.ico"
+  },
+  "nav": {
+    "items": [
+      {
+        "label": "Announcements",
+        "href": "announcements.html"
+      },
+      {
+        "label": "Schedule",
+        "href": "index.html"
+      },
+      {
+        "label": "Grades",
+        "href": "gradeviewer.html"
+      }
+    ]
+  },
+  "hero": {
+    "schedulePageEyebrow": "Currently in",
+    "schedulePageStatusFallback": "Loading...",
+    "announcementsPageTitle": "Announcements",
+    "gradesPageTitle": "Grades"
+  },
+  "countdown": {
+    "minSuffix": "m",
+    "secondsAriaLabel": "seconds remaining"
+  },
+  "footer": {
+    "copyright": "© Jayaditya & Emir / Poolesville High School",
+    "feedbackUrl": "https://forms.gle/UrULj3gWiL9eqeif9",
+    "feedbackLabel": "Feedback Form",
+    "supportEmail": "supportphss@gmail.com",
+    "gradesPageOnlyEmail": true
+  },
+  "grades": {
+    "iframeUrlLocal": "http://localhost:3001/login",
+    "iframeUrlProd": "https://schedulephs.web.app/login",
+    "pageTitle": "Grades - PHS"
+  },
+  "theme": {
+    "accent": "#a855f7",
+    "accent2": "#7c3aed",
+    "bg1": "#0b0814",
+    "bg2": "#150b29",
+    "fg1": "#ffffff",
+    "fg2": "#a0a0b0"
+  },
+  "announcements": {
+    "items": [
+      {
+        "title": "Certificate",
+        "bullets": [
+          "Certificate of Authenticity: The new website link is the one you are currently on."
+        ]
+      },
+      {
+        "title": "Welcome!",
+        "bullets": [
+          "Hello everyone!",
+          "This website was designed in response to the inconveniences students face with modern applications.",
+          "Working on importing GradeViewer™ for more ease of access."
+        ]
+      }
+    ]
+  },
+  "bellSchedules": {
+    "Normal Schedule": {
+      "27900": [
+        30900,
+        "Period 1"
+      ],
+      "31200": [
+        33900,
+        "Period 2"
+      ],
+      "34200": [
+        36900,
+        "Period 3"
+      ],
+      "37200": [
+        39900,
+        "Period 4"
+      ],
+      "39900": [
+        43200,
+        "Lunch"
+      ],
+      "43500": [
+        46200,
+        "Period 5"
+      ],
+      "46500": [
+        49200,
+        "Period 6"
+      ],
+      "49500": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    },
+    "Advisory": {
+      "27900": [
+        30600,
+        "Period 1"
+      ],
+      "30900": [
+        33300,
+        "Period 2"
+      ],
+      "33600": [
+        36000,
+        "Homeroom"
+      ],
+      "36300": [
+        38700,
+        "Period 3"
+      ],
+      "39000": [
+        41400,
+        "Period 4"
+      ],
+      "41400": [
+        44100,
+        "Lunch"
+      ],
+      "44400": [
+        46800,
+        "Period 5"
+      ],
+      "47100": [
+        49500,
+        "Period 6"
+      ],
+      "49800": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    },
+    "Early Release": {
+      "27900": [
+        29700,
+        "Period 1"
+      ],
+      "30000": [
+        31620,
+        "Period 2"
+      ],
+      "31920": [
+        33540,
+        "Period 3"
+      ],
+      "33840": [
+        35460,
+        "Period 4"
+      ],
+      "35760": [
+        37380,
+        "Period 5"
+      ],
+      "37680": [
+        39300,
+        "Period 6"
+      ],
+      "39600": [
+        41220,
+        "Period 7"
+      ],
+      "41220": [
+        43080,
+        "Lunch"
+      ]
+    }
+  },
+  "gradeMelon": {
+    "privacyTitle": "Privacy & Safety FAQ",
+    "privacyParagraphs": [
+      "GradeViewer is limited to Montgomery County Public Schools. It uses your StudentVUE username and password only to request your own StudentVUE data.",
+      "Your password is not intentionally stored on our server. If you turn on Remember me, your username and an encrypted password token are kept in your browser cookies for up to 7 days or until logout.",
+      "Grades, attendance, schedule, documents, and basic student info are loaded into the browser so the dashboard can display them. They are not intentionally saved to a GradeViewer database.",
+      "The StudentVUE library may use a proxy service to reach Synergy. That means login requests and StudentVUE responses can pass through that service before reaching your browser.",
+      "Use this only with your own account. For privacy questions or removal requests, email supportphss@gmail.com."
+    ],
+    "privacyDoneLabel": "Done",
+    "privacyButtonLabel": "Privacy & Safety FAQ"
+  },
+  "scheduleOverride": null,
+  "updatedAt": 1779029975994
+}

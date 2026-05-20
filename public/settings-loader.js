@@ -9,9 +9,11 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260520-publicsettings1';
   const CACHE_KEY = 'phs:site-settings:v2';
   const LAST_GOOD_KEY = 'phs:site-settings:last-good:v2';
   const CACHE_TTL_MS = 5 * 1000;
+  const SETTINGS_FETCH_TIMEOUT_MS = 4500;
   const isPreviewIframe = (() => {
     try { return new URLSearchParams(location.search).has('_preview'); }
     catch { return false; }
@@ -31,10 +33,6 @@
     try { sessionStorage.setItem(CACHE_KEY, payload); } catch {}
     try { localStorage.setItem(LAST_GOOD_KEY, payload); } catch {}
   }
-  function withoutCachedScheduleOverride(settings) {
-    if (!settings || typeof settings !== 'object' || !settings.scheduleOverride) return settings;
-    return { ...settings, scheduleOverride: null };
-  }
   function pickPath(obj, dotted) {
     return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
   }
@@ -53,7 +51,10 @@
   }
   function safeHex(value) {
     const raw = String(value || '').trim();
-    return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toUpperCase() : null;
+    if (/^#[0-9a-f]{3}$/i.test(raw)) {
+      return '#' + raw.slice(1).split('').map(ch => ch + ch).join('').toUpperCase();
+    }
+    return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw) ? raw.toUpperCase() : null;
   }
 
   function applyBindings(settings) {
@@ -129,23 +130,66 @@
     document.documentElement.classList.remove('settings-loading');
   }
 
-  function fetchAndApply() {
-    if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
-    return fetch(BACKEND + '/site-settings', { credentials: 'omit', cache: 'no-store' })
+  function fetchJson(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SETTINGS_FETCH_TIMEOUT_MS);
+    return fetch(url, {
+      credentials: 'omit',
+      cache: 'no-store',
+      signal: controller.signal
+    })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-      .then(s => { writeCache(s); applyBindings(s); return s; })
-      .catch(err => {
-        console.warn('[settings] fetch failed:', err);
-        if (!window.__SITE_SETTINGS__) {
-          document.documentElement.classList.remove('settings-loading');
-          document.dispatchEvent(new CustomEvent('site-settings:unavailable'));
-        }
-      });
+      .finally(() => clearTimeout(timeout));
   }
 
-  // Apply cached copy/theme settings immediately, but never replay a cached schedule override.
+  function chooseBackendSettings(backendSettings) {
+    if (!backendSettings || typeof backendSettings !== 'object') return null;
+    const current = window.__SITE_SETTINGS__;
+    if (!current) return backendSettings;
+
+    const currentUpdated = Number(current.updatedAt || 0);
+    const backendUpdated = Number(backendSettings.updatedAt || 0);
+    if (!currentUpdated || !backendUpdated || backendUpdated >= currentUpdated) return backendSettings;
+
+    // Public frontend JSON owns durable UI copy/theme/footer state. If the backend
+    // has an older settings document but a live override, only layer that override.
+    if (backendSettings.scheduleOverride) {
+      return { ...current, scheduleOverride: backendSettings.scheduleOverride };
+    }
+    return null;
+  }
+
+  async function fetchAndApply() {
+    if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
+    try {
+      const publicSettings = await fetchJson(PUBLIC_SETTINGS_URL);
+      writeCache(publicSettings);
+      applyBindings(publicSettings);
+    } catch (err) {
+      console.warn('[settings] public fetch failed:', err);
+    }
+
+    try {
+      const backendSettings = await fetchJson(BACKEND + '/site-settings');
+      const nextSettings = chooseBackendSettings(backendSettings);
+      if (nextSettings) {
+        writeCache(nextSettings);
+        applyBindings(nextSettings);
+      }
+    } catch (err) {
+      console.warn('[settings] backend fetch failed:', err);
+    }
+
+    if (!window.__SITE_SETTINGS__) {
+      document.documentElement.classList.remove('settings-loading');
+      document.dispatchEvent(new CustomEvent('site-settings:unavailable'));
+    }
+    return window.__SITE_SETTINGS__;
+  }
+
+  // Apply cached public settings immediately; schedule overrides are still date-checked in main.js.
   const cached = readCache();
-  if (cached.settings && !isPreviewIframe) applyBindings(withoutCachedScheduleOverride(cached.settings));
+  if (cached.settings && !isPreviewIframe) applyBindings(cached.settings);
 
   fetchAndApply();
 
