@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 1,
   "branding": {
     "siteTitle": "PHS Schedule",
-    "siteDescription": "Beautiful Shader Experiences - PHS Schedule",
+    "siteDescription": "PHS Schedule",
     "logoSrc": "phs-logo.png",
     "logoAlt": "PHS Logo",
     "logoLink": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/",
@@ -25,7 +25,7 @@
     ]
   },
   "hero": {
-    "schedulePageEyebrow": "Currently in",
+    "schedulePageEyebrow": "We're in",
     "schedulePageStatusFallback": "Loading...",
     "announcementsPageTitle": "Announcements",
     "gradesPageTitle": "Grades"
@@ -38,7 +38,7 @@
     "copyright": "© Jayaditya & Emir / Poolesville High School",
     "feedbackUrl": "https://forms.gle/UrULj3gWiL9eqeif9",
     "feedbackLabel": "Feedback Form",
-    "supportEmail": "supportphss@gmail.com",
+    "supportEmail": "For all inquiries, support, or removal requests, please contact us at emirbakir523@gmail.com or jayalternateuser@gmail.com",
     "gradesPageOnlyEmail": true
   },
   "grades": {
@@ -47,12 +47,25 @@
     "pageTitle": "Grades - PHS"
   },
   "theme": {
-    "accent": "#a855f7",
-    "accent2": "#7c3aed",
-    "bg1": "#0b0814",
-    "bg2": "#150b29",
+    "accent": "#8288d5",
+    "accent2": "#17173a",
+    "bg1": "#000000",
+    "bg2": "#101124",
     "fg1": "#ffffff",
-    "fg2": "#a0a0b0"
+    "fg2": "#a7abbf"
+  },
+  "appearance": {
+    "heroEyebrowSize": 56,
+    "heroTitleSize": 90,
+    "countdownSize": 58,
+    "scheduleTitleSize": 20,
+    "periodTimeSize": 13,
+    "periodNameSize": 15,
+    "periodDurationSize": 14,
+    "periodCardPadding": 16,
+    "periodCardRadius": 12,
+    "footerSize": 12,
+    "footerColor": "#a7abbf"
   },
   "announcements": {
     "items": [
@@ -69,137 +82,34 @@
           "This website was designed in response to the inconveniences students face with modern applications.",
           "Working on importing GradeViewer™ for more ease of access."
         ]
+      },
+      {
+        "title": "This is a test announcement!",
+        "bullets": [
+          "…"
+        ]
+      },
+      {
+        "title": "new update incoming!",
+        "bullets": []
       }
     ]
   },
-  "bellSchedules": {
-    "Normal Schedule": {
-      "27900": [
-        30900,
-        "Period 1"
-      ],
-      "31200": [
-        33900,
-        "Period 2"
-      ],
-      "34200": [
-        36900,
-        "Period 3"
-      ],
-      "37200": [
-        39900,
-        "Period 4"
-      ],
-      "39900": [
-        43200,
-        "Lunch"
-      ],
-      "43500": [
-        46200,
-        "Period 5"
-      ],
-      "46500": [
-        49200,
-        "Period 6"
-      ],
-      "49500": [
-        52200,
-        "Period 7"
-      ],
-      "52620": [
-        55500,
-        "Period 8"
-      ]
-    },
-    "Advisory": {
-      "27900": [
-        30600,
-        "Period 1"
-      ],
-      "30900": [
-        33300,
-        "Period 2"
-      ],
-      "33600": [
-        36000,
-        "Homeroom"
-      ],
-      "36300": [
-        38700,
-        "Period 3"
-      ],
-      "39000": [
-        41400,
-        "Period 4"
-      ],
-      "41400": [
-        44100,
-        "Lunch"
-      ],
-      "44400": [
-        46800,
-        "Period 5"
-      ],
-      "47100": [
-        49500,
-        "Period 6"
-      ],
-      "49800": [
-        52200,
-        "Period 7"
-      ],
-      "52620": [
-        55500,
-        "Period 8"
-      ]
-    },
-    "Early Release": {
-      "27900": [
-        29700,
-        "Period 1"
-      ],
-      "30000": [
-        31620,
-        "Period 2"
-      ],
-      "31920": [
-        33540,
-        "Period 3"
-      ],
-      "33840": [
-        35460,
-        "Period 4"
-      ],
-      "35760": [
-        37380,
-        "Period 5"
-      ],
-      "37680": [
-        39300,
-        "Period 6"
-      ],
-      "39600": [
-        41220,
-        "Period 7"
-      ],
-      "41220": [
-        43080,
-        "Lunch"
-      ]
-    }
+  "privacy": {
+    "faqTitle": "Privacy & Safety FAQ",
+    "faqBody": "Your StudentVue credentials are sent directly from your browser to your school district's servers. They are never stored or logged on this site."
   },
+  "bellSchedules": {},
   "gradeMelon": {
+    "privacyButtonLabel": "Privacy & Safety FAQ",
     "privacyTitle": "Privacy & Safety FAQ",
-    "privacyParagraphs": [
-      "GradeViewer is limited to Montgomery County Public Schools. It uses your StudentVUE username and password only to request your own StudentVUE data.",
-      "Your password is not intentionally stored on our server. If you turn on Remember me, your username and an encrypted password token are kept in your browser cookies for up to 7 days or until logout.",
-      "Grades, attendance, schedule, documents, and basic student info are loaded into the browser so the dashboard can display them. They are not intentionally saved to a GradeViewer database.",
-      "The StudentVUE library may use a proxy service to reach Synergy. That means login requests and StudentVUE responses can pass through that service before reaching your browser.",
-      "Use this only with your own account. For privacy questions or removal requests, email supportphss@gmail.com."
-    ],
     "privacyDoneLabel": "Done",
-    "privacyButtonLabel": "Privacy & Safety FAQ"
+    "privacyParagraphs": []
   },
-  "scheduleOverride": null,
-  "updatedAt": 1779029975994
+  "scheduleOverride": {
+    "type": "Advisory",
+    "date": "2026-05-21",
+    "timestamp": 1779365964410
+  },
+  "updatedAt": 1779365969567
 }

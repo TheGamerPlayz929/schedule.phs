@@ -9,10 +9,12 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260521-publicsettings2';
-  const CACHE_KEY = 'phs:site-settings:v4';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v4';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260521-publicsettings3';
+  const CACHE_KEY = 'phs:site-settings:v5';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v5';
   const OLD_CACHE_KEYS = [
+    'phs:site-settings:v4',
+    'phs:site-settings:last-good:v4',
     'phs:site-settings:v2',
     'phs:site-settings:last-good:v2',
     'phs:site-settings:schedule-only:v3',

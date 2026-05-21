@@ -168,7 +168,13 @@ function _applySettingsScheduleOverride(settings) {
   if (!settings || typeof settings !== 'object') return;
   if (!Object.prototype.hasOwnProperty.call(settings, 'scheduleOverride')) return;
   const previousOverride = JSON.stringify(_scheduleOverride);
-  _scheduleOverride = _normalizeScheduleOverride(settings.scheduleOverride || null);
+  const nextOverride = _normalizeScheduleOverride(settings.scheduleOverride || null);
+  if (!nextOverride && _scheduleOverride && _overrideAppliesToday(_scheduleOverride)) {
+    const settingsUpdatedAt = Number(settings.updatedAt || 0);
+    const activeTimestamp = Number(_scheduleOverride.timestamp || 0);
+    if (activeTimestamp && (!settingsUpdatedAt || settingsUpdatedAt < activeTimestamp)) return;
+  }
+  _scheduleOverride = nextOverride;
   if (_scheduleOverride) _writeStoredScheduleOverride(_scheduleOverride);
   else localStorage.removeItem('phs_schedule_override');
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
