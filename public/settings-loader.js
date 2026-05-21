@@ -9,9 +9,15 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260520-publicsettings1';
-  const CACHE_KEY = 'phs:site-settings:v2';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v2';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260521-publicsettings2';
+  const CACHE_KEY = 'phs:site-settings:v4';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v4';
+  const OLD_CACHE_KEYS = [
+    'phs:site-settings:v2',
+    'phs:site-settings:last-good:v2',
+    'phs:site-settings:schedule-only:v3',
+    'phs:site-settings:schedule-only:last-good:v3'
+  ];
   const CACHE_TTL_MS = 5 * 1000;
   const SETTINGS_FETCH_TIMEOUT_MS = 4500;
   const isPreviewIframe = (() => {
@@ -32,6 +38,12 @@
     const payload = JSON.stringify({ ts: Date.now(), settings: s });
     try { sessionStorage.setItem(CACHE_KEY, payload); } catch {}
     try { localStorage.setItem(LAST_GOOD_KEY, payload); } catch {}
+  }
+  function clearOldCaches() {
+    for (const key of OLD_CACHE_KEYS) {
+      try { sessionStorage.removeItem(key); } catch {}
+      try { localStorage.removeItem(key); } catch {}
+    }
   }
   function pickPath(obj, dotted) {
     return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
@@ -147,21 +159,10 @@
     const current = window.__SITE_SETTINGS__;
     if (!current) return backendSettings;
 
-    const currentVersion = Number(current.version || 0);
-    const backendVersion = Number(backendSettings.version || 0);
-    if (currentVersion && backendVersion && backendVersion < currentVersion) {
-      if (backendSettings.scheduleOverride) {
-        return { ...current, scheduleOverride: backendSettings.scheduleOverride };
-      }
-      return null;
-    }
-
     const currentUpdated = Number(current.updatedAt || 0);
     const backendUpdated = Number(backendSettings.updatedAt || 0);
     if (!currentUpdated || !backendUpdated || backendUpdated >= currentUpdated) return backendSettings;
 
-    // Public frontend JSON owns durable UI copy/theme/footer state. If the backend
-    // has an older settings document but a live override, only layer that override.
     if (backendSettings.scheduleOverride) {
       return { ...current, scheduleOverride: backendSettings.scheduleOverride };
     }
@@ -196,7 +197,9 @@
     return window.__SITE_SETTINGS__;
   }
 
-  // Apply cached public settings immediately; schedule overrides are still date-checked in main.js.
+  clearOldCaches();
+
+  // Apply cached public settings immediately; stale v2/v3 caches are deliberately ignored.
   const cached = readCache();
   if (cached.settings && !isPreviewIframe) applyBindings(cached.settings);
 

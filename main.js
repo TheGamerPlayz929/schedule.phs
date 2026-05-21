@@ -75,6 +75,7 @@ async function _pollScheduleOverride() {
     return;
   }
   const previousOverride = JSON.stringify(_scheduleOverride);
+  const settingsOverride = _readSettingsScheduleOverride();
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), OVERRIDE_FETCH_TIMEOUT_MS);
@@ -84,7 +85,7 @@ async function _pollScheduleOverride() {
     });
     clearTimeout(timeout);
     const json = await res.json();
-    _scheduleOverride = _normalizeScheduleOverride(json.override || null);
+    _scheduleOverride = _normalizeScheduleOverride(json.override || null) || settingsOverride;
     if (_scheduleOverride) {
       _writeStoredScheduleOverride(_scheduleOverride);
     } else {
@@ -165,9 +166,11 @@ function _readStoredScheduleOverride() {
 
 function _applySettingsScheduleOverride(settings) {
   if (!settings || typeof settings !== 'object') return;
+  if (!Object.prototype.hasOwnProperty.call(settings, 'scheduleOverride')) return;
   const previousOverride = JSON.stringify(_scheduleOverride);
   _scheduleOverride = _normalizeScheduleOverride(settings.scheduleOverride || null);
   if (_scheduleOverride) _writeStoredScheduleOverride(_scheduleOverride);
+  else localStorage.removeItem('phs_schedule_override');
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
@@ -465,7 +468,10 @@ function _escapeHtml(value) {
 function _renderAnnouncements(settings) {
   const list = document.getElementById('announcements-list');
   if (!list) return;
-  const items = settings?.announcements?.items || [];
+  const configured = settings?.announcements?.items;
+  const items = Array.isArray(configured) && configured.length
+    ? configured
+    : FALLBACK_ANNOUNCEMENTS.announcements.items;
   if (!items.length) {
     list.innerHTML = '<div class="announcements-empty">No announcements yet.</div>';
     return;
@@ -785,8 +791,8 @@ function updateHeroSignatureLayout() {
   const wrapper = document.querySelector('.hero-title-wrapper');
   if (!wrapper) return;
 
-  const hasEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-visible') || _signatureEyebrow?.dataset.pendingSignatureText);
-  const hasTitle = Boolean(_signatureTitle?.classList.contains('is-visible') || _signatureTitle?.dataset.pendingSignatureText);
+  const hasEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-complete'));
+  const hasTitle = Boolean(_signatureTitle?.classList.contains('is-complete'));
   const visibleCount = Number(hasEyebrow) + Number(hasTitle);
 
   wrapper.classList.toggle('signature-ready', visibleCount > 0);
@@ -807,7 +813,7 @@ function setHeroLine(line, text, visible, options = {}) {
   if (!stage) return;
   if (!visible) {
     delete stage.dataset.pendingSignatureText;
-    stage.classList.remove('is-visible');
+    stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
     if (isEyebrow) _lastSignedEyebrow = '';
     else _lastSignedTitle = '';
@@ -826,7 +832,7 @@ function setHeroLine(line, text, visible, options = {}) {
 
   signHeroText(stage, text, options).catch((error) => {
     console.warn('Signature renderer fallback:', error);
-    stage.classList.remove('is-visible');
+    stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
     updateHeroSignatureLayout();
   });
@@ -886,6 +892,7 @@ async function signHeroText(target, text, options = {}) {
   target.innerHTML = '';
   target.dataset.signatureText = phrase;
   delete target.dataset.pendingSignatureText;
+  target.classList.remove('is-complete');
   target.classList.add('is-visible');
   updateHeroSignatureLayout();
 
@@ -983,6 +990,8 @@ async function signHeroText(target, text, options = {}) {
   if (reduceMotion) {
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
+    target.classList.add('is-complete');
+    updateHeroSignatureLayout();
     return;
   }
 
@@ -1002,6 +1011,8 @@ async function signHeroText(target, text, options = {}) {
     } else {
       brush.setAttribute('width', String(viewW + brushWidth));
       glintGroup.style.opacity = '0';
+      target.classList.add('is-complete');
+      updateHeroSignatureLayout();
     }
   };
 
@@ -1010,6 +1021,8 @@ async function signHeroText(target, text, options = {}) {
     if (target.dataset.signatureText !== phrase) return;
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
+    target.classList.add('is-complete');
+    updateHeroSignatureLayout();
   }, totalDuration + 350);
 }
 
@@ -1115,48 +1128,59 @@ function calculateGoal() {
   if (_bs && _bs[scheduleType] && Object.keys(_bs[scheduleType]).length) {
     periods = _bs[scheduleType];
   }
-  let largestUnder = -1;
-  let largest = -1;
   myArray = [];
   isTimerInactive = false;
 
-  let schoolStart = 10000000;
-  for (let k in periods) {
-    let key = parseInt(k);
-    if (key < schoolStart) schoolStart = key;
-    myArray.push({
-      name: periods[key][1],
-      startSec: key,
-      endSec: periods[key][0],
-      timeStr: proccessTime(key) + " \u2192 " + proccessTime(periods[key][0])
-    });
-    if (key <= val && key > largestUnder) largestUnder = key;
-    if (key > largest) largest = key;
-  }
+  const periodEntries = Object.entries(periods || {})
+    .map(([start, value]) => ({
+      startSec: Number(start),
+      endSec: Number(value?.[0]),
+      name: String(value?.[1] || '')
+    }))
+    .filter(p => Number.isFinite(p.startSec) && Number.isFinite(p.endSec) && p.endSec > p.startSec)
+    .sort((a, b) => a.startSec - b.startSec);
+
+  myArray = periodEntries.map(p => ({
+    ...p,
+    timeStr: proccessTime(p.startSec) + " \u2192 " + proccessTime(p.endSec)
+  }));
 
   isBeforeSchool = false;
   isTransition = false;
 
-  if (largestUnder == -1) {
-    goal = schoolStart;
+  if (!periodEntries.length) {
+    _resetTimerState();
+    scheduleType = arr[0];
+    return;
+  }
+
+  const activePeriod = periodEntries.find(p => val >= p.startSec && val < p.endSec);
+  const nextPeriod = periodEntries.find(p => p.startSec > val);
+  const lastPeriod = periodEntries[periodEntries.length - 1];
+
+  if (val < periodEntries[0].startSec) {
+    goal = periodEntries[0].startSec;
     period = "Before School";
     periodStartTime = 0;
-    periodEndTime = schoolStart;
+    periodEndTime = periodEntries[0].startSec;
     isBeforeSchool = true;
-  } else if (periods[largestUnder][0] - val <= 0 && largestUnder != largest) {
-    for (let k in periods) {
-      let key = parseInt(k);
-      if (key > largestUnder) { goal = key; break; }
-    }
+  } else if (activePeriod) {
+    period = activePeriod.name;
+    goal = activePeriod.endSec;
+    periodStartTime = activePeriod.startSec;
+    periodEndTime = activePeriod.endSec;
+  } else if (nextPeriod) {
     period = "Transition";
-    periodStartTime = periods[largestUnder][0];
-    periodEndTime = goal;
+    goal = nextPeriod.startSec;
+    const previousPeriod = [...periodEntries].reverse().find(p => p.endSec <= val) || lastPeriod;
+    periodStartTime = previousPeriod.endSec;
+    periodEndTime = nextPeriod.startSec;
     isTransition = true;
   } else {
-    period = periods[largestUnder][1];
-    goal = periods[largestUnder][0];
-    periodStartTime = largestUnder;
-    periodEndTime = periods[largestUnder][0];
+    period = lastPeriod.name;
+    goal = lastPeriod.endSec;
+    periodStartTime = lastPeriod.startSec;
+    periodEndTime = lastPeriod.endSec;
   }
 }
 

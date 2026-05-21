@@ -54,7 +54,7 @@ function readSiteSettings() {
       ],
     },
     footer: {
-      supportEmail: "supportphss@gmail.com",
+      supportEmail: "For all inquiries, support, or removal requests, please contact us at emirbakir523@gmail.com or thegamerp929@gmail.com",
     },
     bellSchedules: {},
     scheduleOverride: null,

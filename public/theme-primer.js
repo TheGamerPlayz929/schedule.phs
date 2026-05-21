@@ -65,7 +65,7 @@
     }
   };
 
-  const cached = readJson('phs:site-settings:last-good:v2');
+  const cached = readJson('phs:site-settings:last-good:v4');
   applySettingsTheme(cached && cached.settings);
   applyAppearance(readJson('phs:appearance:v2'));
   root.classList.add('theme-primed');
