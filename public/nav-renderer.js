@@ -17,6 +17,18 @@
     return false;
   }
 
+  function safeNavHref(href) {
+    const raw = String(href || '').trim();
+    if (!raw) return null;
+    try {
+      const url = new URL(raw, location.href);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw) || raw.startsWith('//') ? url.href : raw;
+    } catch {
+      return null;
+    }
+  }
+
   function render(settings) {
     const wrap = document.getElementById('nav-links');
     if (!wrap) return;
@@ -25,8 +37,10 @@
     const items = Array.isArray(configured) && configured.length ? configured : DEFAULT_NAV_ITEMS;
     wrap.innerHTML = '';
     for (const it of items) {
+      const href = safeNavHref(it.href);
+      if (!href) continue;
       const a = document.createElement('a');
-      a.href = it.href;
+      a.href = href;
       a.className = 'nav-btn' + (pageMatches(it.href, page) ? ' active' : '');
       a.textContent = it.label;
       wrap.appendChild(a);
