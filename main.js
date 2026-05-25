@@ -27,11 +27,24 @@ const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
 const OVERRIDE_FETCH_TIMEOUT_MS = 5000;
 const OVERRIDE_POLL_INTERVAL_MS = 5000;
+const OVERRIDE_FAILURE_BACKOFF_MAX_MS = 60000;
 const OVERRIDE_CACHE_FALLBACK_TTL_MS = 24 * 60 * 60 * 1000;
 const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
 const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const SCHEDULE_DATA_FETCH_TIMEOUT_MS = 5000;
+const LUNCH_WEATHER_CACHE_KEY = 'phs:lunch-weather:v6';
+const LUNCH_WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
+const LUNCH_WEATHER_STALE_TTL_MS = 6 * 60 * 60 * 1000;
+const LUNCH_WEATHER_FETCH_TIMEOUT_MS = 2200;
+const LUNCH_WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=39.1459&longitude=-77.4169&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=2';
+const LUNCH_WEATHER_FALLBACK_START_SEC = 10 * 3600 + 20 * 60;
+const LUNCH_WEATHER_FALLBACK_END_SEC = 12 * 3600;
+const LUNCH_WEATHER_FORECAST_END_SEC = 14 * 3600 + 30 * 60;
+const LUNCH_WEATHER_MAX_HOURS = 5;
 const GRADEVIEWER_DEFAULT_LOCAL_URL = 'http://localhost:3001/login';
 const GRADEVIEWER_DEFAULT_PROD_URL = 'https://schedulephs.web.app/login';
+const OPENTYPE_SCRIPT_URL = 'vendor/opentype.min.js?v=20260524-perf1';
+const SIGNATURE_FONT_URL = 'assets/fonts/AlexBrush-Regular.ttf';
 const FALLBACK_ANNOUNCEMENTS = {
   announcements: {
     items: [
@@ -56,6 +69,19 @@ const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(loc
   : 'https://phs-grades-backend.onrender.com';
 const _IS_ADMIN_PREVIEW = new URLSearchParams(location.search).has('_preview');
 
+function _isScheduleEntry(entry) {
+  return Array.isArray(entry)
+    && typeof entry[0] === 'string'
+    && entry[1]
+    && typeof entry[1] === 'object'
+    && !Array.isArray(entry[1]);
+}
+
+function _isScheduleDataShape(nextData) {
+  if (!nextData || typeof nextData !== 'object' || !_isScheduleEntry(nextData.base)) return false;
+  return Object.values(nextData).every(_isScheduleEntry);
+}
+
 let _siteView = 'schedule';
 let _siteViewScroll = { announcements: 0, schedule: 0, grades: 0 };
 let _gradesFrame = null;
@@ -68,22 +94,44 @@ let _gradesIsFullscreen = false;
 let _gradesSavedFrameCss = '';
 let _gradesSavedScalerCss = '';
 const _gradesSavedTransforms = [];
+let _weatherCard = null;
+let _weatherAlert = null;
+let _weatherAlertIcon = null;
+let _weatherDetails = null;
+let _weatherTemp = null;
+let _weatherCondition = null;
+let _weatherSymbol = null;
+let _weatherHours = null;
+let _weatherMeta = null;
+let _weatherPayload = null;
+let _weatherLoading = false;
+let _weatherVisible = false;
+let _overrideFailureCount = 0;
+let _overrideRetryAt = 0;
+const _periodEntryCache = new WeakMap();
 
 async function _pollScheduleOverride() {
   if (_IS_ADMIN_PREVIEW && window.__SITE_SETTINGS__) {
     _scheduleOverride = _normalizeScheduleOverride(window.__SITE_SETTINGS__.scheduleOverride || null);
     return;
   }
+  if (_isLocalhost()) {
+    const previousOverride = JSON.stringify(_scheduleOverride);
+    _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
+    if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
+    return;
+  }
+  if (Date.now() < _overrideRetryAt) return;
   const previousOverride = JSON.stringify(_scheduleOverride);
   const settingsOverride = _readSettingsScheduleOverride();
+  let timeout = 0;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), OVERRIDE_FETCH_TIMEOUT_MS);
+    timeout = setTimeout(() => controller.abort(), OVERRIDE_FETCH_TIMEOUT_MS);
     const res = await fetch(`${_BACKEND_URL}/schedule-override`, {
       signal: controller.signal,
       cache: 'no-store'
     });
-    clearTimeout(timeout);
     const json = await res.json();
     _scheduleOverride = _normalizeScheduleOverride(json.override || null) || settingsOverride;
     if (_scheduleOverride) {
@@ -91,8 +139,15 @@ async function _pollScheduleOverride() {
     } else {
       localStorage.removeItem('phs_schedule_override');
     }
+    _overrideFailureCount = 0;
+    _overrideRetryAt = 0;
   } catch (e) {
+    _overrideFailureCount += 1;
+    const backoff = Math.min(OVERRIDE_FAILURE_BACKOFF_MAX_MS, OVERRIDE_POLL_INTERVAL_MS * (2 ** _overrideFailureCount));
+    _overrideRetryAt = Date.now() + backoff;
     _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
+  } finally {
+    clearTimeout(timeout);
   }
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
@@ -185,7 +240,11 @@ function _isLocalhost() {
 }
 
 function _clockSeconds(date = new Date()) {
-  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + 37 + _timeOffsetSeconds;
+  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds() + _timeOffsetSeconds;
+}
+
+function _effectiveClockDate(date = new Date()) {
+  return new Date(date.getTime() + _timeOffsetSeconds * 1000);
 }
 
 function _scheduleKeyForDate(date) {
@@ -205,6 +264,29 @@ function _getScheduleDataForDate(date) {
   const key = _scheduleKeyForDate(date);
   if (key in data) return data[key];
   return _isWeekendDate(date) ? ['No School', {}] : data.base;
+}
+
+function _getPeriodEntries(periods) {
+  if (!periods || typeof periods !== 'object') return [];
+  const cached = _periodEntryCache.get(periods);
+  if (cached) return cached;
+
+  const entries = Object.entries(periods)
+    .map(([start, value]) => {
+      const startSec = Number(start);
+      const endSec = Number(value?.[0]);
+      return {
+        startSec,
+        endSec,
+        name: String(value?.[1] || ''),
+        timeStr: proccessTime(startSec) + " \u2192 " + proccessTime(endSec)
+      };
+    })
+    .filter(p => Number.isFinite(p.startSec) && Number.isFinite(p.endSec) && p.endSec > p.startSec)
+    .sort((a, b) => a.startSec - b.startSec);
+
+  _periodEntryCache.set(periods, entries);
+  return entries;
 }
 
 function _isNonInstructionalSchedule(type) {
@@ -291,7 +373,7 @@ function _readScheduleDataCache() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') return null;
     if (Date.now() - Number(parsed.ts || 0) > SCHEDULE_DATA_CACHE_TTL_MS) return null;
-    return parsed.data;
+    return _isScheduleDataShape(parsed.data) ? parsed.data : null;
   } catch {
     return null;
   }
@@ -303,6 +385,412 @@ function _writeScheduleDataCache(nextData) {
     sessionStorage.setItem(SCHEDULE_DATA_CACHE_KEY, payload);
     localStorage.setItem(SCHEDULE_DATA_CACHE_KEY, payload);
   } catch {}
+}
+
+function _weatherLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function _lunchWeatherContext(referenceDate = _effectiveClockDate()) {
+  const { startSec, endSec } = _lunchWeatherWindowSeconds();
+  return {
+    localDate: _weatherLocalDateKey(referenceDate),
+    scheduleType: String(scheduleType || ''),
+    startSec,
+    endSec
+  };
+}
+
+function _readLunchWeatherCache(maxAgeMs = LUNCH_WEATHER_STALE_TTL_MS) {
+  try {
+    const raw = localStorage.getItem(LUNCH_WEATHER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const ageMs = Date.now() - Number(parsed?.ts || 0);
+    if (!parsed?.api || !Number.isFinite(ageMs) || ageMs > maxAgeMs) return null;
+    if (!_isLunchWeatherApiValid(parsed.api)) {
+      localStorage.removeItem(LUNCH_WEATHER_CACHE_KEY);
+      return null;
+    }
+    return parsed.api;
+  } catch {
+    return null;
+  }
+}
+
+function _writeLunchWeatherCache(api) {
+  try {
+    if (!_isLunchWeatherApiValid(api)) return;
+    localStorage.setItem(LUNCH_WEATHER_CACHE_KEY, JSON.stringify({ ts: Date.now(), api }));
+  } catch {}
+}
+
+function _hasWeatherArray(hourly, key, minLength) {
+  return Array.isArray(hourly?.[key]) && hourly[key].length >= minLength;
+}
+
+function _isLunchWeatherApiValid(api) {
+  const hourly = api?.hourly;
+  const times = hourly?.time;
+  if (!api || typeof api !== 'object' || !Array.isArray(times) || !times.length) return false;
+  return _hasWeatherArray(hourly, 'temperature_2m', times.length)
+    && _hasWeatherArray(hourly, 'apparent_temperature', times.length)
+    && _hasWeatherArray(hourly, 'precipitation_probability', times.length)
+    && _hasWeatherArray(hourly, 'weather_code', times.length)
+    && _hasWeatherArray(hourly, 'wind_speed_10m', times.length);
+}
+
+function _weatherKind(code, isDay = true) {
+  const value = Number(code);
+  if ([0].includes(value)) return 'clear';
+  if ([1, 2].includes(value)) return isDay ? 'partly' : 'cloudy';
+  if ([3].includes(value)) return 'cloudy';
+  if ([45, 48].includes(value)) return 'fog';
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(value)) return 'rain';
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return 'snow';
+  return 'cloudy';
+}
+
+function _weatherGlyph(code, isDay = true) {
+  const value = Number(code);
+  if (value === 0) return isDay ? '☀️' : '🌙';
+  if ([1, 2].includes(value)) return isDay ? '🌤️' : '☁️';
+  if (value === 3) return '☁️';
+  if ([45, 48].includes(value)) return '🌫️';
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return '🌧️';
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return '🌨️';
+  if ([95, 96, 99].includes(value)) return '⛈️';
+  return '☁️';
+}
+
+function _weatherLabel(code) {
+  const value = Number(code);
+  if (value === 0) return 'Clear';
+  if (value === 1) return 'Mostly Clear';
+  if (value === 2) return 'Partly Cloudy';
+  if (value === 3) return 'Cloudy';
+  if ([45, 48].includes(value)) return 'Fog';
+  if ([51, 53, 55, 56, 57].includes(value)) return 'Drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return 'Rain';
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return 'Snow';
+  if ([95, 96, 99].includes(value)) return 'Storms';
+  return 'Weather';
+}
+
+function _setWeatherSymbol(el, code, isDay = true) {
+  if (!el) return;
+  const isMini = el.classList.contains('weather-symbol--mini');
+  el.className = `weather-symbol${isMini ? ' weather-symbol--mini' : ''}`;
+  el.textContent = _weatherGlyph(code, isDay);
+  el.setAttribute('aria-label', _weatherLabel(code));
+}
+
+function _formatWeatherHour(iso, index) {
+  if (index === 0) return 'Now';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '--';
+  const hour24 = date.getHours();
+  const suffix = hour24 < 12 ? 'AM' : 'PM';
+  const hour = hour24 === 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24);
+  return `${hour}${suffix}`;
+}
+
+function _isWeatherDaylight(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return true;
+  const hour = date.getHours();
+  return hour >= 6 && hour < 20;
+}
+
+function _weatherDateAt(referenceDate, seconds) {
+  const date = new Date(referenceDate);
+  date.setHours(Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), 0, 0);
+  return date;
+}
+
+function _weatherNextHour(date) {
+  const next = new Date(date);
+  next.setMinutes(0, 0, 0);
+  next.setHours(next.getHours() + 1);
+  return next;
+}
+
+function _nearestWeatherHourIndex(times, targetMs, minMs, maxMs) {
+  let bestIndex = null;
+  let bestDiff = Infinity;
+  times.forEach((time, index) => {
+    const timeMs = new Date(time).getTime();
+    if (!Number.isFinite(timeMs) || timeMs < minMs || timeMs > maxMs) return;
+    const diff = Math.abs(timeMs - targetMs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function _schedulePeriodBounds(pattern) {
+  const entry = myArray.find(item => pattern.test(String(item.name || '')));
+  if (!entry) return null;
+  return {
+    startSec: Number(entry.startSec),
+    endSec: Number(entry.endSec)
+  };
+}
+
+function _lunchWeatherWindowSeconds() {
+  const period4Bounds = _schedulePeriodBounds(/^period\s*4$/i);
+  const lunchBounds = _schedulePeriodBounds(/\blunch\b/i);
+  const startSec = Number.isFinite(period4Bounds?.startSec)
+    ? period4Bounds.startSec
+    : Number.isFinite(lunchBounds?.startSec)
+      ? lunchBounds.startSec
+      : LUNCH_WEATHER_FALLBACK_START_SEC;
+  const endSec = Number.isFinite(lunchBounds?.endSec)
+    ? lunchBounds.endSec
+    : Number.isFinite(period4Bounds?.endSec)
+      ? period4Bounds.endSec
+      : LUNCH_WEATHER_FALLBACK_END_SEC;
+  return { startSec, endSec };
+}
+
+function _weatherHourlyNumber(hourly, key, index, fallback = 0) {
+  if (index === null || index === undefined) return Number(fallback);
+  return Number(hourly?.[key]?.[index] ?? fallback);
+}
+
+function _weatherHourFromSource(hourly, current, time, sourceIndex, label) {
+  return {
+    label,
+    temp: Math.round(_weatherHourlyNumber(hourly, 'temperature_2m', sourceIndex, current.temperature_2m ?? 0)),
+    code: Number(hourly.weather_code?.[sourceIndex] ?? current.weather_code ?? 3),
+    rainChance: Number(hourly.precipitation_probability?.[sourceIndex] ?? 0),
+    isDay: _isWeatherDaylight(time)
+  };
+}
+
+function _renderLunchWeatherDetails(payload) {
+  if (!_weatherDetails) return;
+  const details = payload
+    ? [
+        ['Feels', `${payload.feelsLike}°`],
+        ['Wind', `${payload.wind} mph`],
+        ['Rain', `${Math.round(Number(payload.rainChance || 0))}%`]
+      ]
+    : [
+        ['Feels', '--°'],
+        ['Wind', '-- mph'],
+        ['Rain', '--%']
+      ];
+  _weatherDetails.textContent = '';
+  for (const [labelText, valueText] of details) {
+    const item = document.createElement('span');
+    item.className = 'lunch-weather-detail';
+    const label = document.createElement('span');
+    label.textContent = labelText;
+    const value = document.createElement('strong');
+    value.textContent = valueText;
+    item.append(label, value);
+    item.setAttribute('aria-label', `${labelText} ${valueText}`);
+    _weatherDetails.appendChild(item);
+  }
+}
+
+function _lunchWeatherAdvice(payload) {
+  if (!payload) return 'Lunch weather loading...';
+  return `${payload.condition} around lunch.`;
+}
+
+function _weatherPayloadFromApi(api, referenceDate = _effectiveClockDate()) {
+  if (!_isLunchWeatherApiValid(api)) return null;
+  const current = api?.current || {};
+  const hourly = api?.hourly || {};
+  const times = Array.isArray(hourly.time) ? hourly.time : [];
+  const context = _lunchWeatherContext(referenceDate);
+  const lunchStartMs = _weatherDateAt(referenceDate, context.startSec).getTime();
+  const lunchEndMs = _weatherDateAt(referenceDate, context.endSec).getTime();
+  const forecastEndMs = Math.max(lunchEndMs, _weatherDateAt(referenceDate, LUNCH_WEATHER_FORECAST_END_SEC).getTime());
+  const primarySourceIndex = _nearestWeatherHourIndex(times, referenceDate.getTime(), lunchStartMs, lunchEndMs);
+  const nowTime = primarySourceIndex !== null ? times[primarySourceIndex] : referenceDate.toISOString();
+  const currentCode = Number(hourly.weather_code?.[primarySourceIndex] ?? current.weather_code ?? 3);
+  const currentIsDay = primarySourceIndex !== null ? _isWeatherDaylight(nowTime) : current.is_day !== 0;
+  const nowHour = {
+    label: 'Now',
+    temp: Math.round(_weatherHourlyNumber(hourly, 'temperature_2m', primarySourceIndex, current.temperature_2m ?? 0)),
+    code: currentCode,
+    rainChance: Number(hourly.precipitation_probability?.[primarySourceIndex] ?? 0),
+    isDay: currentIsDay
+  };
+  const nextHourMs = _weatherNextHour(referenceDate).getTime();
+  const futureHours = times
+    .map((time, sourceIndex) => ({ time, sourceIndex, timeMs: new Date(time).getTime() }))
+    .filter(item => Number.isFinite(item.timeMs) && item.timeMs >= nextHourMs && item.timeMs <= forecastEndMs)
+    .slice(0, LUNCH_WEATHER_MAX_HOURS - 1)
+    .map(({ time, sourceIndex }, index) => _weatherHourFromSource(hourly, current, time, sourceIndex, _formatWeatherHour(time, index + 1)));
+  const hours = [nowHour, ...futureHours];
+  return {
+    temp: nowHour.temp,
+    feelsLike: Math.round(_weatherHourlyNumber(hourly, 'apparent_temperature', primarySourceIndex, current.apparent_temperature ?? current.temperature_2m ?? nowHour.temp)),
+    wind: Math.round(_weatherHourlyNumber(hourly, 'wind_speed_10m', primarySourceIndex, current.wind_speed_10m ?? 0)),
+    precipitation: Number(current.precipitation ?? 0),
+    rainChance: Number(nowHour.rainChance ?? 0),
+    code: currentCode,
+    isDay: currentIsDay,
+    condition: _weatherLabel(currentCode),
+    hours,
+    referenceTime: referenceDate.toISOString(),
+    lunchWeatherEndTime: _weatherDateAt(referenceDate, context.endSec).toISOString(),
+    localDate: context.localDate,
+    scheduleType: context.scheduleType,
+    startSec: context.startSec,
+    endSec: context.endSec,
+    fetchedAt: Date.now()
+  };
+}
+
+function _currentScheduleSeconds() {
+  return _clockSeconds(new Date());
+}
+
+function _isLunchNow() {
+  const lunchBounds = _schedulePeriodBounds(/\blunch\b/i);
+  const currentSec = _currentScheduleSeconds();
+  return Number.isFinite(lunchBounds?.startSec)
+    && Number.isFinite(lunchBounds?.endSec)
+    && currentSec >= lunchBounds.startSec
+    && currentSec < lunchBounds.endSec;
+}
+
+function _shouldShowLunchWeather() {
+  if (_isNonInstructionalSchedule(scheduleType)) return false;
+  const { startSec, endSec } = _lunchWeatherWindowSeconds();
+  const currentSec = _currentScheduleSeconds();
+  return Number.isFinite(startSec)
+    && Number.isFinite(endSec)
+    && endSec > startSec
+    && currentSec >= startSec
+    && currentSec < endSec;
+}
+
+function _syncLunchWeatherVisibility() {
+  if (!_weatherCard) return false;
+  const shouldShow = _shouldShowLunchWeather();
+  if (!shouldShow) _weatherPayload = null;
+  _weatherVisible = shouldShow;
+  _weatherCard.hidden = !shouldShow;
+  _weatherCard.setAttribute('aria-hidden', String(!shouldShow));
+  _weatherCard.classList.toggle('is-lunch', shouldShow && _isLunchNow());
+  return shouldShow;
+}
+
+function _renderLunchWeather(payload, state = 'ready') {
+  if (!_weatherCard) return;
+  if (state === 'error') _weatherPayload = null;
+  else if (payload) _weatherPayload = payload;
+  const activePayload = state === 'error' ? null : (payload || _weatherPayload);
+  if (!_syncLunchWeatherVisibility()) return;
+  _weatherCard.classList.toggle('is-loading', state === 'loading');
+  if (_weatherAlert) _weatherAlert.textContent = state === 'error' ? 'Weather is not available right now' : _lunchWeatherAdvice(activePayload);
+  if (_weatherAlertIcon) _weatherAlertIcon.textContent = activePayload ? _weatherGlyph(activePayload.code, activePayload.isDay !== false) : '🌤️';
+  _renderLunchWeatherDetails(activePayload);
+  if (_weatherTemp) _weatherTemp.textContent = activePayload ? `${activePayload.temp}°` : '--°';
+  if (_weatherCondition) _weatherCondition.textContent = activePayload ? activePayload.condition : 'Loading forecast';
+  if (_weatherMeta) {
+    _weatherMeta.textContent = activePayload
+      ? `Feels like ${activePayload.feelsLike}° · Wind ${activePayload.wind} mph · Rain ${activePayload.rainChance}%`
+      : 'Feels like -- · Wind -- · Rain --';
+  }
+  if (_weatherSymbol) _setWeatherSymbol(_weatherSymbol, activePayload?.code ?? 0, activePayload?.isDay !== false);
+  if (_weatherHours) {
+    _weatherHours.innerHTML = '';
+    const hours = activePayload?.hours?.length ? activePayload.hours : [
+      { label: 'Now', temp: '--', code: 3, rainChance: null, isDay: true },
+      { label: 'Next', temp: '--', code: 3, rainChance: null, isDay: true },
+      { label: 'Later', temp: '--', code: 3, rainChance: null, isDay: true },
+      { label: 'After', temp: '--', code: 3, rainChance: null, isDay: true }
+    ];
+    for (const hour of hours.slice(0, LUNCH_WEATHER_MAX_HOURS)) {
+      const item = document.createElement('div');
+      item.className = 'lunch-weather-hour';
+      const label = document.createElement('span');
+      label.textContent = hour.label;
+      const icon = document.createElement('span');
+      icon.className = 'weather-symbol weather-symbol--mini';
+      icon.setAttribute('aria-hidden', 'true');
+      _setWeatherSymbol(icon, hour.code, hour.isDay !== false);
+      const temp = document.createElement('strong');
+      temp.textContent = `${hour.temp}°`;
+      const rain = document.createElement('span');
+      rain.className = 'lunch-weather-rain';
+      const hasRainChance = hour.rainChance !== null && hour.rainChance !== undefined && Number.isFinite(Number(hour.rainChance));
+      const rainChance = hasRainChance ? Math.round(Number(hour.rainChance)) : null;
+      rain.textContent = hasRainChance ? `${rainChance}%` : '--%';
+      rain.setAttribute('aria-label', hasRainChance ? `${rainChance}% chance of rain` : 'Rain chance unavailable');
+      item.append(label, icon, temp, rain);
+      _weatherHours.appendChild(item);
+    }
+  }
+}
+
+async function _loadLunchWeather(forceFresh = false) {
+  if (_weatherLoading || !_syncLunchWeatherVisibility()) return;
+  _weatherLoading = true;
+  const freshApi = _readLunchWeatherCache(LUNCH_WEATHER_CACHE_TTL_MS);
+  const cachedApi = freshApi || _readLunchWeatherCache(LUNCH_WEATHER_STALE_TTL_MS);
+  const cachedPayload = cachedApi ? _weatherPayloadFromApi(cachedApi) : null;
+  if (cachedPayload) _renderLunchWeather(cachedPayload);
+  else _renderLunchWeather(null, 'loading');
+  if (freshApi && !forceFresh) {
+    _weatherLoading = false;
+    return;
+  }
+  try {
+    const res = await fetch(LUNCH_WEATHER_URL, { cache: 'no-store', signal: _timeoutSignal(LUNCH_WEATHER_FETCH_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const api = await res.json();
+    if (!_isLunchWeatherApiValid(api)) throw new Error('Invalid weather payload');
+    _writeLunchWeatherCache(api);
+    _renderLunchWeather(_weatherPayloadFromApi(api));
+  } catch (e) {
+    console.warn('Lunch weather unavailable:', e);
+    if (!cachedPayload) _renderLunchWeather(null, 'error');
+  } finally {
+    _weatherLoading = false;
+  }
+}
+
+function _initLunchWeather() {
+  _weatherCard = document.getElementById('lunch-weather');
+  if (!_weatherCard) return;
+  _weatherAlert = document.getElementById('lunch-weather-alert');
+  _weatherAlertIcon = _weatherCard.querySelector('.weather-alert-mark');
+  _weatherDetails = document.getElementById('lunch-weather-details');
+  _weatherTemp = document.getElementById('lunch-weather-temp');
+  _weatherCondition = document.getElementById('lunch-weather-condition');
+  _weatherSymbol = document.getElementById('lunch-weather-symbol');
+  _weatherHours = document.getElementById('lunch-weather-hours');
+  _weatherMeta = document.getElementById('lunch-weather-meta');
+  _syncLunchWeatherVisibility();
+  setInterval(() => {
+    if (document.visibilityState === 'visible') _loadLunchWeather();
+  }, LUNCH_WEATHER_CACHE_TTL_MS);
+}
+
+function _updateLunchWeatherMode() {
+  if (!_weatherCard) return;
+  const wasVisible = _weatherVisible;
+  if (!_syncLunchWeatherVisibility()) return;
+  if ((!wasVisible || !_weatherPayload) && !_weatherLoading) {
+    _loadLunchWeather(true);
+    return;
+  }
+  if (_weatherPayload) _renderLunchWeather(_weatherPayload);
+  if (_weatherPayload && _weatherAlert) _weatherAlert.textContent = _lunchWeatherAdvice(_weatherPayload);
+  if (_weatherPayload && _weatherAlertIcon) _weatherAlertIcon.textContent = _weatherGlyph(_weatherPayload.code, _weatherPayload.isDay !== false);
 }
 
 function _timeoutSignal(ms) {
@@ -333,6 +821,11 @@ function _safeFrameUrl(value) {
   try {
     const url = new URL(String(value || '').trim(), location.href);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    const allowedHosts = new Set(['schedulephs.web.app']);
+    if (_isLocalhost()) {
+      ['localhost', '127.0.0.1', '[::1]', '::1'].forEach(host => allowedHosts.add(host));
+    }
+    if (!allowedHosts.has(url.hostname)) return '';
     return url.href;
   } catch {
     return '';
@@ -345,12 +838,12 @@ function _navHrefKind(href) {
     const url = new URL(href, location.href);
     const path = url.pathname;
     if (/\/announcements\.html?$/i.test(path)) return 'announcements';
-    if (/\/(?:gradeviewer|grademelon)\.html?$/i.test(path)) return 'grades';
-    if (/\/index\.html?$/i.test(path) || path.endsWith('/')) return 'schedule';
+    if (/\/(?:gradeviewer|grademelon)(?:\.html?)?\/?$/i.test(path)) return 'grades';
+    if (/\/(?:index\.html?|schedule)\/?$/i.test(path) || path.endsWith('/')) return 'schedule';
   } catch {
     if (/announcements\.html?/i.test(href)) return 'announcements';
-    if (/gradeviewer\.html?|grademelon\.html?/i.test(href)) return 'grades';
-    if (/index\.html?/i.test(href) || href === '/') return 'schedule';
+    if (/(^|\/)(?:gradeviewer|grademelon)(?:\.html?)?\/?$/i.test(href)) return 'grades';
+    if (/(^|\/)(?:index\.html?|schedule)\/?$/i.test(href) || href === '/') return 'schedule';
   }
   return '';
 }
@@ -483,7 +976,8 @@ function _renderAnnouncements(settings) {
     return;
   }
   list.innerHTML = items.map(item => {
-    const bullets = (item.bullets || []).map(bullet => `<li>${_escapeHtml(bullet)}</li>`).join('');
+    const bulletItems = Array.isArray(item.bullets) ? item.bullets : [];
+    const bullets = bulletItems.map(bullet => `<li>${_escapeHtml(bullet)}</li>`).join('');
     return `<div class="announcement-card">
       <div class="announcement-title">${_escapeHtml(item.title || '')}</div>
       <div class="announcement-content"><ul>${bullets}</ul></div>
@@ -541,7 +1035,9 @@ function _setGradesFrameSize() {
   const w = _gradesScaler.offsetWidth;
   if (!w) return;
   const top = _gradesScaler.getBoundingClientRect().top;
-  const h = Math.max(720, window.innerHeight - top - 24);
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const minHeight = window.matchMedia('(max-width: 640px)').matches ? 420 : 720;
+  const h = Math.max(minHeight, viewportHeight - top - 24);
   _gradesFrame.style.width = w + 'px';
   _gradesFrame.style.height = h + 'px';
   _gradesScaler.style.height = h + 'px';
@@ -556,11 +1052,11 @@ function _isAllowedGradesOrigin(origin) {
   const list = [
     _safeFrameUrl(settings?.grades?.iframeUrlLocal),
     _safeFrameUrl(settings?.grades?.iframeUrlProd),
-    GRADEVIEWER_DEFAULT_LOCAL_URL,
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
     GRADEVIEWER_DEFAULT_PROD_URL
   ];
+  if (_isLocalhost()) {
+    list.push(GRADEVIEWER_DEFAULT_LOCAL_URL, 'http://localhost:3001', 'http://127.0.0.1:3001');
+  }
   return list.some(url => {
     try { return url && new URL(url).origin === origin; }
     catch { return false; }
@@ -569,7 +1065,7 @@ function _isAllowedGradesOrigin(origin) {
 
 function _readAppearanceForGrades() {
   try {
-    const raw = JSON.parse(localStorage.getItem('phs:appearance:v2') || '{}');
+    const raw = JSON.parse(localStorage.getItem('phs:appearance:v3') || '{}');
     const isHex = value => /^#[0-9a-fA-F]{6}$/.test(String(value || ''));
     const colors = Array.isArray(raw.colors) ? raw.colors.filter(isHex).slice(0, 5).map(color => color.toUpperCase()) : [];
     while (colors.length < 2) colors.push(colors[0] || '#8288D5');
@@ -586,10 +1082,19 @@ function _gradesFrameTargetOrigin() {
   catch { return null; }
 }
 
+function _gradesFrameReachedTargetOrigin(targetOrigin) {
+  try {
+    return _gradesFrame.contentWindow.location.origin === targetOrigin;
+  } catch {
+    return true;
+  }
+}
+
 function _postThemeToGradesFrame() {
   if (!_gradesFrame?.contentWindow) return;
   const targetOrigin = _gradesFrameTargetOrigin();
   if (!targetOrigin || targetOrigin === 'null') return;
+  if (!_gradesFrameReachedTargetOrigin(targetOrigin)) return;
   try {
     _gradesFrame.contentWindow.postMessage({ type: 'phs:appearance-settings', settings: _readAppearanceForGrades() }, targetOrigin);
   } catch {}
@@ -614,7 +1119,7 @@ function _initGradesFrameBridge() {
   });
 
   window.addEventListener('storage', event => {
-    if (event.key === 'phs:appearance:v2') _postThemeToGradesFrame();
+    if (event.key === 'phs:appearance:v3') _postThemeToGradesFrame();
   });
   document.addEventListener('phs:appearance-storage-sync', _postThemeToGradesFrame);
   _gradesFrame.addEventListener('load', () => {
@@ -719,11 +1224,21 @@ function _initAdminPanel() {
   document.body.appendChild(panel);
 
   let collapsed = false;
-  document.getElementById('admin-collapse').addEventListener('click', () => {
-    collapsed = !collapsed;
-    document.getElementById('admin-body').style.display = collapsed ? 'none' : 'flex';
-    document.getElementById('admin-collapse').textContent = collapsed ? '▸' : '▾';
-  });
+  const adminPanel = document.getElementById('admin-panel');
+  const adminBody = document.getElementById('admin-body');
+  const adminCollapse = document.getElementById('admin-collapse');
+  const setAdminCollapsed = (nextCollapsed) => {
+    collapsed = nextCollapsed;
+    adminPanel.classList.toggle('is-collapsed', collapsed);
+    adminBody.style.display = collapsed ? 'none' : 'flex';
+    adminCollapse.textContent = collapsed ? '▸' : '▾';
+  };
+  const collapseAdminOnCompactViewport = () => {
+    if (window.innerWidth <= 640) setAdminCollapsed(true);
+  };
+  adminCollapse.addEventListener('click', () => setAdminCollapsed(!collapsed));
+  window.addEventListener('resize', collapseAdminOnCompactViewport);
+  collapseAdminOnCompactViewport();
 
   const ampmBtn = document.getElementById('admin-ampm');
   ampmBtn.addEventListener('click', () => {
@@ -746,6 +1261,8 @@ function _initAdminPanel() {
     const dispH = parseInt(document.getElementById('admin-h').value) || 12;
     document.getElementById('admin-status').textContent = `Set → ${dispH}:${pad(m)}:${pad(s)} ${ampmBtn.textContent}`;
     updateAll();
+    _loadLunchWeather(true);
+    collapseAdminOnCompactViewport();
   });
 
   document.getElementById('admin-reset').addEventListener('click', () => {
@@ -757,12 +1274,16 @@ function _initAdminPanel() {
     document.getElementById('admin-schedule-type').value = '';
     document.getElementById('admin-status').textContent = 'Real time';
     updateAll();
+    _loadLunchWeather(true);
+    collapseAdminOnCompactViewport();
   });
 
   document.getElementById('admin-schedule-type').addEventListener('change', (event) => {
     _devScheduleType = event.target.value || null;
     _setAdminStatus(_devScheduleType ? `Testing ${_devScheduleType}` : 'Auto schedule');
+    _weatherPayload = null;
     updateAll();
+    _loadLunchWeather(true);
   });
 }
 
@@ -773,19 +1294,212 @@ let _ringFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
 let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
 let _lastSignedTitle = '', _lastSignedEyebrow = '';
 let _signatureFontPromise = null;
+let _signatureLibraryPromise = null;
 let _signatureId = 0;
+let _signatureRequestId = 0;
+const HOMEPAGE_INTRO_COPY = 'poolesville.web';
+const HOMEPAGE_INTRO_SEEN_KEY = 'phs:homepage-intro-seen:v1';
+let _homepageIntroMotionReady = false;
+let _homepageIntroDataReady = false;
+let _homepageIntroRenderDeferred = false;
+let _homepageIntroExitTimer = 0;
+
+function _homepageIntroDelay(min, max) {
+  const duration = Math.round(min + Math.random() * (max - min));
+  return new Promise(resolve => setTimeout(resolve, duration));
+}
+
+function _randomizeHomepageIntroBackground(root) {
+  const range = (min, max) => min + Math.random() * (max - min);
+  const percent = (value) => `${Math.round(value)}%`;
+  const degree = (value) => `${Math.round(value)}deg`;
+  const number = (value) => value.toFixed(2);
+  const targets = [document.documentElement, root].filter(Boolean);
+  const setShaderProperty = (name, value) => {
+    for (const target of targets) target.style.setProperty(name, value);
+  };
+  const patterns = [
+    { conic: [48, 42], glowA: [22, 36], glowB: [70, 28], glowC: [48, 86], shadow: 82 },
+    { conic: [38, 58], glowA: [62, 30], glowB: [20, 66], glowC: [80, 78], shadow: 108 },
+    { conic: [58, 54], glowA: [30, 76], glowB: [76, 46], glowC: [42, 22], shadow: 64 },
+    { conic: [50, 34], glowA: [74, 24], glowB: [34, 44], glowC: [58, 84], shadow: 132 },
+    { conic: [46, 66], glowA: [18, 28], glowB: [80, 64], glowC: [44, 82], shadow: 44 }
+  ];
+  const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+  const randomPoint = (point, amount) => Math.random() < 0.45
+    ? [range(14, 86), range(14, 86)]
+    : [jitter(point[0], amount), jitter(point[1], amount)];
+  const jitter = (value, amount = 10) => Math.max(12, Math.min(88, value + range(-amount, amount)));
+  const size = (wMin, wMax, hMin, hMax) => `${Math.round(range(wMin, wMax))}% ${Math.round(range(hMin, hMax))}%`;
+  const conicPoint = randomPoint(pattern.conic, 20);
+  const glowPointA = randomPoint(pattern.glowA, 24);
+  const glowPointB = randomPoint(pattern.glowB, 24);
+  const glowPointC = randomPoint(pattern.glowC, 24);
+
+  setShaderProperty('--homepage-conic-from', degree(range(0, 360)));
+  setShaderProperty('--homepage-conic-x', percent(conicPoint[0]));
+  setShaderProperty('--homepage-conic-y', percent(conicPoint[1]));
+  setShaderProperty('--homepage-conic-blur', `${Math.round(range(24, 48))}px`);
+  setShaderProperty('--homepage-conic-opacity', number(range(0.76, 0.98)));
+  setShaderProperty('--homepage-conic-scale-a', number(range(1.16, 1.28)));
+  setShaderProperty('--homepage-conic-scale-b', number(range(1.26, 1.42)));
+  setShaderProperty('--homepage-conic-rotate-a', degree(range(-14, 8)));
+  setShaderProperty('--homepage-conic-rotate-b', degree(range(-4, 18)));
+  setShaderProperty('--homepage-glow-a-x', percent(glowPointA[0]));
+  setShaderProperty('--homepage-glow-a-y', percent(glowPointA[1]));
+  setShaderProperty('--homepage-glow-a-size', size(44, 90, 30, 68));
+  setShaderProperty('--homepage-glow-a-strength', `${Math.round(range(16, 30))}%`);
+  setShaderProperty('--homepage-glow-b-x', percent(glowPointB[0]));
+  setShaderProperty('--homepage-glow-b-y', percent(glowPointB[1]));
+  setShaderProperty('--homepage-glow-b-size', size(48, 96, 34, 70));
+  setShaderProperty('--homepage-glow-c-x', percent(glowPointC[0]));
+  setShaderProperty('--homepage-glow-c-y', percent(glowPointC[1]));
+  setShaderProperty('--homepage-glow-c-size', size(52, 104, 38, 78));
+  setShaderProperty('--homepage-vignette-x', percent(range(28, 76)));
+  setShaderProperty('--homepage-vignette-y', percent(range(30, 78)));
+  setShaderProperty('--homepage-shadow-angle', degree(Math.random() < 0.5 ? range(0, 360) : pattern.shadow + range(-28, 28)));
+  setShaderProperty('--homepage-texture-size', `${Math.round(range(28, 42))}px`);
+  setShaderProperty('--homepage-texture-opacity', number(range(0.055, 0.1)));
+  setShaderProperty('--homepage-texture-drift-x', `${Math.round(range(-44, 44))}px`);
+  setShaderProperty('--homepage-texture-drift-y', `${Math.round(range(-44, 44))}px`);
+  setShaderProperty('--homepage-move-x-a', percent(range(-7, 7)));
+  setShaderProperty('--homepage-move-y-a', percent(range(-6, 6)));
+  setShaderProperty('--homepage-move-x-b', percent(range(-7, 7)));
+  setShaderProperty('--homepage-move-y-b', percent(range(-6, 6)));
+}
+
+async function _homepageIntroTypeTo(textEl, targetLength) {
+  while (textEl.textContent.length < targetLength) {
+    textEl.textContent = HOMEPAGE_INTRO_COPY.slice(0, textEl.textContent.length + 1);
+    await _homepageIntroDelay(30, 48);
+  }
+}
+
+function _finishHomepageIntro(root) {
+  if (!root || root.dataset.finished === 'true') return;
+  root.dataset.finished = 'true';
+  if (_homepageIntroRenderDeferred && data) {
+    _homepageIntroRenderDeferred = false;
+    updateAll();
+  }
+  root.classList.add('is-exiting');
+  setTimeout(() => root.remove(), 720);
+}
+
+function _hasSeenHomepageIntro() {
+  try { return sessionStorage.getItem(HOMEPAGE_INTRO_SEEN_KEY) === 'true'; }
+  catch { return false; }
+}
+
+function _markHomepageIntroSeen() {
+  try {
+    sessionStorage.setItem(HOMEPAGE_INTRO_SEEN_KEY, 'true');
+  } catch {}
+}
+
+function _maybeFinishHomepageIntro() {
+  if (!_homepageIntroMotionReady || !_homepageIntroDataReady) return;
+  const root = document.getElementById('homepage-intro');
+  if (!root) return;
+  clearTimeout(_homepageIntroExitTimer);
+  _homepageIntroExitTimer = setTimeout(() => _finishHomepageIntro(root), 20);
+}
+
+function _markHomepageIntroDataReady() {
+  _homepageIntroDataReady = true;
+  _maybeFinishHomepageIntro();
+}
+
+function _updateAllOrDeferForHomepageIntro() {
+  const root = document.getElementById('homepage-intro');
+  if (root && !root.classList.contains('is-exiting')) {
+    _homepageIntroRenderDeferred = true;
+    return;
+  }
+  updateAll();
+}
+
+function _renderScheduleDataUnavailable(error) {
+  console.warn('Schedule data unavailable:', error);
+  document.title = 'Schedule unavailable | PHS';
+  document.body.classList.add('schedule-terminal-state');
+  document.body.classList.remove('schedule-no-school-state', 'schedule-ended-state');
+  _setTimerSurfaceVisible(false);
+  _clearCountdownDisplay();
+  if (_heroEyebrow) setHeroLine('eyebrow', '', false);
+  if (_heroTitle) setHeroLine('title', 'Schedule unavailable', true, { fontSize: 96, revealStroke: 40 });
+  if (_statusPill && _statusLabel) {
+    _statusPill.style.display = 'inline-flex';
+    _statusPill.dataset.status = 'off';
+    _statusLabel.textContent = 'Refresh to retry';
+  }
+  if (_schedTitle) _schedTitle.textContent = 'Schedule unavailable';
+  if (_schedDate) _schedDate.textContent = '';
+  if (_periodList) {
+    _periodList.innerHTML = '';
+    const li = document.createElement('li');
+    li.className = 'period-card period-card--empty';
+    li.textContent = 'Could not load bell schedule data';
+    _periodList.appendChild(li);
+  }
+}
+
+async function _runHomepageIntro(root, textEl) {
+  root.classList.add('is-running');
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    textEl.textContent = HOMEPAGE_INTRO_COPY;
+    _homepageIntroMotionReady = true;
+    _maybeFinishHomepageIntro();
+    return;
+  }
+
+  textEl.textContent = '';
+  const finalLength = HOMEPAGE_INTRO_COPY.length;
+  await _homepageIntroTypeTo(textEl, finalLength);
+  _homepageIntroMotionReady = true;
+  _maybeFinishHomepageIntro();
+}
+
+function _initHomepageIntro() {
+  const root = document.getElementById('homepage-intro');
+  const textEl = document.getElementById('homepage-intro-text');
+  if (!root || !textEl) return;
+  _randomizeHomepageIntroBackground(root);
+  if (_hasSeenHomepageIntro()) {
+    document.documentElement.classList.add('homepage-intro-skip');
+    root.remove();
+    return;
+  }
+  _markHomepageIntroSeen();
+  _runHomepageIntro(root, textEl).catch(() => _finishHomepageIntro(root));
+}
 
 function getSignatureFont() {
   if (_signatureFontPromise) return _signatureFontPromise;
-  if (!window.opentype) return Promise.reject(new Error('opentype.js did not load'));
 
-  _signatureFontPromise = new Promise((resolve, reject) => {
-    opentype.load('assets/fonts/AlexBrush-Regular.ttf', (err, font) => {
+  _signatureFontPromise = loadSignatureLibrary().then((opentypeApi) => new Promise((resolve, reject) => {
+    opentypeApi.load(SIGNATURE_FONT_URL, (err, font) => {
       if (err || !font) reject(err || new Error('Signature font did not load'));
       else resolve(font);
     });
-  });
+  }));
   return _signatureFontPromise;
+}
+
+function loadSignatureLibrary() {
+  if (window.opentype) return Promise.resolve(window.opentype);
+  if (_signatureLibraryPromise) return _signatureLibraryPromise;
+
+  _signatureLibraryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = OPENTYPE_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => window.opentype ? resolve(window.opentype) : reject(new Error('opentype.js did not initialize'));
+    script.onerror = () => reject(new Error('opentype.js failed to load'));
+    document.head.appendChild(script);
+  });
+  return _signatureLibraryPromise;
 }
 
 function smootherStep(t) {
@@ -797,13 +1511,17 @@ function updateHeroSignatureLayout() {
   const wrapper = document.querySelector('.hero-title-wrapper');
   if (!wrapper) return;
 
-  const hasEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-complete'));
-  const hasTitle = Boolean(_signatureTitle?.classList.contains('is-complete'));
-  const visibleCount = Number(hasEyebrow) + Number(hasTitle);
+  const pendingEyebrow = Boolean(_signatureEyebrow?.dataset.pendingSignatureText);
+  const pendingTitle = Boolean(_signatureTitle?.dataset.pendingSignatureText);
+  const visibleEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-visible'));
+  const visibleTitle = Boolean(_signatureTitle?.classList.contains('is-visible'));
+  const layoutCount = Number(visibleEyebrow || pendingEyebrow) + Number(visibleTitle || pendingTitle);
+  const visibleCount = Number(visibleEyebrow) + Number(visibleTitle);
 
   wrapper.classList.toggle('signature-ready', visibleCount > 0);
-  wrapper.classList.toggle('signature-single', visibleCount === 1);
-  wrapper.classList.toggle('signature-double', visibleCount === 2);
+  wrapper.classList.toggle('signature-pending', pendingEyebrow || pendingTitle);
+  wrapper.classList.toggle('signature-single', layoutCount === 1);
+  wrapper.classList.toggle('signature-double', layoutCount === 2);
 }
 
 function setHeroLine(line, text, visible, options = {}) {
@@ -815,12 +1533,15 @@ function setHeroLine(line, text, visible, options = {}) {
 
   fallback.textContent = text;
   fallback.style.display = visible ? 'block' : 'none';
+  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible));
 
   if (!stage) return;
   if (!visible) {
     delete stage.dataset.pendingSignatureText;
+    delete stage.dataset.signatureRequestId;
     stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
+    fallback.classList.remove('signature-fallback-hidden');
     if (isEyebrow) _lastSignedEyebrow = '';
     else _lastSignedTitle = '';
     updateHeroSignatureLayout();
@@ -828,29 +1549,38 @@ function setHeroLine(line, text, visible, options = {}) {
   }
 
   const currentText = isEyebrow ? _lastSignedEyebrow : _lastSignedTitle;
-  if (currentText === text && stage.classList.contains('is-visible')) return;
+  if (currentText === text && (stage.classList.contains('is-visible') || stage.dataset.pendingSignatureText === text)) return;
 
   if (isEyebrow) _lastSignedEyebrow = text;
   else _lastSignedTitle = text;
 
+  const requestId = String(++_signatureRequestId);
   stage.dataset.pendingSignatureText = text;
+  stage.dataset.signatureRequestId = requestId;
+  stage.classList.remove('is-visible', 'is-complete');
+  stage.innerHTML = '';
   updateHeroSignatureLayout();
 
-  signHeroText(stage, text, options).catch((error) => {
+  signHeroText(stage, text, options, requestId).catch((error) => {
     console.warn('Signature renderer fallback:', error);
+    if (stage.dataset.signatureRequestId !== requestId) return;
+    delete stage.dataset.signatureRequestId;
+    delete stage.dataset.pendingSignatureText;
     stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
+    fallback.classList.remove('signature-fallback-hidden');
     updateHeroSignatureLayout();
   });
 }
 
-async function signHeroText(target, text, options = {}) {
+async function signHeroText(target, text, options = {}, requestId = '') {
   const phrase = String(text || '').trim();
   if (!target || !phrase) return;
 
   target.dataset.pendingSignatureText = phrase;
   const font = await getSignatureFont();
   if (target.dataset.pendingSignatureText !== phrase) return;
+  if (requestId && target.dataset.signatureRequestId !== requestId) return;
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fontSize = options.fontSize || 128;
@@ -894,6 +1624,7 @@ async function signHeroText(target, text, options = {}) {
   const maskId = `signature-mask-${runId}`;
   const gradId = `signature-brush-${runId}`;
 
+  if (requestId && target.dataset.signatureRequestId !== requestId) return;
   if (target._signatureRaf) cancelAnimationFrame(target._signatureRaf);
   target.innerHTML = '';
   target.dataset.signatureText = phrase;
@@ -975,6 +1706,7 @@ async function signHeroText(target, text, options = {}) {
   svg.appendChild(defs);
   svg.appendChild(fillGroup);
   svg.appendChild(glintGroup);
+  if (requestId && target.dataset.signatureRequestId !== requestId) return;
   target.appendChild(svg);
 
   const glintWidth = viewW * 0.08;
@@ -994,6 +1726,7 @@ async function signHeroText(target, text, options = {}) {
   const totalDuration = Math.min(1750, Math.max(950, viewW * 1.18));
 
   if (reduceMotion) {
+    if (requestId && target.dataset.signatureRequestId !== requestId) return;
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
     target.classList.add('is-complete');
@@ -1003,6 +1736,7 @@ async function signHeroText(target, text, options = {}) {
 
   const startTime = performance.now();
   const animate = (now) => {
+    if (requestId && target.dataset.signatureRequestId !== requestId) return;
     const elapsed = now - startTime;
     const progress = smootherStep(elapsed / totalDuration);
     const brushReach = Math.max(0, (viewW + brushWidth) * progress);
@@ -1025,6 +1759,7 @@ async function signHeroText(target, text, options = {}) {
   target._signatureRaf = requestAnimationFrame(animate);
   setTimeout(() => {
     if (target.dataset.signatureText !== phrase) return;
+    if (requestId && target.dataset.signatureRequestId !== requestId) return;
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
     target.classList.add('is-complete');
@@ -1053,33 +1788,43 @@ async function main() {
 
     _initKeepAliveTabs();
     _prepareCountdownDisplay();
+    _initLunchWeather();
 
     const cachedData = _readScheduleDataCache();
     if (cachedData) {
       data = cachedData;
-      updateAll();
+      _updateAllOrDeferForHomepageIntro();
+      _markHomepageIntroDataReady();
     }
 
     try {
-      const response = await fetch('data.json', { cache: 'no-store' });
+      const response = await fetch('data.json', {
+        cache: 'no-cache',
+        signal: _timeoutSignal(SCHEDULE_DATA_FETCH_TIMEOUT_MS)
+      });
       const freshData = await response.json();
+      if (!_isScheduleDataShape(freshData)) throw new Error('Invalid schedule data shape');
       if (freshData && typeof freshData === 'object') {
         data = freshData;
         _writeScheduleDataCache(freshData);
       }
     } catch (fetchError) {
-      if (!data) throw fetchError;
+      if (!data) {
+        _renderScheduleDataUnavailable(fetchError);
+        _markHomepageIntroDataReady();
+        return;
+      }
       console.warn('Using cached schedule data:', fetchError);
     }
 
     _initAdminPanel();
     _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
-    updateAll();
+    _updateAllOrDeferForHomepageIntro();
+    _markHomepageIntroDataReady();
     _pollScheduleOverride();
     _overrideInterval = setInterval(() => {
       if (!_IS_ADMIN_PREVIEW && document.visibilityState === 'visible') _pollScheduleOverride();
     }, OVERRIDE_POLL_INTERVAL_MS);
-    updateAll();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (!_IS_ADMIN_PREVIEW) _pollScheduleOverride();
@@ -1088,6 +1833,7 @@ async function main() {
     });
   } catch (e) {
     console.error("Initialization failed:", e);
+    _markHomepageIntroDataReady();
   }
 }
 
@@ -1134,22 +1880,10 @@ function calculateGoal() {
   if (_bs && _bs[scheduleType] && Object.keys(_bs[scheduleType]).length) {
     periods = _bs[scheduleType];
   }
-  myArray = [];
   isTimerInactive = false;
 
-  const periodEntries = Object.entries(periods || {})
-    .map(([start, value]) => ({
-      startSec: Number(start),
-      endSec: Number(value?.[0]),
-      name: String(value?.[1] || '')
-    }))
-    .filter(p => Number.isFinite(p.startSec) && Number.isFinite(p.endSec) && p.endSec > p.startSec)
-    .sort((a, b) => a.startSec - b.startSec);
-
-  myArray = periodEntries.map(p => ({
-    ...p,
-    timeStr: proccessTime(p.startSec) + " \u2192 " + proccessTime(p.endSec)
-  }));
+  const periodEntries = _getPeriodEntries(periods);
+  myArray = periodEntries;
 
   isBeforeSchool = false;
   isTransition = false;
@@ -1178,7 +1912,13 @@ function calculateGoal() {
   } else if (nextPeriod) {
     period = "Transition";
     goal = nextPeriod.startSec;
-    const previousPeriod = [...periodEntries].reverse().find(p => p.endSec <= val) || lastPeriod;
+    let previousPeriod = lastPeriod;
+    for (let i = periodEntries.length - 1; i >= 0; i -= 1) {
+      if (periodEntries[i].endSec <= val) {
+        previousPeriod = periodEntries[i];
+        break;
+      }
+    }
     periodStartTime = previousPeriod.endSec;
     periodEndTime = nextPeriod.startSec;
     isTransition = true;
@@ -1197,6 +1937,7 @@ function calculateGoal() {
 function updateAll() {
   if (!data) return;
   calculateGoal();
+  _updateLunchWeatherMode();
 
   const date = new Date();
   let val = _clockSeconds(date);
@@ -1235,7 +1976,7 @@ function updateAll() {
     }
   }
 
-  if (_siteView !== 'grades') {
+  if (_siteView === 'schedule') {
     document.title = isTimerInactive
       ? `${noSchool ? scheduleType : 'Done'} | PHS`
       : (h === 0
@@ -1378,7 +2119,13 @@ document.addEventListener('site-settings:applied', e => {
   _applySettingsScheduleOverride(e.detail);
   _applyGradesFrameUrl(e.detail);
   _applyViewTitle(document.querySelector('[data-site-view]') ? _siteView : _viewFromLocation());
+  if (data) updateAll();
   requestAnimationFrame(() => _updateNavActive(_siteView));
 });
 
-window.onload = main;
+_initHomepageIntro();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', main, { once: true });
+} else {
+  main();
+}
