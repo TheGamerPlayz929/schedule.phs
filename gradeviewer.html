@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-bind="grades.pageTitle">Grades - PHS</title>
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
-  <script src="theme-primer.js?v=20260521-publicsettings2"></script>
-  <link rel="stylesheet" href="main.css?v=20260506-tabs3">
+  <script src="theme-primer.js?v=20260524-desktopfix1"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Geist:wght@400..800&family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="main.css?v=20260524-desktopfix7">
   <style>
     html, body { min-height: 100vh; overflow-x: hidden; overflow-y: auto; }
     .app-shell { max-width: none; padding: 0; }
@@ -87,7 +90,7 @@
     <div class="brand">
       <div class="brand-icon">
         <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
-          <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
+          <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo-96.png" width="48" height="40" decoding="async" fetchpriority="low" alt="PHS Logo" style="height: 40px; width: auto;">
         </a>
       </div>
     </div>
@@ -170,15 +173,17 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 3">
-    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;"><span data-bind="footer.supportEmail">supportphss@gmail.com</span></a>
+    <div class="footer-links">
+      <span class="footer-contact">For all inquiries, support, or removal requests, please contact us at <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:jayalternateuser@gmail.com">jayalternateuser@gmail.com</a></span>
+      <a href="privacy.html">Privacy &amp; Safety</a>
+    </div>
   </footer>
 </div>
 
-<script src="settings-loader.js?v=20260521-publicsettings2"></script>
-<script src="nav-renderer.js?v=20260506-island1"></script>
-<script src="privacy-analytics.js?v=20260506-island1"></script>
+<script src="settings-loader.js?v=20260524-perf1"></script>
+<script src="nav-renderer.js?v=20260524-desktopfix2"></script>
+<script src="privacy-analytics.js?v=20260524-desktopfix2"></script>
 <script src="google-analytics.js?v=20260506-island1"></script>
-<script src="main.js?v=20260521-publicsettings2"></script>
 <script>
   /* ── Iframe sizing ── */
   const scaler = document.getElementById('grades-scaler');
@@ -209,12 +214,29 @@
     try {
       const url = new URL(String(value || '').trim(), location.href);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+      const allowedHosts = new Set(['schedulephs.web.app']);
+      if (isLocal) ['localhost', '127.0.0.1', '[::1]', '::1'].forEach(host => allowedHosts.add(host));
+      if (!allowedHosts.has(url.hostname)) return '';
       return url.href;
     } catch {
       return '';
     }
   }
   const defaultLocalUrl = 'http://localhost:3001/login';
+  const defaultProdUrl = 'https://schedulephs.web.app/login';
+  const embedCacheBust = '20260525-faq';
+  function withEmbedVersion(value) {
+    if (!value) return '';
+    try {
+      const url = new URL(value, location.href);
+      if (url.hostname === 'schedulephs.web.app') {
+        url.searchParams.set('phs_embed_v', embedCacheBust);
+      }
+      return url.href;
+    } catch {
+      return value;
+    }
+  }
 
   // Lock the URL once we've successfully set it — periodic settings refresh
   // must not yank a logged-in user back to a different origin.
@@ -224,7 +246,7 @@
     if (frameUrlLocked) return;
     const myToken = ++applyToken;
     const localUrl = settings?.grades?.iframeUrlLocal || (isLocal ? defaultLocalUrl : '');
-    const prodUrl  = settings?.grades?.iframeUrlProd || 'https://schedulephs.web.app/login';
+    const prodUrl  = withEmbedVersion(settings?.grades?.iframeUrlProd || defaultProdUrl);
     let url = safeFrameUrl(isLocal ? localUrl : prodUrl);
     if (isLocal && (!localUrl || !(await localGradeMelonAvailable()))) url = prodUrl;
     url = safeFrameUrl(url);
@@ -241,7 +263,7 @@
   setTimeout(() => {
     if (frameUrlLocked) return;
     if (frame.src === 'about:blank' || frame.src === '') {
-      frame.src = isLocal ? defaultLocalUrl : 'https://schedulephs.web.app/login';
+      frame.src = isLocal ? defaultLocalUrl : withEmbedVersion(defaultProdUrl);
       frameUrlLocked = true;
     }
   }, 2500);
@@ -257,7 +279,9 @@
     const w = scaler.offsetWidth;
     if (!w) return; // wait for layout
     const top = scaler.getBoundingClientRect().top;
-    const h = Math.max(720, window.innerHeight - top - 24);
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const minHeight = window.matchMedia('(max-width: 640px)').matches ? 420 : 720;
+    const h = Math.max(minHeight, viewportHeight - top - 24);
     frame.style.width  = w + 'px';
     frame.style.height = h + 'px';
     scaler.style.height = h + 'px';
@@ -278,13 +302,14 @@
       if (origin === new URL(frame.src, location.href).origin) return true;
     } catch {}
     const s = window.__SITE_SETTINGS__ || {};
-    const list = [safeFrameUrl(s?.grades?.iframeUrlLocal), safeFrameUrl(s?.grades?.iframeUrlProd), defaultLocalUrl, 'http://localhost:3001', 'http://127.0.0.1:3001', 'https://schedulephs.web.app'];
+    const list = [safeFrameUrl(s?.grades?.iframeUrlLocal), safeFrameUrl(s?.grades?.iframeUrlProd), 'https://schedulephs.web.app'];
+    if (isLocal) list.push(defaultLocalUrl, 'http://localhost:3001', 'http://127.0.0.1:3001');
     return list.some(u => { try { return u && new URL(u).origin === origin; } catch { return false; } });
   }
 
   function readAppearance() {
     try {
-      const raw = JSON.parse(localStorage.getItem('phs:appearance:v2') || '{}');
+      const raw = JSON.parse(localStorage.getItem('phs:appearance:v3') || '{}');
       const isHex = value => /^#[0-9a-fA-F]{6}$/.test(String(value || ''));
       const colors = Array.isArray(raw.colors) ? raw.colors.filter(isHex).slice(0, 5).map(color => color.toUpperCase()) : [];
       while (colors.length < 2) colors.push(colors[0] || '#8288D5');
@@ -296,10 +321,15 @@
     try { return new URL(frame.src, location.href).origin; }
     catch { return null; }
   }
+  function frameReachedTargetOrigin(targetOrigin) {
+    try { return frame.contentWindow.location.origin === targetOrigin; }
+    catch { return true; }
+  }
   function postThemeToFrame() {
     if (!frame.contentWindow) return;
     const targetOrigin = frameTargetOrigin();
     if (!targetOrigin || targetOrigin === 'null') return;
+    if (!frameReachedTargetOrigin(targetOrigin)) return;
     try { frame.contentWindow.postMessage({ type: 'phs:appearance-settings', settings: readAppearance() }, targetOrigin); }
     catch {}
   }
@@ -315,7 +345,7 @@
   });
   // Push appearance updates into the iframe whenever the user tweaks the theme.
   window.addEventListener('storage', (e) => {
-    if (e.key === 'phs:appearance:v2') postThemeToFrame();
+    if (e.key === 'phs:appearance:v3') postThemeToFrame();
   });
   document.addEventListener('phs:appearance-storage-sync', postThemeToFrame);
   // Also push on first iframe load (in case the iframe sends ready before we set up the listener).
@@ -357,6 +387,6 @@
     setSize();
   }
 </script>
-<script src="appearance-settings.js?v=20260506-island1"></script>
+<script src="appearance-settings.js?v=20260524-desktopfix1"></script>
 </body>
 </html>

@@ -696,9 +696,27 @@ body.site-view-schedule.schedule-terminal-state .signature-stage--title {
 }
 
 body.site-view-schedule.schedule-terminal-state .ring-wrap,
-body.site-view-schedule.schedule-terminal-state .schedule-section[data-site-view="schedule"],
-body.site-view-schedule.schedule-terminal-state .app-footer {
+body.site-view-schedule.schedule-terminal-state .schedule-section[data-site-view="schedule"] {
   display: none !important;
+}
+
+body.site-view-schedule.schedule-terminal-state .app-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  z-index: 80;
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  transform: none;
+}
+
+body.site-view-schedule.schedule-terminal-state .app-footer.fade-up {
+  opacity: 1;
+  animation: none;
+  transform: none;
 }
 
 .signature-stage svg {
@@ -1420,6 +1438,131 @@ body.appearance-open .appearance-toggle {
   font-size: calc(var(--footer-size, 12px) * var(--user-text-scale));
   color: var(--footer-color, var(--fg-3));
   border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+.footer-links {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  max-width: min(100%, 1180px);
+  margin: 0 auto;
+  line-height: 1.55;
+}
+.footer-links a {
+  color: inherit;
+  text-decoration: none;
+}
+.footer-contact a {
+  color: var(--fg-2);
+}
+.footer-links a:hover,
+.footer-links a:focus-visible {
+  color: var(--fg-1);
+  text-decoration: underline;
+}
+.privacy-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 24px 12px;
+}
+.privacy-card {
+  width: min(980px, 100%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: var(--fg-2);
+  backdrop-filter: none;
+}
+.privacy-card h1 {
+  margin: 0 0 8px;
+  color: var(--fg-1);
+  font-size: clamp(32px, 5vw, 54px);
+  line-height: 1;
+  letter-spacing: 0;
+}
+.privacy-card .privacy-updated {
+  margin: 0 0 20px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.privacy-card section + section {
+  margin-top: 18px;
+}
+.privacy-card h2 {
+  margin: 0 0 6px;
+  color: var(--fg-1);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+.privacy-card p,
+.privacy-card li {
+  color: var(--fg-2);
+  font-size: 14px;
+  line-height: 1.52;
+}
+.privacy-card p {
+  margin: 0 0 8px;
+}
+.privacy-card ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.privacy-card a {
+  color: var(--fg-1);
+}
+.privacy-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  font-weight: 650;
+  outline-offset: 2px;
+  transition: color 160ms ease, background 160ms ease;
+}
+.privacy-back__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: currentColor;
+  opacity: 0.6;
+  transition: transform 160ms var(--ease-out-expo), opacity 160ms ease;
+}
+.privacy-back__label {
+  color: currentColor;
+}
+.privacy-back:hover,
+.privacy-back:focus-visible,
+.privacy-back:active {
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--fg-1);
+  text-decoration: none;
+}
+.privacy-back:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.34);
+}
+.privacy-back:hover .privacy-back__icon,
+.privacy-back:focus-visible .privacy-back__icon {
+  transform: translateX(-2px);
+  opacity: 0.86;
 }
 .nav-actions {
   display: flex;

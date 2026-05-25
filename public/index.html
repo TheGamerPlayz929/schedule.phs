@@ -9,10 +9,29 @@
   <title data-bind="branding.siteTitle">PHS Schedule</title>
   <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Beautiful Shader Experiences - PHS Schedule">
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
-  <script src="theme-primer.js?v=20260521-publicsettings2"></script>
-  <link rel="stylesheet" href="main.css?v=20260506-tabs3">
+  <script>
+    try {
+      if (sessionStorage.getItem('phs:homepage-intro-seen:v1') === 'true') {
+        document.documentElement.classList.add('homepage-intro-skip');
+      }
+    } catch {}
+  </script>
+  <script src="theme-primer.js?v=20260524-desktopfix1"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Geist:wght@400..800&family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="main.css?v=20260524-desktopfix7">
 </head>
 <body>
+
+<div class="homepage-intro" id="homepage-intro" aria-hidden="true">
+  <div class="homepage-intro__texture"></div>
+  <div class="homepage-intro__mark">
+    <div class="homepage-intro__domain">
+      <span id="homepage-intro-text"></span><span class="homepage-intro__cursor"></span>
+    </div>
+  </div>
+</div>
 
 <div class="ambient-canvas">
   <div class="ambient-orb ambient-orb--1"></div>
@@ -26,7 +45,7 @@
   <nav class="glass-nav fade-up" style="--stagger: 0">
     <div class="brand-icon">
       <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
-        <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
+        <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo-96.png" width="48" height="40" decoding="async" fetchpriority="low" alt="PHS Logo" style="height: 40px; width: auto;">
       </a>
     </div>
     <div class="nav-links" id="nav-links" data-page="schedule">
@@ -58,11 +77,11 @@
       <button type="button" class="theme-picker-plane" data-appearance-plane aria-label="Choose theme shade">
         <span data-theme-picker-dot></span>
       </button>
-      <input class="theme-native-color" type="color" data-appearance="accent" value="#8288d5" aria-label="Accent color">
-      <input class="theme-hue" type="range" data-appearance="hue" min="0" max="360" step="1" value="236" aria-label="Hue">
+      <input class="theme-native-color" type="color" data-appearance="accent" value="#a8aaa8" aria-label="Accent color">
+      <input class="theme-hue" type="range" data-appearance="hue" min="0" max="360" step="1" value="40" aria-label="Hue">
       <div class="theme-field">
         <span class="theme-swatch" data-theme-swatch></span>
-        <input type="text" data-appearance="hex" value="#8288D5" maxlength="7" aria-label="Hex color">
+        <input type="text" data-appearance="hex" value="#A8AAA8" maxlength="7" aria-label="Hex color">
         <button type="button" data-appearance-eyedropper aria-label="Use browser color picker">
           <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="m16.24 2.56 5.2 5.2a1.9 1.9 0 0 1 0 2.68l-1.08 1.08-1.94-1.94-8.85 8.85a3 3 0 0 1-1.3.76l-4.4 1.18a1 1 0 0 1-1.22-1.22l1.18-4.4a3 3 0 0 1 .76-1.3l8.85-8.85-1.94-1.94 1.08-1.08a1.9 1.9 0 0 1 2.68 0Zm-2.9 6.28-7.34 7.34-.48 1.78 1.78-.48 7.34-7.34-1.3-1.3Zm4.56-.7-2.04-2.04-.82.82 2.04 2.04.82-.82Z"/></svg>
         </button>
@@ -108,8 +127,8 @@
       <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
         <defs>
           <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="var(--ring-start, #c084fc)"/>
-            <stop offset="100%" stop-color="var(--ring-end, #8288d5)"/>
+            <stop offset="0%" stop-color="var(--ring-start, #ecece8)"/>
+            <stop offset="100%" stop-color="var(--ring-end, #a8aaa8)"/>
           </linearGradient>
         </defs>
         <path
@@ -137,6 +156,24 @@
         </div>
       </div>
     </div>
+
+    <section class="lunch-weather-card fade-up" id="lunch-weather" aria-label="Lunch weather for Poolesville" aria-hidden="true" style="--stagger: 4" hidden>
+      <div class="lunch-weather-summary">
+        <div class="lunch-weather-alert"><span id="lunch-weather-alert" aria-live="polite">Checking lunch weather...</span></div>
+        <div class="lunch-weather-details" id="lunch-weather-details" aria-label="Weather details">
+          <span class="lunch-weather-detail"><span>Feels</span><strong>--°</strong></span>
+          <span class="lunch-weather-detail"><span>Wind</span><strong>-- mph</strong></span>
+          <span class="lunch-weather-detail"><span>Rain</span><strong>--%</strong></span>
+        </div>
+      </div>
+      <div class="lunch-weather-hours" id="lunch-weather-hours" aria-label="Hourly lunch weather">
+        <div class="lunch-weather-hour"><span>Now</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+        <div class="lunch-weather-hour"><span>Next</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+        <div class="lunch-weather-hour"><span>Later</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+        <div class="lunch-weather-hour"><span>After</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Schedule Section -->
@@ -185,16 +222,18 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 5">
-    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;"><span data-bind="footer.supportEmail">supportphss@gmail.com</span></a>
+    <div class="footer-links">
+      <span class="footer-contact">For all inquiries, support, or removal requests, please contact us at <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:jayalternateuser@gmail.com">jayalternateuser@gmail.com</a></span>
+      <a href="privacy.html">Privacy &amp; Safety</a>
+    </div>
   </footer>
 </div>
 
-<script defer src="settings-loader.js?v=20260521-publicsettings2"></script>
-<script defer src="nav-renderer.js?v=20260506-island1"></script>
-<script defer src="privacy-analytics.js?v=20260506-island1"></script>
+<script defer src="settings-loader.js?v=20260524-perf1"></script>
+<script defer src="nav-renderer.js?v=20260524-desktopfix2"></script>
+<script defer src="privacy-analytics.js?v=20260524-desktopfix2"></script>
 <script defer src="google-analytics.js?v=20260506-island1"></script>
-<script defer src="appearance-settings.js?v=20260506-island1"></script>
-<script defer src="vendor/opentype.min.js"></script>
-<script defer src="main.js?v=20260521-publicsettings2"></script>
+<script defer src="appearance-settings.js?v=20260524-desktopfix1"></script>
+<script defer src="main.js?v=20260525-faq1"></script>
 </body>
 </html>

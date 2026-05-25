@@ -1,7 +1,7 @@
 (function () {
   const root = document.documentElement;
   const isHex = value => /^#[0-9a-f]{6}$/i.test(String(value || ''));
-  const cleanHex = value => isHex(value) ? String(value).toUpperCase() : '#8288D5';
+  const cleanHex = value => isHex(value) ? String(value).toUpperCase() : '#A8AAA8';
   const rgbToHex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
   const hexToRgb = value => {
     const n = Number.parseInt(cleanHex(value).slice(1), 16);
@@ -22,9 +22,9 @@
     catch { return null; }
   };
   const normalizeColors = (colors, fallback) => {
-    const base = Array.isArray(colors) ? colors : [fallback || '#8288D5', mix(fallback || '#8288D5', -0.7)];
+    const base = Array.isArray(colors) ? colors : [fallback || '#A8AAA8', mix(fallback || '#A8AAA8', -0.7)];
     const list = base.filter(isHex).slice(0, 5).map(cleanHex);
-    while (list.length < 2) list.push(mix(list[0] || '#8288D5', -0.7));
+    while (list.length < 2) list.push(mix(list[0] || '#A8AAA8', -0.7));
     return list;
   };
   const gradient = colors => `linear-gradient(90deg, ${colors.map((color, index) => {
@@ -50,7 +50,7 @@
     const accent = cleanHex(settings.accent || colors[0]);
     const darkColor = cleanHex(colors[1] || mix(accent, -0.7));
     const intensity = Math.max(15, Math.min(100, Number(settings.intensity) || 60)) / 100;
-    root.style.setProperty('--user-bg-base', mix(colors[0], -0.9));
+    root.style.setProperty('--user-bg-base', mix(darkColor, -0.82));
     root.style.setProperty('--user-orb-1', rgba(colors[0], 0.95 * intensity));
     root.style.setProperty('--user-orb-2', rgba(darkColor, 0.85 * intensity));
     root.style.setProperty('--user-orb-3', rgba(colors[2] || mix(accent, 0.18), 0.7 * intensity));
@@ -65,8 +65,9 @@
     }
   };
 
-  const cached = readJson('phs:site-settings:last-good:v4');
+  const cached = readJson('phs:site-settings:last-good:v5') || readJson('phs:site-settings:last-good:v4');
   applySettingsTheme(cached && cached.settings);
-  applyAppearance(readJson('phs:appearance:v2'));
+  try { localStorage.removeItem('phs:appearance:v2'); } catch {}
+  applyAppearance(readJson('phs:appearance:v3'));
   root.classList.add('theme-primed');
 })();

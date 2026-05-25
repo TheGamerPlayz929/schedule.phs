@@ -1,15 +1,15 @@
 /* Visitor-only appearance controls for the schedule page. */
 (function () {
-  const KEY = 'phs:appearance:v2';
-  const OLD_KEYS = ['phs:appearance:v1'];
-  const defaults = { accent: '#8288d5', colors: ['#8288d5', '#17173a'], hue: 236, planeX: 40, planeY: 16, intensity: 60, textScale: 1, reduceGlow: false };
+  const KEY = 'phs:appearance:v3';
+  const OLD_KEYS = ['phs:appearance:v1', 'phs:appearance:v2'];
+  const defaults = { accent: '#A8AAA8', colors: ['#A8AAA8', '#131414', '#ECECE8'], hue: 40, planeX: 1, planeY: 33, intensity: 48, textScale: 1, reduceGlow: false };
   const MAX_COLORS = 5;
 
   function hexToRgb(hex) {
     const clean = String(hex || '').replace('#', '').trim();
     const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
     const n = Number.parseInt(full, 16);
-    if (!Number.isFinite(n)) return { r: 130, g: 136, b: 213 };
+    if (!Number.isFinite(n)) return { r: 168, g: 170, b: 168 };
     return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
   }
   function clampHex(value) {
@@ -134,7 +134,7 @@
     const accent = clampHex(settings.accent || colors[0]);
     const darkColor = clampHex(colors[1] || mix(accent, -0.7));
     const intensity = Math.max(15, Math.min(100, Number(settings.intensity) || defaults.intensity)) / 100;
-    root.style.setProperty('--user-bg-base', mix(colors[0], -0.9));
+    root.style.setProperty('--user-bg-base', mix(darkColor, -0.82));
     root.style.setProperty('--user-orb-1', rgba(colors[0], 0.95 * intensity));
     root.style.setProperty('--user-orb-2', rgba(darkColor, 0.85 * intensity));
     root.style.setProperty('--user-orb-3', rgba(colors[2] || mix(accent, 0.18), 0.7 * intensity));
@@ -202,6 +202,12 @@
     window.clearTimeout(writeLater.timer);
     writeLater.timer = window.setTimeout(() => write(settings), 120);
   }
+  function slotForAccent(settings) {
+    const accent = clampHex(settings.accent);
+    const colors = normalizeColors(settings.colors, accent);
+    const index = colors.findIndex(color => color === accent);
+    return index >= 0 ? index : 0;
+  }
   function mount() {
     const toggle = document.getElementById('appearance-toggle');
     const panel = document.getElementById('appearance-panel');
@@ -228,7 +234,7 @@
     enhanceAppearanceSlider(intensity);
     enhanceAppearanceSlider(scale);
     let current = read();
-    let activeSlot = 0;
+    let activeSlot = slotForAccent(current);
     let stopsLayoutSignature = '';
     let frame = 0;
 
@@ -312,6 +318,7 @@
         frame = 0;
         normalizeCurrent(false);
         renderPickerOnly();
+        apply(current);
       });
     }
     function openPanel(open) {

@@ -11,9 +11,9 @@
 
   function pageMatches(href, page) {
     if (!href) return false;
-    if (page === 'schedule')      return /(^|\/)index\.html?$/i.test(href) || href === 'index.html';
+    if (page === 'schedule')      return /(^|\/)(?:index\.html?|schedule)\/?$/i.test(href) || href === '/' || href === 'index.html';
     if (page === 'announcements') return /announcements\.html?$/i.test(href);
-    if (page === 'grades')        return /gradeviewer\.html?$/i.test(href) || /grademelon\.html?$/i.test(href);
+    if (page === 'grades')        return /(?:^|\/)(?:gradeviewer|grademelon)(?:\.html?)?\/?$/i.test(href);
     return false;
   }
 

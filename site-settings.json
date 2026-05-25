@@ -3,7 +3,7 @@
   "branding": {
     "siteTitle": "PHS Schedule",
     "siteDescription": "PHS Schedule",
-    "logoSrc": "phs-logo.png",
+    "logoSrc": "phs-logo-96.png",
     "logoAlt": "PHS Logo",
     "logoLink": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/",
     "favicon": "Icons8-Windows-8-Animals-Falcon.ico"
@@ -47,12 +47,12 @@
     "pageTitle": "Grades - PHS"
   },
   "theme": {
-    "accent": "#8288d5",
-    "accent2": "#17173a",
-    "bg1": "#000000",
-    "bg2": "#101124",
+    "accent": "#a8aaa8",
+    "accent2": "#131414",
+    "bg1": "#010101",
+    "bg2": "#131414",
     "fg1": "#ffffff",
-    "fg2": "#a7abbf"
+    "fg2": "#b9bab8"
   },
   "appearance": {
     "heroEyebrowSize": 56,
@@ -82,22 +82,8 @@
           "This website was designed in response to the inconveniences students face with modern applications.",
           "Working on importing GradeViewer™ for more ease of access."
         ]
-      },
-      {
-        "title": "This is a test announcement!",
-        "bullets": [
-          "…"
-        ]
-      },
-      {
-        "title": "new update incoming!",
-        "bullets": []
       }
     ]
-  },
-  "privacy": {
-    "faqTitle": "Privacy & Safety FAQ",
-    "faqBody": "Your StudentVue credentials are sent directly from your browser to your school district's servers. They are never stored or logged on this site."
   },
   "bellSchedules": {},
   "gradeMelon": {
@@ -106,10 +92,6 @@
     "privacyDoneLabel": "Done",
     "privacyParagraphs": []
   },
-  "scheduleOverride": {
-    "type": "Advisory",
-    "date": "2026-05-21",
-    "timestamp": 1779365964410
-  },
+  "scheduleOverride": null,
   "updatedAt": 1779365969567
 }

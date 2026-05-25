@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Announcements - PHS</title>
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
-  <script src="theme-primer.js?v=20260521-publicsettings2"></script>
-  <link rel="stylesheet" href="main.css?v=20260506-tabs3">
+  <script src="theme-primer.js?v=20260524-desktopfix1"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Geist:wght@400..800&family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="main.css?v=20260524-desktopfix7">
   <style>
     .announcements-list {
       display: flex;
@@ -76,7 +79,7 @@
     <div class="brand">
       <div class="brand-icon">
         <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
-          <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo.png" alt="PHS Logo" style="height: 40px; width: auto;">
+          <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo-96.png" width="48" height="40" decoding="async" fetchpriority="low" alt="PHS Logo" style="height: 40px; width: auto;">
         </a>
       </div>
     </div>
@@ -151,13 +154,16 @@
   </section>
 
   <footer class="app-footer fade-up" style="--stagger: 3">
-    <a data-bind="footer.supportEmail" data-bind-attr="mailto" href="mailto:supportphss@gmail.com" style="color:inherit;text-decoration:none;"><span data-bind="footer.supportEmail">supportphss@gmail.com</span></a>
+    <div class="footer-links">
+      <span class="footer-contact">For all inquiries, support, or removal requests, please contact us at <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:jayalternateuser@gmail.com">jayalternateuser@gmail.com</a></span>
+      <a href="privacy.html">Privacy &amp; Safety</a>
+    </div>
   </footer>
 </div>
 
-<script src="settings-loader.js?v=20260521-publicsettings2"></script>
-<script src="nav-renderer.js?v=20260506-island1"></script>
-<script src="privacy-analytics.js?v=20260506-island1"></script>
+<script src="settings-loader.js?v=20260524-perf1"></script>
+<script src="nav-renderer.js?v=20260524-desktopfix2"></script>
+<script src="privacy-analytics.js?v=20260524-desktopfix2"></script>
 <script src="google-analytics.js?v=20260506-island1"></script>
 <script>
   const FALLBACK_ANNOUNCEMENTS = {
@@ -191,7 +197,8 @@
       return;
     }
     list.innerHTML = items.map(a => {
-      const bullets = (a.bullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join('');
+      const bulletItems = Array.isArray(a.bullets) ? a.bullets : [];
+      const bullets = bulletItems.map(b => `<li>${escapeHtml(b)}</li>`).join('');
       return `<div class="announcement-card">
         <div class="announcement-title">${escapeHtml(a.title || '')}</div>
         <div class="announcement-content"><ul>${bullets}</ul></div>
@@ -207,7 +214,6 @@
     }
   }, 2500);
 </script>
-<script src="main.js?v=20260521-publicsettings2"></script>
-<script src="appearance-settings.js?v=20260506-island1"></script>
+<script src="appearance-settings.js?v=20260524-desktopfix1"></script>
 </body>
 </html>

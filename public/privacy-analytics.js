@@ -8,9 +8,14 @@
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const PAGE_MAP = {
     '/': 'schedule',
+    '/schedule': 'schedule',
+    '/schedule/': 'schedule',
     '/index.html': 'schedule',
     '/announcements.html': 'announcements',
-    '/gradeviewer.html': 'grades'
+    '/gradeviewer.html': 'grades',
+    '/grademelon': 'grades',
+    '/grademelon/': 'grades',
+    '/grademelon.html': 'grades'
   };
 
   const page = PAGE_MAP[location.pathname] || document.getElementById('nav-links')?.dataset.page;

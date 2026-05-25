@@ -20,10 +20,13 @@
     'phs:site-settings:schedule-only:v3',
     'phs:site-settings:schedule-only:last-good:v3'
   ];
-  const CACHE_TTL_MS = 5 * 1000;
+  const CACHE_TTL_MS = 60 * 1000;
   const SETTINGS_FETCH_TIMEOUT_MS = 4500;
+  const BACKEND_RETRY_MAX_MS = 60000;
+  let backendRetryAt = 0;
+  let backendBackoffMs = 0;
   const isPreviewIframe = (() => {
-    try { return new URLSearchParams(location.search).has('_preview'); }
+    try { return new URLSearchParams(location.search).has('_preview') && window.parent !== window; }
     catch { return false; }
   })();
 
@@ -144,12 +147,12 @@
     document.documentElement.classList.remove('settings-loading');
   }
 
-  function fetchJson(url) {
+  function fetchJson(url, options = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SETTINGS_FETCH_TIMEOUT_MS);
     return fetch(url, {
       credentials: 'omit',
-      cache: 'no-store',
+      cache: options.noStore ? 'no-store' : 'default',
       signal: controller.signal
     })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
@@ -171,6 +174,16 @@
     return null;
   }
 
+  function noteBackendSuccess() {
+    backendRetryAt = 0;
+    backendBackoffMs = 0;
+  }
+
+  function noteBackendFailure() {
+    backendBackoffMs = backendBackoffMs ? Math.min(BACKEND_RETRY_MAX_MS, backendBackoffMs * 2) : (isLocal ? BACKEND_RETRY_MAX_MS : CACHE_TTL_MS * 2);
+    backendRetryAt = Date.now() + backendBackoffMs;
+  }
+
   async function fetchAndApply() {
     if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
     try {
@@ -181,15 +194,19 @@
       console.warn('[settings] public fetch failed:', err);
     }
 
-    try {
-      const backendSettings = await fetchJson(BACKEND + '/site-settings');
-      const nextSettings = chooseBackendSettings(backendSettings);
-      if (nextSettings) {
-        writeCache(nextSettings);
-        applyBindings(nextSettings);
+    if (!isLocal && Date.now() >= backendRetryAt) {
+      try {
+        const backendSettings = await fetchJson(BACKEND + '/site-settings', { noStore: true });
+        noteBackendSuccess();
+        const nextSettings = chooseBackendSettings(backendSettings);
+        if (nextSettings) {
+          writeCache(nextSettings);
+          applyBindings(nextSettings);
+        }
+      } catch (err) {
+        noteBackendFailure();
+        console.warn('[settings] backend fetch failed:', err);
       }
-    } catch (err) {
-      console.warn('[settings] backend fetch failed:', err);
     }
 
     if (!window.__SITE_SETTINGS__) {
@@ -222,6 +239,7 @@
   window.addEventListener('message', (e) => {
     if (!e.data || e.data.type !== 'phs:preview-settings') return;
     if (!isPreviewIframe) return; // never accept overrides on the live site
+    if (e.source !== window.parent) return;
     const s = e.data.settings;
     if (s && typeof s === 'object') {
       window.__SITE_SETTINGS__ = s;

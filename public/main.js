@@ -32,17 +32,19 @@ const OVERRIDE_CACHE_FALLBACK_TTL_MS = 24 * 60 * 60 * 1000;
 const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
 const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const SCHEDULE_DATA_FETCH_TIMEOUT_MS = 5000;
-const LUNCH_WEATHER_CACHE_KEY = 'phs:lunch-weather:v6';
+const LUNCH_WEATHER_CACHE_KEY = 'phs:lunch-weather:v7';
 const LUNCH_WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
 const LUNCH_WEATHER_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 const LUNCH_WEATHER_FETCH_TIMEOUT_MS = 2200;
-const LUNCH_WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=39.1459&longitude=-77.4169&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=2';
+const LUNCH_WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=39.1459&longitude=-77.4169&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&minutely_15=precipitation,precipitation_probability,weather_code&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=2';
 const LUNCH_WEATHER_FALLBACK_START_SEC = 10 * 3600 + 20 * 60;
 const LUNCH_WEATHER_FALLBACK_END_SEC = 12 * 3600;
 const LUNCH_WEATHER_FORECAST_END_SEC = 14 * 3600 + 30 * 60;
 const LUNCH_WEATHER_MAX_HOURS = 5;
+const LUNCH_WEATHER_SOON_WINDOW_MINUTES = 45;
 const GRADEVIEWER_DEFAULT_LOCAL_URL = 'http://localhost:3001/login';
 const GRADEVIEWER_DEFAULT_PROD_URL = 'https://schedulephs.web.app/login';
+const GRADEVIEWER_EMBED_CACHE_BUST = '20260525-faq';
 const OPENTYPE_SCRIPT_URL = 'vendor/opentype.min.js?v=20260524-perf1';
 const SIGNATURE_FONT_URL = 'assets/fonts/AlexBrush-Regular.ttf';
 const FALLBACK_ANNOUNCEMENTS = {
@@ -573,6 +575,40 @@ function _weatherHourFromSource(hourly, current, time, sourceIndex, label) {
   };
 }
 
+function _minuteWeatherNumber(minutely, key, index, fallback = 0) {
+  if (index === null || index === undefined) return Number(fallback);
+  return Number(minutely?.[key]?.[index] ?? fallback);
+}
+
+function _rainSoonFromApi(api, referenceDate = _effectiveClockDate()) {
+  const minutely = api?.minutely_15;
+  const times = Array.isArray(minutely?.time) ? minutely.time : [];
+  if (!times.length) return null;
+  const startMs = referenceDate.getTime();
+  const endMs = startMs + LUNCH_WEATHER_SOON_WINDOW_MINUTES * 60 * 1000;
+  let firstRain = null;
+  let maxChance = 0;
+  for (let index = 0; index < times.length; index += 1) {
+    const timeMs = new Date(times[index]).getTime();
+    if (!Number.isFinite(timeMs) || timeMs < startMs || timeMs > endMs) continue;
+    const chance = _minuteWeatherNumber(minutely, 'precipitation_probability', index, 0);
+    const precipitation = _minuteWeatherNumber(minutely, 'precipitation', index, 0);
+    const code = Number(minutely.weather_code?.[index] ?? 0);
+    maxChance = Math.max(maxChance, chance);
+    if (!firstRain && (precipitation > 0 || _weatherKind(code) === 'rain')) {
+      firstRain = { timeMs, chance, precipitation, code };
+    }
+  }
+  if (!firstRain && maxChance < 35) return null;
+  return {
+    minutes: firstRain ? Math.max(0, Math.round((firstRain.timeMs - startMs) / 60000)) : null,
+    chance: Math.round(firstRain?.chance ?? maxChance),
+    precipitation: Number(firstRain?.precipitation ?? 0),
+    code: Number(firstRain?.code ?? 0),
+    windowMinutes: LUNCH_WEATHER_SOON_WINDOW_MINUTES
+  };
+}
+
 function _renderLunchWeatherDetails(payload) {
   if (!_weatherDetails) return;
   const details = payload
@@ -602,6 +638,14 @@ function _renderLunchWeatherDetails(payload) {
 
 function _lunchWeatherAdvice(payload) {
   if (!payload) return 'Lunch weather loading...';
+  if (payload.soonRain) {
+    if (payload.soonRain.minutes !== null && payload.soonRain.minutes <= 15) return 'Rain expected soon.';
+    if (payload.soonRain.chance >= 60) return 'Rain likely soon.';
+    return 'Rain possible soon.';
+  }
+  if (_weatherKind(payload.code, payload.isDay !== false) === 'rain' || payload.precipitation > 0) return 'Rain around lunch.';
+  if (payload.rainChance >= 60) return 'Rain likely around lunch.';
+  if (payload.rainChance >= 35) return 'Rain possible around lunch.';
   return `${payload.condition} around lunch.`;
 }
 
@@ -641,6 +685,7 @@ function _weatherPayloadFromApi(api, referenceDate = _effectiveClockDate()) {
     code: currentCode,
     isDay: currentIsDay,
     condition: _weatherLabel(currentCode),
+    soonRain: _rainSoonFromApi(api, referenceDate),
     hours,
     referenceTime: referenceDate.toISOString(),
     lunchWeatherEndTime: _weatherDateAt(referenceDate, context.endSec).toISOString(),
@@ -832,6 +877,19 @@ function _safeFrameUrl(value) {
   }
 }
 
+function _withGradeViewerEmbedVersion(value) {
+  if (!value) return '';
+  try {
+    const url = new URL(value, window.location.href);
+    if (url.hostname === 'schedulephs.web.app') {
+      url.searchParams.set('phs_embed_v', GRADEVIEWER_EMBED_CACHE_BUST);
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 function _navHrefKind(href) {
   if (!href) return '';
   try {
@@ -1010,7 +1068,7 @@ async function _applyGradesFrameUrl(settings) {
   if (_gradesFrameUrlLocked || !_gradesFrame) return;
   const token = ++_gradesFrameApplyToken;
   const localUrl = settings?.grades?.iframeUrlLocal || (_isLocalhost() ? GRADEVIEWER_DEFAULT_LOCAL_URL : '');
-  const prodUrl = settings?.grades?.iframeUrlProd || GRADEVIEWER_DEFAULT_PROD_URL;
+  const prodUrl = _withGradeViewerEmbedVersion(settings?.grades?.iframeUrlProd || GRADEVIEWER_DEFAULT_PROD_URL);
   let url = _safeFrameUrl(_isLocalhost() ? localUrl : prodUrl);
   if (_isLocalhost() && (!localUrl || !(await _localGradeMelonAvailable()))) url = prodUrl;
   url = _safeFrameUrl(url);
