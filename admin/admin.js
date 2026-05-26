@@ -9,7 +9,8 @@
   const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const BACKEND_HOST = 'phs-grades-backend.onrender.com';
   const isBackendHostedAdmin = location.hostname === BACKEND_HOST;
-  const BACKEND = isBackendHostedAdmin ? location.origin : (isLocal ? 'http://localhost:3000' : `https://${BACKEND_HOST}`);
+  const LOCAL_BACKEND = location.protocol === 'file:' ? 'http://localhost:3000' : `http://${location.hostname}:3000`;
+  const BACKEND = isBackendHostedAdmin ? location.origin : (isLocal ? (location.port === '3000' ? location.origin : LOCAL_BACKEND) : `https://${BACKEND_HOST}`);
   const TOKEN_KEY = 'phs:admin-token:v1';
   const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
   const SIDEBAR_COLLAPSED_KEY = 'phs:admin-sidebar-collapsed:v1';
@@ -22,13 +23,17 @@
     defaults: null,
     draft: null,       // working copy with unsaved edits
     identity: null,
-    activeTab: 'branding',
+    adminHealth: null,
+    devControlsEnabled: false,
+    lastPublishResult: null,
+    lastPublishAt: null,
+    activeTab: 'overview',
     search: '',
     previewMode: 'draft', // 'draft' | 'live'
     importAssistant: null,
     jarvis: {
       messages: [
-        { role: 'assistant', text: 'Ask anything. I will draft the change, then you can preview and publish it.' }
+        { role: 'assistant', text: 'Tell me the admin change. I will draft it as a preview first; nothing publishes until you approve it.' }
       ],
       pending: null,
       attachments: [],
@@ -71,33 +76,51 @@
 
   // ── Schema (drives the entire UI) ──────────────────────────────────────
   const SCHEMA = [
-    { id: 'jarvis',       label: 'Jarvis', title: 'Jarvis V1.1', icon: 'jarvis',
-      sub: 'Ask Anything. Let Jarvis cook, then preview before publishing.',
+    { id: 'overview', label: 'Overview', title: 'Control room', icon: 'analytics', section: 'Control',
+      sub: 'Publish readiness, backend status, and the shortest path to safe changes.',
+      groups: [{ title: '', custom: 'overviewDashboard' }]
+    },
+    { id: 'jarvis', label: 'Jarvis', title: 'Jarvis', icon: 'jarvis', section: 'Control',
+      sub: 'AI drafting for safe admin changes. Review the draft before anything publishes.',
       groups: [{ title: '', custom: 'jarvisAssistant' }]
     },
-    { id: 'branding',    label: 'Branding',         icon: 'branding',
-      sub: 'Site title, logo, favicon — visible on every page.',
+    { id: 'bellSchedules',label: 'Schedule', title: 'Schedule', icon: 'bell', section: 'Workflows',
+      sub: 'Use a custom schedule for today, choose the active schedule, and edit reusable schedule types.',
+      groups: [
+        { title: 'Active override', custom: 'scheduleOverrideEditor' },
+        { title: 'Reusable schedules', custom: 'bellEditor' },
+        { title: 'Custom schedule from image', custom: 'scheduleImageImport' }
+      ]
+    },
+    { id: 'announcements',label: 'Announcements', icon: 'announce', section: 'Workflows',
+      sub: 'Cards shown on the announcements page.',
+      groups: [{ title: 'Cards', custom: 'announcementsEditor' }]
+    },
+    { id: 'appearance', label: 'Site', title: 'Site controls', icon: 'theme', section: 'Workflows',
+      sub: 'Branding, navigation, page copy, theme defaults, and footer content.',
       groups: [{
+        title: 'Theme colors', fields: [
+          { path: 'theme.accent',  label: 'Accent',           kind: 'color' },
+          { path: 'theme.accent2', label: 'Accent (deep)',    kind: 'color' },
+          { path: 'theme.bg1',     label: 'Background outer', kind: 'color' },
+          { path: 'theme.bg2',     label: 'Background inner', kind: 'color' },
+          { path: 'theme.fg1',     label: 'Foreground',       kind: 'color' },
+          { path: 'theme.fg2',     label: 'Muted foreground', kind: 'color' },
+        ]},{
         title: 'Identity', fields: [
           { path: 'branding.siteTitle',       label: 'Site title (browser tab)', kind: 'text', max: 200 },
           { path: 'branding.siteDescription', label: 'Meta description',         kind: 'text', max: 300 },
         ]},{
         title: 'Logo', fields: [
-          { path: 'branding.logoSrc',  label: 'Logo image', kind: 'image', help: 'PNG / JPG / SVG, ≤ 4 MB' },
+          { path: 'branding.logoSrc',  label: 'Logo image', kind: 'image', help: 'PNG / JPG / WebP / GIF / ICO, ≤ 4 MB' },
           { path: 'branding.logoAlt',  label: 'Logo alt text', kind: 'text', max: 120 },
           { path: 'branding.logoLink', label: 'Logo click-through URL', kind: 'url' },
         ]},{
         title: 'Favicon', fields: [
           { path: 'branding.favicon', label: 'Favicon (ico / png)', kind: 'image' }
-        ]}]
-    },
-    { id: 'nav',          label: 'Navigation',       icon: 'nav',
-      sub: 'Links shown in the top navigation bar of every page.',
-      groups: [{ title: 'Nav items', custom: 'navEditor' }]
-    },
-    { id: 'hero',         label: 'Page Headers',     icon: 'hero',
-      sub: 'Hero text on each page.',
-      groups: [{
+        ]},{
+        title: 'Navigation', custom: 'navEditor'
+      },{
         title: 'Schedule page', fields: [
           { path: 'hero.schedulePageEyebrow',        label: 'Eyebrow above period name', kind: 'text', max: 80 },
           { path: 'hero.schedulePageStatusFallback', label: 'Status pill loading text', kind: 'text', max: 60 },
@@ -107,29 +130,8 @@
           { path: 'hero.gradesPageTitle',        label: 'Grades title',        kind: 'text', max: 80 },
         ]}]
     },
-    { id: 'announcements',label: 'Announcements',    icon: 'announce',
-      sub: 'Cards shown on the announcements page.',
-      groups: [{ title: 'Cards', custom: 'announcementsEditor' }]
-    },
-    { id: 'bellSchedules',label: 'Bell Schedule',    icon: 'bell',
-      sub: 'Use a custom schedule for today, choose the active schedule, and edit reusable schedule types.',
-      groups: [
-        { title: 'Custom schedule from image', custom: 'scheduleImageImport' },
-        { title: 'Active override', custom: 'scheduleOverrideEditor' },
-        { title: 'Reusable schedules', custom: 'bellEditor' }
-      ]
-    },
-    { id: 'grades',       label: 'Grades Iframe',    icon: 'grades',
-      sub: 'Where the embedded GradeMelon iframe loads from.',
-      groups: [{
-        title: 'Iframe URLs', fields: [
-          { path: 'grades.iframeUrlLocal', label: 'Local-development URL', kind: 'url', help: 'Used when site runs on localhost.' },
-          { path: 'grades.iframeUrlProd',  label: 'Production URL',         kind: 'url' },
-          { path: 'grades.pageTitle',      label: 'Browser-tab title',      kind: 'text' },
-        ]}]
-    },
-    { id: 'gradeMelon',   label: 'GradeViewer', title: 'FAQ/Privacy',  icon: 'grademelon',
-      sub: 'Privacy FAQ and button text shown in the GradeViewer page.',
+    { id: 'safety', label: 'Safety', title: 'Safety and privacy', icon: 'privacy', section: 'Workflows',
+      sub: 'Privacy text, GradeViewer copy, analytics visibility, and policy-sensitive settings.',
       groups: [{
         title: 'Privacy / Safety FAQ', fields: [
           { path: 'gradeMelon.privacyButtonLabel', label: 'Link button label', kind: 'text' },
@@ -137,18 +139,27 @@
           { path: 'gradeMelon.privacyDoneLabel',   label: 'Close-button label',kind: 'text' },
         ]},{
         title: 'Modal paragraphs', custom: 'privacyParagraphsEditor'
+      },{
+        title: 'Usage overview', custom: 'analyticsDashboard'
       }]
     },
-    { id: 'appearance',   label: 'Appearance',       icon: 'theme',
-      sub: 'Staff defaults for colors, sizing, and spacing on the public pages.',
+    { id: 'history', label: 'History', title: 'History and rollback', icon: 'backup', section: 'System',
+      sub: 'Recent admin actions and published backups.',
       groups: [{
-        title: 'Theme colors', fields: [
-          { path: 'theme.accent',  label: 'Accent',           kind: 'color' },
-          { path: 'theme.accent2', label: 'Accent (deep)',    kind: 'color' },
-          { path: 'theme.bg1',     label: 'Background outer', kind: 'color' },
-          { path: 'theme.bg2',     label: 'Background inner', kind: 'color' },
-          { path: 'theme.fg1',     label: 'Foreground',       kind: 'color' },
-          { path: 'theme.fg2',     label: 'Muted foreground', kind: 'color' },
+        title: 'Recent events', custom: 'auditLog'
+      },{
+        title: 'Published versions', custom: 'backupManager'
+      }]
+    },
+    { id: 'advanced', label: 'Advanced', title: 'Advanced settings', icon: 'grades', section: 'System',
+      sub: 'Low-frequency controls. Change these only when the public app contract changes.',
+      groups: [{
+        title: 'Local server', custom: 'localDevTools'
+      },{
+        title: 'GradeViewer iframe', fields: [
+          { path: 'grades.iframeUrlLocal', label: 'Local-development URL', kind: 'url', help: 'Used when site runs on localhost.' },
+          { path: 'grades.iframeUrlProd',  label: 'Production URL',         kind: 'url' },
+          { path: 'grades.pageTitle',      label: 'Browser-tab title',      kind: 'text' },
         ]},{
         title: 'Hero and countdown', fields: [
           { path: 'appearance.heroEyebrowSize', label: 'Hero eyebrow size', kind: 'number', min: 28, max: 110, step: 1, unit: 'px' },
@@ -166,39 +177,13 @@
         title: 'Footer display', fields: [
           { path: 'appearance.footerSize',  label: 'Footer text size', kind: 'number', min: 9, max: 24, step: 1, unit: 'px' },
           { path: 'appearance.footerColor', label: 'Footer text color', kind: 'color' },
-        ]}]
-    },
-    { id: 'footer',       label: 'Footer',           icon: 'footer',
-      sub: 'Footer copy, feedback link, support contact.',
-      groups: [{
+        ]},{
         title: 'Footer', fields: [
           { path: 'footer.copyright',     label: 'Copyright line',  kind: 'text' },
           { path: 'footer.feedbackUrl',   label: 'Feedback URL',    kind: 'url' },
           { path: 'footer.feedbackLabel', label: 'Feedback label',  kind: 'text' },
           { path: 'footer.supportEmail',  label: 'Support contact (any text or email)', kind: 'text', help: 'Email addresses become a clickable mailto: link automatically. Any other text is rendered as plain text.' },
         ]}]
-    },
-    { id: 'countdown',    label: 'Countdown',        icon: 'countdown',
-      sub: 'Labels around the countdown ring.',
-      groups: [{
-        title: 'Labels', fields: [
-          { path: 'countdown.minSuffix', label: 'Minute suffix (e.g. "m")', kind: 'text', max: 6 }
-        ]}]
-    },
-    { id: 'analytics',    label: 'Statistics',       icon: 'analytics',
-      sub: 'Privacy-safe aggregate usage data. No personal data is collected.',
-      readOnly: true,
-      groups: [{ title: 'Usage overview', custom: 'analyticsDashboard' }]
-    },
-    { id: 'audit',        label: 'Audit Log',        icon: 'audit',
-      sub: 'Recent admin changes — read only.',
-      readOnly: true,
-      groups: [{ title: 'Recent events', custom: 'auditLog' }]
-    },
-    { id: 'backups',      label: 'Backups',          icon: 'backup',
-      sub: 'Restore a previously published version if a change needs to be rolled back.',
-      readOnly: true,
-      groups: [{ title: 'Published versions', custom: 'backupManager' }]
     }
   ];
 
@@ -300,6 +285,7 @@
     const host = $('#toast-host');
     const el = document.createElement('div');
     el.className = 'admin-toast ' + kind;
+    if (kind === 'error') el.setAttribute('role', 'alert');
     el.textContent = msg;
     host.appendChild(el);
     setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .25s'; }, ms - 250);
@@ -318,6 +304,13 @@
     $('#login-shell').classList.add('hidden');
     $('#app-shell').classList.remove('hidden');
     syncSidebarState();
+  }
+
+  function restoreBearerSession() {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) state.token = token;
+    } catch {}
   }
   function fetchWithTimeout(url, opts = {}, ms = 15000) {
     const controller = new AbortController();
@@ -473,6 +466,7 @@
     try {
       const who = existingWho || await api('/admin/whoami');
       state.identity = who.identity || null;
+      state.devControlsEnabled = Boolean(who.devControlsEnabled);
       const [settings, defaults] = await Promise.all([
         fetch(BACKEND + '/site-settings').then(r => r.json()),
         fetch(BACKEND + '/site-settings/defaults').then(r => r.json())
@@ -499,13 +493,21 @@
     }
   }
   function pingConnection() {
-    api('/health', { silentAuth: true })
+    api('/admin/storage-status', { silentAuth: true })
       .then(j => {
+        state.adminHealth = j;
         const el = $('#conn-status');
-        if (j?.ok) { el.classList.remove('offline'); el.textContent = 'Backend online · ' + new URL(BACKEND).host; }
-        else { el.classList.add('offline'); el.textContent = 'Backend reachable but not OK'; }
+        el.classList.remove('offline');
+        el.textContent = 'Backend online · ' + (j?.settings?.type || 'settings ready');
+        if (state.activeTab === 'overview') renderActiveTab();
       })
-      .catch(() => { const el = $('#conn-status'); el.classList.add('offline'); el.textContent = 'Backend offline'; });
+      .catch(() => {
+        state.adminHealth = null;
+        const el = $('#conn-status');
+        el.classList.add('offline');
+        el.textContent = 'Admin health offline';
+        if (state.activeTab === 'overview') renderActiveTab();
+      });
   }
 
   function renderAdminIdentity() {
@@ -527,11 +529,119 @@
     chip.textContent = initials;
   }
 
+  function sectionLabelForKey(key) {
+    return ({
+      branding: 'Site',
+      nav: 'Site',
+      hero: 'Site',
+      theme: 'Site',
+      appearance: 'Site',
+      footer: 'Site',
+      countdown: 'Advanced',
+      announcements: 'Announcements',
+      bellSchedules: 'Schedule',
+      scheduleOverride: 'Schedule',
+      gradeMelon: 'Safety',
+      grades: 'Advanced'
+    })[key] || key;
+  }
+
+  function changedSections() {
+    if (!state.settings || !state.draft) return [];
+    const keys = new Set([...Object.keys(state.settings), ...Object.keys(state.draft)]);
+    return [...keys]
+      .filter(k => k !== 'updatedAt' && !eq(state.settings[k], state.draft[k]))
+      .map(sectionLabelForKey)
+      .filter((label, idx, arr) => arr.indexOf(label) === idx);
+  }
+
+  function renderOverviewDashboard() {
+    const host = document.createElement('div');
+    const changed = changedSections();
+    const dirty = changed.length > 0;
+    const override = state.draft?.scheduleOverride?.type || 'Auto / data.json';
+    const announcementCount = state.draft?.announcements?.items?.length || 0;
+    const health = state.adminHealth;
+    const settingsStorage = health?.settings;
+    const auditStorage = health?.audit;
+    const publish = state.lastPublishResult;
+    const syncError = publish?.publicFrontend?.error;
+    const syncDisabled = publish?.publicFrontend?.enabled === false;
+    const syncState = !publish
+      ? 'No publish this session'
+      : syncError
+        ? 'GitHub sync failed'
+        : syncDisabled
+          ? 'Backend saved only'
+          : 'Backend and public site synced';
+
+    host.innerHTML = `
+      <div class="admin-overview-grid">
+        <section class="admin-overview-card ${dirty ? 'attention' : 'ok'}">
+          <span>Draft state</span>
+          <strong>${dirty ? `${changed.length} changed ${changed.length === 1 ? 'section' : 'sections'}` : 'Ready'}</strong>
+          <small>${dirty ? escapeHtml(changed.join(', ')) : 'No unpublished edits.'}</small>
+        </section>
+        <section class="admin-overview-card ${health ? 'ok' : 'muted'}">
+          <span>Backend</span>
+          <strong>${health ? 'Online' : 'Checking'}</strong>
+          <small>${health ? escapeHtml(new URL(BACKEND).host) : 'Waiting for admin health.'}</small>
+        </section>
+        <section class="admin-overview-card ${syncError ? 'danger' : syncDisabled ? 'attention' : 'ok'}">
+          <span>Public sync</span>
+          <strong>${escapeHtml(syncState)}</strong>
+          <small>${syncError ? escapeHtml(syncError) : state.lastPublishAt ? `Last publish ${new Date(state.lastPublishAt).toLocaleTimeString()}` : 'Status appears after publishing.'}</small>
+        </section>
+        <section class="admin-overview-card">
+          <span>Active schedule</span>
+          <strong>${escapeHtml(override)}</strong>
+          <small>${announcementCount} announcement ${announcementCount === 1 ? 'card' : 'cards'} live in draft.</small>
+        </section>
+      </div>
+      <div class="admin-readiness-panel">
+        <div>
+          <h2>Next move</h2>
+          <p>${dirty ? 'Preview the draft, then publish only the sections listed below.' : 'Pick a workflow from the left. Schedule and announcements are the daily paths.'}</p>
+        </div>
+        <div class="admin-readiness-actions">
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="bellSchedules">${ICON.bell}<span>Schedule</span></button>
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="announcements">${ICON.announce}<span>Announcements</span></button>
+          <button type="button" class="admin-btn admin-btn-sm" id="overview-preview">${ICON.eye}<span>Preview</span></button>
+          ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-sm admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+        </div>
+      </div>
+      <div class="admin-system-strip">
+        <span>Settings storage: <strong>${escapeHtml(settingsStorage?.type || 'unknown')}</strong>${settingsStorage?.durable ? ' durable' : ''}</span>
+        <span>Audit storage: <strong>${escapeHtml(auditStorage?.type || 'unknown')}</strong>${auditStorage?.durable ? ' durable' : ''}</span>
+        <span>Signed in as: <strong>${escapeHtml(state.identity?.email || state.identity?.name || 'local admin')}</strong></span>
+      </div>`;
+
+    host.querySelectorAll('[data-go-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.activeTab = btn.dataset.goTab;
+        renderSidebar();
+        renderActiveTab();
+      });
+    });
+    host.querySelector('#overview-preview')?.addEventListener('click', openDraftPreview);
+    host.querySelector('#overview-public-sync-retry')?.addEventListener('click', retryPublicSync);
+    return host;
+  }
+
   // ── Sidebar / tabs ─────────────────────────────────────────────────────
   function renderSidebar() {
     const nav = $('#tabs');
     nav.innerHTML = '';
+    let lastSection = '';
     for (const tab of SCHEMA) {
+      const section = tab.section || 'Site';
+      if (section !== lastSection) {
+        const label = document.createElement('div');
+        label.className = 'admin-sidebar-section-label admin-sidebar-section-label--inline';
+        label.textContent = section;
+        nav.appendChild(label);
+        lastSection = section;
+      }
       const b = document.createElement('button');
       b.className = 'admin-tab-btn' + (tab.id === state.activeTab ? ' active' : '');
       b.dataset.tab = tab.id;
@@ -686,27 +796,42 @@
     const host = document.createElement('div');
     const preview = document.createElement('div');
     preview.className = 'admin-image-preview';
+    function previewSrc(rawValue) {
+      const raw = String(rawValue || '').trim();
+      if (!raw) return '';
+      if (/^(https?:|data:image\/|blob:|\/)/i.test(raw)) return raw;
+      return '';
+    }
     function paint() {
       const v = get(state.draft, field.path) || '';
+      const src = previewSrc(v);
       preview.innerHTML = `
-        <img src="${escapeHtml(v)}" alt="">
+        <div class="admin-image-preview-media">
+          ${src ? `<img src="${escapeHtml(src)}" alt="">` : `<span class="admin-image-fallback">${ICON.upload}</span>`}
+        </div>
         <div class="info">
           <div class="name">${escapeHtml(v) || '— no image set —'}</div>
-          <div class="meta">Choose a file to upload, or paste a URL/path.</div>
+          <div class="meta">${v ? (src ? 'Previewing the saved URL/path.' : 'Preview needs a served URL/path, such as /uploads/file.png.') : 'Choose a file to upload, or paste a URL/path.'}</div>
         </div>
       `;
-      preview.querySelector('img')?.addEventListener('error', e => { e.currentTarget.style.opacity = '.2'; });
+      preview.querySelector('img')?.addEventListener('error', () => {
+        const media = preview.querySelector('.admin-image-preview-media');
+        const meta = preview.querySelector('.meta');
+        if (media) media.innerHTML = `<span class="admin-image-fallback">${ICON.upload}</span>`;
+        if (meta) meta.textContent = 'Preview unavailable. Upload the file or use a served URL/path.';
+      });
     }
     paint();
     const text = document.createElement('input');
     text.className = 'admin-input mono';
+    text.id = fieldId(field.path);
     text.style.marginTop = '10px';
     text.value = value || '';
-    text.placeholder = 'phs-logo.png · /uploads/123-logo.svg · https://…';
+    text.placeholder = 'phs-logo.png · /uploads/123-logo.png · https://…';
     text.addEventListener('input', () => { onFieldChange(field.path, text.value); paint(); });
 
     const file = document.createElement('input');
-    file.type = 'file'; file.accept = 'image/*'; file.style.display = 'none';
+    file.type = 'file'; file.accept = '.png,.jpg,.jpeg,.webp,.gif,.ico,image/png,image/jpeg,image/webp,image/gif,image/x-icon'; file.style.display = 'none';
     file.addEventListener('change', async () => {
       if (!file.files?.length) return;
       const fd = new FormData();
@@ -733,6 +858,37 @@
     btnRow.append(upBtn, clrBtn, file);
 
     host.append(preview, text, btnRow);
+    return host;
+  }
+
+  function renderLocalDevTools() {
+    const host = document.createElement('div');
+    const localHost = isLocal || state.identity?.email === 'localhost';
+    const enabled = localHost && state.devControlsEnabled;
+    host.className = 'admin-local-dev-tools';
+    host.innerHTML = `
+      <div class="admin-privacy-note admin-local-dev-note">
+        <strong>Local host controls</strong>
+        <span>${enabled
+          ? 'Enabled for this local backend. This never appears as an active control in production.'
+          : 'Locked. Restart the backend with ENABLE_DEV_ADMIN_CONTROLS=true to enable this local-only control.'}</span>
+      </div>
+      <div class="admin-readiness-actions admin-local-dev-actions">
+        <button type="button" class="admin-btn admin-btn-danger" id="admin-dev-shutdown" ${enabled ? '' : 'disabled'}>
+          ${ICON.close}<span>Force shutdown local host</span>
+        </button>
+      </div>
+      <div class="admin-field-help">Use this only when localhost is stuck. After shutdown, ask Codex to start the admin server again.</div>
+    `;
+    host.querySelector('#admin-dev-shutdown')?.addEventListener('click', async () => {
+      if (!confirm('Force shutdown this local admin server? You will need to start localhost again.')) return;
+      try {
+        await api('/admin/dev/shutdown', { method: 'POST' });
+        toast('Local host is shutting down. Ask Codex to start it again.', 'success', 6000);
+      } catch (e) {
+        toast('Shutdown refused: ' + e.message, 'error', 6000);
+      }
+    });
     return host;
   }
 
@@ -1725,7 +1881,7 @@
                 <canvas class="admin-jarvis-globe" width="760" height="760"></canvas>
               </div>
             </div>
-            <h2>${busy ? 'Let Jarvis cook...' : 'Jarvis V1.1'}</h2>
+            <h2>${busy ? 'Drafting change...' : 'Jarvis'}</h2>
             <div class="admin-jarvis-messages ${hasConversation ? 'has-conversation' : ''}" id="jarvis-messages">
               ${state.jarvis.messages.map(m => `
                 <div class="admin-jarvis-message ${m.role === 'user' ? 'user' : 'assistant'}">
@@ -1742,8 +1898,8 @@
               ${renderAttachmentChips(state.jarvis.attachments, true)}
               <div class="admin-jarvis-composer-row">
                 <button type="button" class="admin-jarvis-icon-btn" id="jarvis-add-file" title="Add images" aria-label="Add images">${ICON.plus}</button>
-                <textarea id="jarvis-input" maxlength="3000" rows="1" placeholder="Let Jarvis cook..." ${busy ? 'disabled' : ''}></textarea>
-                <button type="button" class="admin-jarvis-tools-btn" aria-label="Gemini tools"><span>${ICON.sparkle}</span><strong>G</strong></button>
+                <textarea id="jarvis-input" maxlength="3000" rows="1" placeholder="Describe the site change..." ${busy ? 'disabled' : ''}></textarea>
+                <button type="button" class="admin-jarvis-tools-btn" aria-label="Add image context"><span>${ICON.sparkle}</span><strong>G</strong></button>
                 <button type="submit" class="admin-jarvis-send-btn" id="jarvis-send" aria-label="Send" ${busy ? 'disabled' : ''}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m6 11 6-6 6 6"/></svg>
                 </button>
@@ -1837,13 +1993,13 @@
         text: requestText,
         attachments: attachmentDataForMessage(attachments)
       });
-      state.jarvis.messages.push({ role: 'assistant', text: 'Let Jarvis cook...' });
+      state.jarvis.messages.push({ role: 'assistant', text: 'Drafting a safe preview...' });
       paint();
 
       const beforeDraft = deepClone(state.draft);
       try {
         const history = state.jarvis.messages
-          .filter(m => !(m.role === 'assistant' && m.text === 'Let Jarvis cook...'))
+          .filter(m => !(m.role === 'assistant' && m.text === 'Drafting a safe preview...'))
           .slice(-12);
         const resp = await api('/admin/ai/jarvis', {
           method: 'POST',
@@ -2130,8 +2286,10 @@
       if (tab.id === 'appearance') card.classList.add(`admin-appearance-card-${group.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
       card.innerHTML = group.title ? `<h2>${escapeHtml(group.title)}</h2>` : '';
 
-      if (group.custom === 'navEditor')                 { card.appendChild(renderNavEditor()); anyVisible = true; }
+      if (group.custom === 'overviewDashboard')         { card.classList.add('admin-card--flush'); card.appendChild(renderOverviewDashboard()); anyVisible = true; }
+      else if (group.custom === 'navEditor')            { card.appendChild(renderNavEditor()); anyVisible = true; }
       else if (group.custom === 'jarvisAssistant')      { card.appendChild(renderJarvisAssistant()); anyVisible = true; }
+      else if (group.custom === 'localDevTools')        { card.appendChild(renderLocalDevTools()); anyVisible = true; }
       else if (group.custom === 'announcementsEditor')  { card.appendChild(renderAnnouncementsEditor()); anyVisible = true; }
       else if (group.custom === 'scheduleOverrideEditor'){ card.appendChild(renderScheduleOverrideEditor()); anyVisible = true; }
       else if (group.custom === 'bellEditor')           { card.appendChild(renderBellEditor()); anyVisible = true; }
@@ -2159,13 +2317,16 @@
   // ── Dirty / publish ────────────────────────────────────────────────────
   function refreshDirtyMarkers() {
     const dirty = !eq(state.settings, state.draft);
+    const changed = changedSections();
     const tab = SCHEMA.find(t => t.id === state.activeTab) || SCHEMA[0];
     const readOnly = Boolean(tab.readOnly);
+    $('#app-shell')?.classList.toggle('admin-shell--has-unsaved', dirty && !readOnly);
     $('#discard-btn').classList.toggle('hidden', readOnly);
     $('#publish-btn').classList.toggle('hidden', readOnly);
     $('#dirty-pill').classList.toggle('hidden', readOnly);
     $('#dirty-pill').classList.toggle('visible', dirty);
-    $('#dirty-pill').textContent = dirty ? 'Unsaved changes' : '';
+    $('#dirty-pill').textContent = dirty ? `${changed.length || 1} changed ${changed.length === 1 ? 'section' : 'sections'}` : '';
+    $('#publish-btn').textContent = dirty ? `Publish ${changed.length || 1}` : 'Publish';
     $('#publish-btn').disabled = readOnly || !dirty;
     $('#discard-btn').disabled = readOnly || !dirty;
     $$('.admin-field').forEach(f => {
@@ -2183,7 +2344,6 @@
 
   async function publishDraft(source = 'manual', opts = {}) {
     const btn = $('#publish-btn');
-    const originalText = btn.textContent;
     btn.disabled = true; btn.textContent = 'Publishing...';
     try {
       const patch = {};
@@ -2196,6 +2356,8 @@
       const json = await api('/site-settings', { method: 'PUT', body: JSON.stringify({ patch, source }) });
       state.settings = json.settings;
       state.draft = deepClone(json.settings);
+      state.lastPublishResult = json;
+      state.lastPublishAt = new Date().toISOString();
       if (json.publicFrontend?.error) {
         toast('Backend saved, but GitHub frontend sync failed: ' + json.publicFrontend.error, 'error', 7000);
       } else if (json.publicFrontend?.enabled === false) {
@@ -2211,13 +2373,41 @@
       toast('Publish failed: ' + e.message, 'error', 6000);
       throw e;
     } finally {
-      btn.disabled = false; btn.textContent = originalText || 'Publish';
+      btn.disabled = false;
+      refreshDirtyMarkers();
     }
   }
 
   $('#publish-btn').addEventListener('click', () => {
     publishDraft('manual').catch(() => {});
   });
+
+  async function retryPublicSync() {
+    const btn = $('#overview-public-sync-retry');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Retrying...';
+    }
+    try {
+      const json = await api('/admin/publish-public-settings', { method: 'POST' });
+      state.lastPublishResult = json;
+      state.lastPublishAt = new Date().toISOString();
+      if (json.publicFrontend?.error) {
+        toast('GitHub frontend sync failed: ' + json.publicFrontend.error, 'error', 7000);
+      } else if (json.publicFrontend?.enabled === false) {
+        toast('GitHub frontend sync is not configured.', 'error', 7000);
+      } else {
+        toast('Public site settings synced.', 'success', 3500);
+      }
+      renderActiveTab();
+    } catch (e) {
+      toast('Public sync retry failed: ' + e.message, 'error', 6000);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Retry public sync';
+      }
+    }
+  }
 
   $('#sidebar-collapse-btn')?.addEventListener('click', toggleDesktopSidebar);
   $('#mobile-sidebar-toggle')?.addEventListener('click', toggleMobileSidebar);
@@ -2313,7 +2503,7 @@
   });
 
   // ── Init ───────────────────────────────────────────────────────────────
-  try { localStorage.removeItem(TOKEN_KEY); } catch {}
-  if (isLocal || isBackendHostedAdmin) bootApp(); else showLogin();
+  restoreBearerSession();
+  if (isLocal || isBackendHostedAdmin || state.token) bootApp(); else showLogin();
   if (!isLocal) loadAuthConfig();
 })();
