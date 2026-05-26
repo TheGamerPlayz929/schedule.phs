@@ -73,10 +73,58 @@
     }
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw) ? raw.toUpperCase() : null;
   }
+  function cleanStatusText(value, fallback, max) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return (text || fallback).slice(0, max);
+  }
+  function ensureMaintenancePanel() {
+    let panel = document.getElementById('site-maintenance');
+    if (panel) return panel;
+
+    panel = document.createElement('main');
+    panel.id = 'site-maintenance';
+    panel.className = 'site-maintenance';
+    panel.hidden = true;
+    panel.setAttribute('role', 'status');
+    panel.setAttribute('aria-live', 'polite');
+
+    const mark = document.createElement('div');
+    mark.className = 'site-maintenance__mark';
+    mark.textContent = 'PHS';
+
+    const title = document.createElement('h1');
+    title.id = 'site-maintenance-title';
+
+    const message = document.createElement('p');
+    message.id = 'site-maintenance-message';
+
+    const note = document.createElement('span');
+    note.className = 'site-maintenance__note';
+    note.textContent = 'poolesville.web';
+
+    panel.append(mark, title, message, note);
+    document.body.appendChild(panel);
+    return panel;
+  }
+  function applySiteStatus(settings) {
+    const status = settings?.siteStatus || {};
+    const maintenance = status.mode === 'maintenance';
+    const panel = ensureMaintenancePanel();
+    document.body.classList.toggle('site-maintenance-active', maintenance);
+    document.querySelectorAll('.app-shell').forEach(shell => {
+      if (maintenance) shell.setAttribute('aria-hidden', 'true');
+      else shell.removeAttribute('aria-hidden');
+    });
+    panel.hidden = !maintenance;
+    if (!maintenance) return;
+    document.getElementById('site-maintenance-title').textContent = cleanStatusText(status.title, 'Site paused for maintenance', 120);
+    document.getElementById('site-maintenance-message').textContent = cleanStatusText(status.message, 'Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon.', 500);
+  }
 
   function applyBindings(settings) {
     if (!settings || typeof settings !== 'object') return;
     window.__SITE_SETTINGS__ = settings;
+    applySiteStatus(settings);
     document.querySelectorAll('[data-bind]').forEach(el => {
       const key = el.getAttribute('data-bind');
       const val = pickPath(settings, key);

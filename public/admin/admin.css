@@ -851,6 +851,55 @@ select:focus-visible,
   justify-content: flex-start;
 }
 
+.admin-security-tools {
+  display: grid;
+  gap: 14px;
+}
+.admin-security-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.admin-security-panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-1);
+  padding: 18px;
+}
+.admin-security-mode-row,
+.admin-security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.admin-security-actions {
+  margin: 14px 0 0;
+  justify-content: flex-start;
+}
+.admin-security-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.admin-security-list div {
+  min-height: 94px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.018);
+}
+.admin-security-list strong {
+  display: block;
+  color: var(--fg-1);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.admin-security-list span {
+  display: block;
+  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* ── Toast ───────────────────────────────────────────────────────── */
 .admin-toast-host {
   position: fixed; right: 22px; bottom: 22px;
@@ -1100,6 +1149,7 @@ select:focus-visible,
 
 @media (max-width: 1180px) {
   .admin-overview-grid,
+  .admin-security-grid,
   .admin-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1110,6 +1160,8 @@ select:focus-visible,
 
 @media (max-width: 720px) {
   .admin-overview-grid,
+  .admin-security-grid,
+  .admin-security-list,
   .admin-stat-grid {
     grid-template-columns: 1fr;
   }

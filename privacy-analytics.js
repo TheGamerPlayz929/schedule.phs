@@ -1,6 +1,7 @@
 /* Privacy-safe first-party analytics.
- * Collects only aggregate page events. No cookies, localStorage, IPs, names,
- * emails, user agents, StudentVue data, or persistent identifiers.
+ * Collects only aggregate page views and visible-duration totals. No cookies,
+ * localStorage, IPs, names, emails, user agents, StudentVue data, or persistent
+ * identifiers.
  */
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
@@ -21,15 +22,11 @@
   const page = PAGE_MAP[location.pathname] || document.getElementById('nav-links')?.dataset.page;
   if (!page) return;
 
-  const tabId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2))
-    .replace(/[^a-zA-Z0-9_-]/g, '')
-    .slice(0, 80);
   let visibleSince = document.visibilityState === 'visible' ? Date.now() : 0;
   let sentFinal = false;
-  let heartbeatTimer = 0;
 
   function post(payload, beacon = false) {
-    const body = JSON.stringify({ page, tabId, ...payload });
+    const body = JSON.stringify({ page, ...payload });
     if (beacon && navigator.sendBeacon) {
       navigator.sendBeacon(BACKEND + '/analytics/event', new Blob([body], { type: 'application/json' }));
       return;
@@ -52,24 +49,11 @@
 
   post({ type: 'pageview' });
 
-  function startHeartbeat() {
-    if (heartbeatTimer || document.visibilityState !== 'visible') return;
-    heartbeatTimer = setInterval(() => post({ type: 'heartbeat' }), 30000);
-  }
-  function stopHeartbeat() {
-    if (!heartbeatTimer) return;
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = 0;
-  }
-  startHeartbeat();
-
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      stopHeartbeat();
       sendDuration(true);
     } else {
       visibleSince = Date.now();
-      startHeartbeat();
     }
   });
 

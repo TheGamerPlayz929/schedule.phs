@@ -84,6 +84,10 @@
       sub: 'AI drafting for safe admin changes. Review the draft before anything publishes.',
       groups: [{ title: '', custom: 'jarvisAssistant' }]
     },
+    { id: 'security', label: 'Security', title: 'Site security', icon: 'privacy', section: 'Control',
+      sub: 'Main-site availability, public sync status, and admin safety controls.',
+      groups: [{ title: '', custom: 'siteSecurityCenter' }]
+    },
     { id: 'bellSchedules',label: 'Schedule', title: 'Schedule', icon: 'bell', section: 'Workflows',
       sub: 'Use a custom schedule for today, choose the active schedule, and edit reusable schedule types.',
       groups: [
@@ -130,7 +134,7 @@
           { path: 'hero.gradesPageTitle',        label: 'Grades title',        kind: 'text', max: 80 },
         ]}]
     },
-    { id: 'safety', label: 'Safety', title: 'Safety and privacy', icon: 'privacy', section: 'Workflows',
+    { id: 'safety', label: 'Privacy', title: 'Privacy and analytics', icon: 'privacy', section: 'Workflows',
       sub: 'Privacy text, GradeViewer copy, analytics visibility, and policy-sensitive settings.',
       groups: [{
         title: 'Privacy / Safety FAQ', fields: [
@@ -154,8 +158,6 @@
     { id: 'advanced', label: 'Advanced', title: 'Advanced settings', icon: 'grades', section: 'System',
       sub: 'Low-frequency controls. Change these only when the public app contract changes.',
       groups: [{
-        title: 'Local server', custom: 'localDevTools'
-      },{
         title: 'GradeViewer iframe', fields: [
           { path: 'grades.iframeUrlLocal', label: 'Local-development URL', kind: 'url', help: 'Used when site runs on localhost.' },
           { path: 'grades.iframeUrlProd',  label: 'Production URL',         kind: 'url' },
@@ -541,7 +543,9 @@
       announcements: 'Announcements',
       bellSchedules: 'Schedule',
       scheduleOverride: 'Schedule',
-      gradeMelon: 'Safety',
+      privacy: 'Privacy',
+      gradeMelon: 'Privacy',
+      siteStatus: 'Security',
       grades: 'Advanced'
     })[key] || key;
   }
@@ -572,7 +576,7 @@
       : syncError
         ? 'GitHub sync failed'
         : syncDisabled
-          ? 'Backend saved only'
+          ? 'Public sync needs setup'
           : 'Backend and public site synced';
 
     host.innerHTML = `
@@ -606,6 +610,7 @@
         <div class="admin-readiness-actions">
           <button type="button" class="admin-btn admin-btn-sm" data-go-tab="bellSchedules">${ICON.bell}<span>Schedule</span></button>
           <button type="button" class="admin-btn admin-btn-sm" data-go-tab="announcements">${ICON.announce}<span>Announcements</span></button>
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Security</span></button>
           <button type="button" class="admin-btn admin-btn-sm" id="overview-preview">${ICON.eye}<span>Preview</span></button>
           ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-sm admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
         </div>
@@ -861,34 +866,121 @@
     return host;
   }
 
-  function renderLocalDevTools() {
+  function normalizedSiteStatus() {
+    const status = state.draft?.siteStatus || {};
+    const title = typeof status.title === 'string' && status.title.trim()
+      ? status.title
+      : 'Site paused for maintenance';
+    const message = typeof status.message === 'string' && status.message.trim()
+      ? status.message
+      : 'Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon.';
+    return {
+      mode: status.mode === 'maintenance' ? 'maintenance' : 'live',
+      title,
+      message
+    };
+  }
+
+  function updateSiteStatusDraft(patch, rerender = false) {
+    state.draft.siteStatus = Object.assign({}, normalizedSiteStatus(), patch);
+    markDirty();
+    pushPreview();
+    if (rerender) renderActiveTab();
+  }
+
+  function renderSiteSecurityCenter() {
     const host = document.createElement('div');
-    const localHost = isLocal || state.identity?.email === 'localhost';
-    const enabled = localHost && state.devControlsEnabled;
-    host.className = 'admin-local-dev-tools';
+    const status = normalizedSiteStatus();
+    const maintenance = status.mode === 'maintenance';
+    const publish = state.lastPublishResult;
+    const syncError = publish?.publicFrontend?.error;
+    const syncDisabled = publish?.publicFrontend?.enabled === false;
+    const syncText = syncError
+      ? 'Sync failed'
+      : syncDisabled
+        ? 'Sync needs setup'
+        : publish
+          ? 'Synced'
+          : 'Ready';
+    const authText = state.identity?.method === 'google'
+      ? 'Google admin'
+      : state.identity?.method === 'local-dev'
+        ? 'Local admin'
+        : 'Admin session';
+
+    host.className = 'admin-security-tools';
     host.innerHTML = `
-      <div class="admin-privacy-note admin-local-dev-note">
-        <strong>Local host controls</strong>
-        <span>${enabled
-          ? 'Enabled for this local backend. This never appears as an active control in production.'
-          : 'Locked. Restart the backend with ENABLE_DEV_ADMIN_CONTROLS=true to enable this local-only control.'}</span>
+      <div class="admin-overview-grid admin-security-grid">
+        <section class="admin-overview-card ${maintenance ? 'danger' : 'ok'}">
+          <span>Public site</span>
+          <strong>${maintenance ? 'Maintenance' : 'Live'}</strong>
+          <small>${maintenance ? 'Visitors see a clean maintenance page.' : 'Visitors see the normal site.'}</small>
+        </section>
+        <section class="admin-overview-card ${syncError ? 'danger' : syncDisabled ? 'attention' : 'ok'}">
+          <span>Public sync</span>
+          <strong>${escapeHtml(syncText)}</strong>
+          <small>${syncError ? escapeHtml(syncError) : 'Publishing pushes the public-safe settings snapshot.'}</small>
+        </section>
+        <section class="admin-overview-card ok">
+          <span>Admin access</span>
+          <strong>${escapeHtml(authText)}</strong>
+          <small>${escapeHtml(state.identity?.email || state.identity?.name || 'Current session')}</small>
+        </section>
       </div>
-      <div class="admin-readiness-actions admin-local-dev-actions">
-        <button type="button" class="admin-btn admin-btn-danger" id="admin-dev-shutdown" ${enabled ? '' : 'disabled'}>
-          ${ICON.close}<span>Force shutdown local host</span>
-        </button>
-      </div>
-      <div class="admin-field-help">Use this only when localhost is stuck. After shutdown, ask Codex to start the admin server again.</div>
+
+      <section class="admin-security-panel">
+        <div class="admin-panel-heading">
+          <h2>Main-site availability</h2>
+          <span>Maintenance switch</span>
+        </div>
+        <div class="admin-security-mode-row">
+          <button type="button" class="admin-btn ${maintenance ? 'admin-btn-ghost' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live site</span></button>
+          <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" data-site-mode="maintenance">${ICON.close}<span>Force main-site shutdown</span></button>
+        </div>
+        <div class="admin-field">
+          <label for="site-status-title">Maintenance title</label>
+          <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}">
+        </div>
+        <div class="admin-field">
+          <label for="site-status-message">Maintenance message</label>
+          <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
+        </div>
+        <div class="admin-field-help">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
+        <div class="admin-readiness-actions admin-security-actions">
+          <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish security change</span></button>
+          <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview</span></button>
+          ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+        </div>
+      </section>
+
+      <section class="admin-security-panel">
+        <div class="admin-panel-heading">
+          <h2>Security controls</h2>
+          <span>Current safeguards</span>
+        </div>
+        <div class="admin-security-list">
+          <div><strong>Authenticated admin only</strong><span>Security changes still go through the normal admin session and publish flow.</span></div>
+          <div><strong>Validated public settings</strong><span>The maintenance switch only accepts live or maintenance, with short plain text.</span></div>
+          <div><strong>Public-safe publishing</strong><span>Only public site settings are synced; logs, sessions, IP data, and admin records stay backend-only.</span></div>
+          <div><strong>Audit and rollback</strong><span>Each publish keeps the existing backup and event history path available.</span></div>
+        </div>
+      </section>
     `;
-    host.querySelector('#admin-dev-shutdown')?.addEventListener('click', async () => {
-      if (!confirm('Force shutdown this local admin server? You will need to start localhost again.')) return;
-      try {
-        await api('/admin/dev/shutdown', { method: 'POST' });
-        toast('Local host is shutting down. Ask Codex to start it again.', 'success', 6000);
-      } catch (e) {
-        toast('Shutdown refused: ' + e.message, 'error', 6000);
-      }
+
+    host.querySelector('[data-site-mode="live"]')?.addEventListener('click', () => {
+      updateSiteStatusDraft({ mode: 'live' }, true);
+      toast('Live mode staged. Publish to restore the public site.', 'success', 3500);
     });
+    host.querySelector('[data-site-mode="maintenance"]')?.addEventListener('click', () => {
+      if (!maintenance && !confirm('Show the maintenance page on the main site after publishing?')) return;
+      updateSiteStatusDraft({ mode: 'maintenance' }, true);
+      toast('Maintenance mode staged. Publish to pause the public site.', 'success', 3500);
+    });
+    host.querySelector('#site-status-title')?.addEventListener('input', e => updateSiteStatusDraft({ title: e.target.value }));
+    host.querySelector('#site-status-message')?.addEventListener('input', e => updateSiteStatusDraft({ message: e.target.value }));
+    host.querySelector('#security-publish')?.addEventListener('click', () => publishDraft('security').catch(() => {}));
+    host.querySelector('#security-preview')?.addEventListener('click', openDraftPreview);
+    host.querySelector('#security-sync')?.addEventListener('click', retryPublicSync);
     return host;
   }
 
@@ -2148,17 +2240,15 @@
       const totals = last7.reduce((acc, key) => {
         const t = days[key]?.totals || {};
         acc.pageviews += t.pageviews || 0;
-        acc.heartbeats += t.heartbeats || 0;
         acc.durationSeconds += t.durationSeconds || 0;
         return acc;
-      }, { pageviews: 0, heartbeats: 0, durationSeconds: 0 });
+      }, { pageviews: 0, durationSeconds: 0 });
 
       const pages = {};
       for (const key of last7) {
         for (const [page, metrics] of Object.entries(days[key]?.pages || {})) {
-          pages[page] ||= { pageviews: 0, heartbeats: 0, durationSeconds: 0 };
+          pages[page] ||= { pageviews: 0, durationSeconds: 0 };
           pages[page].pageviews += metrics.pageviews || 0;
-          pages[page].heartbeats += metrics.heartbeats || 0;
           pages[page].durationSeconds += metrics.durationSeconds || 0;
         }
       }
@@ -2179,7 +2269,6 @@
             </td>
             <td>${formatNumber(m.pageviews)}</td>
             <td>${formatDuration(m.durationSeconds)}</td>
-            <td>${formatNumber(j.active?.pages?.[page] || 0)}</td>
           </tr>`).join('');
 
       const trendBars = trendDays.map(key => {
@@ -2197,7 +2286,7 @@
         <div class="admin-rank-row">
           <div>
             <strong>${escapeHtml(pageLabel(page))}</strong>
-            <span>${formatDuration(m.durationSeconds)} total time · ${formatNumber(j.active?.pages?.[page] || 0)} active</span>
+            <span>${formatDuration(m.durationSeconds)} total time</span>
           </div>
           <div class="admin-rank-meter"><span style="width:${Math.round(((m.pageviews || 0) / maxPageViews) * 100)}%"></span></div>
           <b>${formatNumber(m.pageviews)}</b>
@@ -2209,7 +2298,6 @@
           <td class="action">${escapeHtml(key)}</td>
           <td>${formatNumber(t.pageviews)}</td>
           <td>${formatDuration(t.durationSeconds)}</td>
-          <td>${formatNumber(t.heartbeats)}</td>
         </tr>`;
       }).join('');
 
@@ -2217,7 +2305,7 @@
         <div class="admin-stat-grid">
           <div class="admin-stat"><span>GA active users</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.activeUsers || 0) : 'Not set'}</strong><small>Google Analytics</small></div>
           <div class="admin-stat"><span>GA 7-day views</span><strong>${ga.configured && !ga.error ? formatNumber(ga.totals?.pageviews || 0) : '-'}</strong><small>${ga.configured && !ga.error ? `${formatNumber(ga.totals?.sessions || 0)} sessions` : 'Waiting for setup'}</small></div>
-          <div class="admin-stat"><span>Active now</span><strong>${formatNumber(j.active?.total || 0)}</strong><small>First-party live count</small></div>
+          <div class="admin-stat"><span>Time tracked</span><strong>${formatDuration(totals.durationSeconds)}</strong><small>First-party aggregate</small></div>
           <div class="admin-stat"><span>First-party 7-day views</span><strong>${formatNumber(totals.pageviews)}</strong><small>${formatDuration(totals.durationSeconds)} total time</small></div>
         </div>
         <div class="${ga.configured && !ga.error ? 'admin-privacy-note' : 'admin-setup-note'}">
@@ -2253,13 +2341,13 @@
         </table>` : ga.error ? `<div class="admin-field-help" style="color:var(--danger);margin-top:12px">${escapeHtml(ga.error)}</div>` : ''}
         <h2 style="margin-top:22px">First-party pages</h2>
         <table class="admin-audit-table">
-          <thead><tr><th>Page</th><th>Views</th><th>Total time</th><th>Active now</th></tr></thead>
-          <tbody>${pageRows || '<tr><td colspan="4" class="muted">No page data yet.</td></tr>'}</tbody>
+          <thead><tr><th>Page</th><th>Views</th><th>Total time</th></tr></thead>
+          <tbody>${pageRows || '<tr><td colspan="3" class="muted">No page data yet.</td></tr>'}</tbody>
         </table>
         <h2 style="margin-top:22px">Recent days</h2>
         <table class="admin-audit-table">
-          <thead><tr><th>Date</th><th>Views</th><th>Total time</th><th>Heartbeats</th></tr></thead>
-          <tbody>${dayRows || '<tr><td colspan="4" class="muted">No daily data yet.</td></tr>'}</tbody>
+          <thead><tr><th>Date</th><th>Views</th><th>Total time</th></tr></thead>
+          <tbody>${dayRows || '<tr><td colspan="3" class="muted">No daily data yet.</td></tr>'}</tbody>
         </table>`;
     }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`; });
     return host;
@@ -2289,7 +2377,7 @@
       if (group.custom === 'overviewDashboard')         { card.classList.add('admin-card--flush'); card.appendChild(renderOverviewDashboard()); anyVisible = true; }
       else if (group.custom === 'navEditor')            { card.appendChild(renderNavEditor()); anyVisible = true; }
       else if (group.custom === 'jarvisAssistant')      { card.appendChild(renderJarvisAssistant()); anyVisible = true; }
-      else if (group.custom === 'localDevTools')        { card.appendChild(renderLocalDevTools()); anyVisible = true; }
+      else if (group.custom === 'siteSecurityCenter')   { card.classList.add('admin-card--flush'); card.appendChild(renderSiteSecurityCenter()); anyVisible = true; }
       else if (group.custom === 'announcementsEditor')  { card.appendChild(renderAnnouncementsEditor()); anyVisible = true; }
       else if (group.custom === 'scheduleOverrideEditor'){ card.appendChild(renderScheduleOverrideEditor()); anyVisible = true; }
       else if (group.custom === 'bellEditor')           { card.appendChild(renderBellEditor()); anyVisible = true; }
@@ -2361,7 +2449,7 @@
       if (json.publicFrontend?.error) {
         toast('Backend saved, but GitHub frontend sync failed: ' + json.publicFrontend.error, 'error', 7000);
       } else if (json.publicFrontend?.enabled === false) {
-        toast('Backend saved. GitHub frontend sync is not configured.', 'error', 7000);
+        toast('Saved in admin. Public site sync needs setup before live changes update automatically.', 'error', 7000);
       } else {
         toast(json.backup?.id ? 'Changes published. Backup saved first.' : 'Changes published — public site will update within 30 s.', 'success', 4000);
       }
@@ -2395,7 +2483,7 @@
       if (json.publicFrontend?.error) {
         toast('GitHub frontend sync failed: ' + json.publicFrontend.error, 'error', 7000);
       } else if (json.publicFrontend?.enabled === false) {
-        toast('GitHub frontend sync is not configured.', 'error', 7000);
+        toast('Public site sync needs setup before live changes update automatically.', 'error', 7000);
       } else {
         toast('Public site settings synced.', 'success', 3500);
       }
