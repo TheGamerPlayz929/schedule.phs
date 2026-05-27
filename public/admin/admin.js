@@ -14,6 +14,27 @@
   const TOKEN_KEY = 'phs:admin-token:v1';
   const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
   const SIDEBAR_COLLAPSED_KEY = 'phs:admin-sidebar-collapsed:v1';
+  const SECURITY_NOTES_KEY = 'phs:admin-security-notes:v1';
+  const SECURITY_TEMPLATES = [
+    {
+      id: 'security-review',
+      label: 'Security review',
+      title: 'Site paused for security review',
+      message: 'Poolesville Schedule is temporarily unavailable while we verify site integrity. Please check back soon.'
+    },
+    {
+      id: 'sync-repair',
+      label: 'Sync repair',
+      title: 'Site paused while updates sync',
+      message: 'Poolesville Schedule is temporarily unavailable while we repair the public update path. Please check back soon.'
+    },
+    {
+      id: 'content-freeze',
+      label: 'Content freeze',
+      title: 'Site paused for content review',
+      message: 'Poolesville Schedule is temporarily unavailable while we review posted content. Please check back soon.'
+    }
+  ];
 
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
@@ -29,6 +50,7 @@
     lastPublishAt: null,
     securitySnapshot: null,
     securitySnapshotLoading: null,
+    securityNotes: loadSecurityNotes(),
     activeTab: 'overview',
     search: '',
     previewMode: 'draft', // 'draft' | 'live'
@@ -218,6 +240,13 @@
   }
   function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function loadSecurityNotes() {
+    try { return localStorage.getItem(SECURITY_NOTES_KEY) || ''; } catch { return ''; }
+  }
+  function saveSecurityNotes(value) {
+    state.securityNotes = String(value || '').slice(0, 1200);
+    try { localStorage.setItem(SECURITY_NOTES_KEY, state.securityNotes); } catch {}
   }
   function safeDataImageSrc(src) {
     const raw = String(src || '').trim();
@@ -588,6 +617,131 @@
       </div>`;
   }
 
+  function formatSecurityDate(value) {
+    if (!value) return 'No timestamp';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Time unavailable';
+    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function securityRiskModel(input) {
+    const issues = [];
+    let score = 100;
+    if (input.checking) {
+      score -= 6;
+      issues.push('Live backend check is still running.');
+    }
+    if (input.maintenance) {
+      score -= 8;
+      issues.push('Public site is staged for maintenance.');
+    }
+    if (input.syncError) {
+      score -= 30;
+      issues.push('Public sync reported an error.');
+    } else if (input.syncDisabled) {
+      score -= 18;
+      issues.push('Public sync is not fully configured.');
+    }
+    if (input.settingsStorage && !input.settingsStorage.durable) {
+      score -= 10;
+      issues.push('Settings storage is local only.');
+    }
+    if (input.auditStorage && !input.auditStorage.durable) {
+      score -= 10;
+      issues.push('Audit storage is local only.');
+    }
+    if (input.backupStorage && !input.backupStorage.durable) {
+      score -= 8;
+      issues.push('Backups are local only.');
+    }
+    if (input.backupCount === 0) {
+      score -= 8;
+      issues.push('No recent backup was returned.');
+    }
+    if (input.privacyOk === false) {
+      score -= 24;
+      issues.push('Analytics privacy check reported a collection risk.');
+    }
+    if (input.errorText) {
+      score -= 14;
+      issues.push('One or more backend security checks failed.');
+    }
+    const clamped = Math.max(0, Math.min(100, score));
+    return {
+      score: clamped,
+      status: clamped >= 88 ? 'ok' : clamped >= 68 ? 'attention' : 'danger',
+      label: clamped >= 88 ? 'Hardened' : clamped >= 68 ? 'Watch' : 'Action needed',
+      issues: issues.length ? issues : ['No blocking issues found in the latest check.']
+    };
+  }
+
+  function storageRow(label, storage) {
+    const status = storage?.durable ? 'ok' : storage ? 'attention' : 'muted';
+    const primary = storage ? storageCopy(storage) : 'Checking';
+    const detail = storage?.durable
+      ? [storage.repo, storage.branch, storage.path].filter(Boolean).join(' / ')
+      : storage
+        ? 'Local development only. Do not treat this as durable production storage.'
+        : 'Waiting for backend storage status.';
+    return `
+      <div class="admin-security-storage-row ${status}">
+        <span aria-hidden="true"></span>
+        <div>
+          <strong>${escapeHtml(label)}</strong>
+          <em>${escapeHtml(primary)}</em>
+          <small>${escapeHtml(detail || 'No path reported.')}</small>
+        </div>
+      </div>`;
+  }
+
+  function securityTimelineItem(item, fallback) {
+    if (!item) {
+      return `<div class="admin-security-timeline-empty">${escapeHtml(fallback)}</div>`;
+    }
+    const actor = item.actor?.email || item.actor?.name || item.email || 'admin';
+    const detail = [item.sections?.join(', '), item.patchKeys?.join(', '), item.section, item.file, item.type, item.message]
+      .filter(Boolean)
+      .join(' · ');
+    return `
+      <div class="admin-security-timeline-item">
+        <time>${escapeHtml(formatSecurityDate(item.timestamp || item.createdAt || item.time))}</time>
+        <strong>${escapeHtml(item.action || item.source || 'admin_event')}</strong>
+        <span>${escapeHtml(actor)}</span>
+        <small>${escapeHtml(detail || 'No extra detail recorded.')}</small>
+      </div>`;
+  }
+
+  function securitySummaryText(model, data) {
+    const notes = String(data.notes || '').trim();
+    return [
+      `PHS admin security summary (${new Date().toLocaleString()})`,
+      `Risk: ${model.score}/100 (${model.label})`,
+      `Public mode: ${data.mode}`,
+      `Public sync: ${data.syncText}`,
+      `Admin: ${data.authText} (${data.sessionDetail})`,
+      `Storage: ${data.storageDetail}`,
+      `Latest audit: ${data.latestAudit || 'No recent audit event returned.'}`,
+      notes ? `Notes: ${notes}` : null
+    ].filter(Boolean).join('\n');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try {
+      document.execCommand('copy');
+      return Promise.resolve();
+    } finally {
+      area.remove();
+    }
+  }
+
   function formatSecurityCheckedAt() {
     const ts = state.securitySnapshot?.checkedAt;
     if (!ts) return 'Not checked yet';
@@ -605,8 +759,8 @@
     state.securitySnapshotLoading = Promise.allSettled([
       api('/admin/storage-status', { silentAuth: true }),
       api('/admin/analytics', { silentAuth: true }),
-      api('/admin/backups?limit=1', { silentAuth: true }),
-      api('/admin/audit-log?limit=1', { silentAuth: true }),
+      api('/admin/backups?limit=3', { silentAuth: true }),
+      api('/admin/audit-log?limit=6', { silentAuth: true }),
       api('/admin/whoami', { silentAuth: true })
     ]).then(results => {
       const [storage, analytics, backups, auditLog, whoami] = results.map(result => result.status === 'fulfilled' ? result.value : null);
@@ -998,6 +1152,58 @@
       : backupCount > 0
         ? 'At least one settings backup is available for rollback.'
         : 'No recent backup returned by this check yet.';
+    const auditEntries = Array.isArray(snapshot.auditLog?.entries) ? snapshot.auditLog.entries : [];
+    const recentBackups = Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups : [];
+    const latestAudit = auditEntries[0];
+    const latestBackup = recentBackups[0];
+    const model = securityRiskModel({
+      checking,
+      maintenance,
+      syncError,
+      syncDisabled,
+      settingsStorage,
+      auditStorage,
+      backupStorage,
+      backupCount,
+      privacyOk,
+      errorText
+    });
+    const summaryText = securitySummaryText(model, {
+      mode: maintenance ? 'maintenance' : 'live',
+      syncText,
+      authText,
+      sessionDetail,
+      storageDetail,
+      latestAudit: latestAudit ? `${latestAudit.action || 'admin_event'} by ${latestAudit.actor?.email || latestAudit.actor?.name || latestAudit.email || 'admin'}` : '',
+      notes: state.securityNotes
+    });
+    const riskIssues = model.issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('');
+    const templateButtons = SECURITY_TEMPLATES.map(t => `
+      <button type="button" class="admin-security-template" data-security-template="${escapeHtml(t.id)}">
+        <strong>${escapeHtml(t.label)}</strong>
+        <span>${escapeHtml(t.title)}</span>
+      </button>`).join('');
+    const releaseGates = [
+      ['Authentication', authMethod === 'google' || authMethod === 'local-dev', `${authText}: ${sessionDetail}`],
+      ['Public sync', !syncError && !syncDisabled, syncError || (syncDisabled ? 'Sync setup required.' : 'Ready to publish public-safe settings.')],
+      ['Durable data', dataDurable, storageDetail],
+      ['Rollback path', backupCount === null ? null : backupCount > 0, backupDetail],
+      ['Privacy telemetry', privacyOk, privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.']
+    ].map(([label, passed, detail]) => `
+      <div class="admin-security-gate ${passed === true ? 'ok' : passed === false ? 'attention' : 'muted'}">
+        <span>${passed === true ? 'Pass' : passed === false ? 'Watch' : 'Check'}</span>
+        <strong>${escapeHtml(label)}</strong>
+        <small>${escapeHtml(detail)}</small>
+      </div>`).join('');
+    const custodyRows = [
+      storageRow('Settings store', settingsStorage),
+      storageRow('Audit log', auditStorage),
+      storageRow('Backup vault', backupStorage)
+    ].join('');
+    const timelineItems = [
+      securityTimelineItem(latestAudit, 'No recent audit event returned.'),
+      securityTimelineItem(latestBackup, 'No recent backup returned.')
+    ].join('');
     const statusChecks = [
       securityCheck(authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention',
         'Admin authentication',
@@ -1031,11 +1237,16 @@
         <div class="admin-security-hero-main">
           <span class="admin-security-kicker">Security command center</span>
           <h2>${maintenance ? 'Main site maintenance is staged' : 'Public site is staged live'}</h2>
-          <p>${escapeHtml(errorText || 'Control public availability, verify admin-only data paths, and jump straight to the panels used during an incident.')}</p>
+          <p>${escapeHtml(errorText || 'Company-style response console for availability, publishing risk, custody, rollback evidence, and incident handoff.')}</p>
+          <div class="admin-security-hero-actions">
+            <button type="button" class="admin-btn admin-btn-sm" id="security-copy-summary">${ICON.audit}<span>Copy incident brief</span></button>
+            <button type="button" class="admin-btn admin-btn-sm" data-security-go-tab="history">${ICON.backup}<span>Open evidence</span></button>
+          </div>
         </div>
-        <div class="admin-security-state ${maintenance ? 'attention' : checking ? 'muted' : 'ok'}">
-          <strong>${maintenance ? 'Maintenance' : checking ? 'Checking' : 'Operational'}</strong>
-          <span>${escapeHtml(formatSecurityCheckedAt())}</span>
+        <div class="admin-security-state ${model.status}">
+          <strong>${model.score}</strong>
+          <span>${escapeHtml(model.label)} risk score</span>
+          <div class="admin-security-scorebar"><i style="width:${model.score}%"></i></div>
           <button type="button" class="admin-btn admin-btn-sm" id="security-refresh">${ICON.refresh}<span>${checking ? 'Checking...' : 'Run check'}</span></button>
         </div>
       </section>
@@ -1063,6 +1274,27 @@
         </section>
       </div>
 
+      <section class="admin-security-panel admin-security-risk-panel">
+        <div class="admin-panel-heading">
+          <h2>Risk model</h2>
+          <span>${escapeHtml(formatSecurityCheckedAt())}</span>
+        </div>
+        <div class="admin-security-risk-grid">
+          <div class="admin-security-risk-readout ${model.status}">
+            <strong>${model.score}</strong>
+            <span>${escapeHtml(model.label)}</span>
+            <small>Calculated from live sync, storage, rollback, privacy, and active mode checks.</small>
+          </div>
+          <div class="admin-security-risk-issues">
+            <strong>Current findings</strong>
+            <ul>${riskIssues}</ul>
+          </div>
+          <div class="admin-security-gates">
+            ${releaseGates}
+          </div>
+        </div>
+      </section>
+
       <div class="admin-security-split">
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
@@ -1080,6 +1312,9 @@
           <div class="admin-field">
             <label for="site-status-message">Maintenance message</label>
             <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
+          </div>
+          <div class="admin-security-template-grid" aria-label="Incident templates">
+            ${templateButtons}
           </div>
           <div class="admin-security-note">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
           <div class="admin-readiness-actions admin-security-actions">
@@ -1103,6 +1338,51 @@
           <div class="admin-security-meta">
             <strong>Admin-only surfaces</strong>
             <span>Use history for accountability, privacy for GradeViewer copy, site controls for public links, and advanced config for embedded integrations.</span>
+          </div>
+        </section>
+      </div>
+
+      <div class="admin-security-ops-grid">
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Data custody</h2>
+            <span>Private backend only</span>
+          </div>
+          <div class="admin-security-storage-map">${custodyRows}</div>
+        </section>
+
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Evidence timeline</h2>
+            <span>Latest audit and rollback</span>
+          </div>
+          <div class="admin-security-timeline">${timelineItems}</div>
+        </section>
+      </div>
+
+      <div class="admin-security-ops-grid admin-security-ops-grid--wide">
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Incident workspace</h2>
+            <span>Local to this browser</span>
+          </div>
+          <textarea id="security-notes" class="admin-textarea admin-security-notes" maxlength="1200" placeholder="Track scope, suspected cause, mitigation, rollback decision, and next owner.">${escapeHtml(state.securityNotes)}</textarea>
+          <div class="admin-readiness-actions admin-security-actions">
+            <button type="button" class="admin-btn" id="security-save-notes">${ICON.audit}<span>Save notes</span></button>
+            <button type="button" class="admin-btn admin-btn-ghost" id="security-clear-notes"><span>Clear notes</span></button>
+          </div>
+        </section>
+
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Operations matrix</h2>
+            <span>Company controls</span>
+          </div>
+          <div class="admin-security-control-list">
+            <div><strong>Change freeze</strong><span>Stage maintenance, preview, publish, then record evidence in History.</span></div>
+            <div><strong>Rollback target</strong><span>${escapeHtml(latestBackup ? formatSecurityDate(latestBackup.createdAt || latestBackup.timestamp) : 'Waiting for backup evidence.')}</span></div>
+            <div><strong>Public data rule</strong><span>Only public settings sync forward; logs, IPs, sessions, and admin identity stay backend-only.</span></div>
+            <div><strong>Session rule</strong><span>Admin actions require the current authenticated session or local development bypass.</span></div>
           </div>
         </section>
       </div>
@@ -1132,6 +1412,27 @@
     host.querySelector('#security-sync')?.addEventListener('click', retryPublicSync);
     host.querySelector('#security-refresh')?.addEventListener('click', () => loadSecuritySnapshot(true).catch(e => toast(e.message, 'error', 5000)));
     host.querySelectorAll('[data-security-go-tab]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.securityGoTab)));
+    host.querySelectorAll('[data-security-template]').forEach(btn => btn.addEventListener('click', () => {
+      const template = SECURITY_TEMPLATES.find(t => t.id === btn.dataset.securityTemplate);
+      if (!template) return;
+      updateSiteStatusDraft({ mode: 'maintenance', title: template.title, message: template.message }, true);
+      toast(`${template.label} template staged. Preview before publishing.`, 'success', 3500);
+    }));
+    host.querySelector('#security-copy-summary')?.addEventListener('click', () => {
+      copyText(summaryText)
+        .then(() => toast('Incident brief copied.', 'success', 2200))
+        .catch(e => toast('Copy failed: ' + e.message, 'error', 5000));
+    });
+    host.querySelector('#security-notes')?.addEventListener('input', e => saveSecurityNotes(e.target.value));
+    host.querySelector('#security-save-notes')?.addEventListener('click', () => {
+      saveSecurityNotes(host.querySelector('#security-notes')?.value || '');
+      toast('Security notes saved locally.', 'success', 2200);
+    });
+    host.querySelector('#security-clear-notes')?.addEventListener('click', () => {
+      saveSecurityNotes('');
+      renderActiveTab();
+      toast('Security notes cleared.', 'success', 2200);
+    });
     return host;
   }
 
