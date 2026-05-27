@@ -15,6 +15,7 @@
   const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
   const SIDEBAR_COLLAPSED_KEY = 'phs:admin-sidebar-collapsed:v1';
   const SECURITY_NOTES_KEY = 'phs:admin-security-notes:v1';
+  const SECURITY_CHECKLIST_KEY = 'phs:admin-security-checklist:v1';
   const SECURITY_TEMPLATES = [
     {
       id: 'security-review',
@@ -35,6 +36,14 @@
       message: 'Poolesville Schedule is temporarily unavailable while we review posted content. Please check back soon.'
     }
   ];
+  const SECURITY_CHECKLIST_ITEMS = [
+    { id: 'scope', label: 'Scope confirmed', detail: 'Confirm the affected public page, setting, or workflow.' },
+    { id: 'maintenance', label: 'Availability decision', detail: 'Decide whether the public site needs maintenance mode.' },
+    { id: 'preview', label: 'Draft preview checked', detail: 'Open preview and verify title, message, logo, and navigation state.' },
+    { id: 'publish', label: 'Published safely', detail: 'Publish only after the draft matches the intended public state.' },
+    { id: 'evidence', label: 'Evidence recorded', detail: 'Copy the incident brief or confirm the History entry exists.' },
+    { id: 'rollback', label: 'Rollback path ready', detail: 'Confirm a recent backup exists before risky public changes.' }
+  ];
 
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
@@ -51,6 +60,8 @@
     securitySnapshot: null,
     securitySnapshotLoading: null,
     securityNotes: loadSecurityNotes(),
+    securityChecklist: loadSecurityChecklist(),
+    securityComposerOpen: false,
     activeTab: 'overview',
     search: '',
     previewMode: 'draft', // 'draft' | 'live'
@@ -247,6 +258,20 @@
   function saveSecurityNotes(value) {
     state.securityNotes = String(value || '').slice(0, 1200);
     try { localStorage.setItem(SECURITY_NOTES_KEY, state.securityNotes); } catch {}
+  }
+  function loadSecurityChecklist() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SECURITY_CHECKLIST_KEY) || '{}');
+      if (saved && typeof saved === 'object') return saved;
+    } catch {}
+    return {};
+  }
+  function saveSecurityChecklist(next) {
+    state.securityChecklist = next && typeof next === 'object' ? next : {};
+    try { localStorage.setItem(SECURITY_CHECKLIST_KEY, JSON.stringify(state.securityChecklist)); } catch {}
+  }
+  function toggleSecurityChecklist(id, checked) {
+    saveSecurityChecklist(Object.assign({}, state.securityChecklist, { [id]: Boolean(checked) }));
   }
   function safeDataImageSrc(src) {
     const raw = String(src || '').trim();
@@ -617,6 +642,33 @@
       </div>`;
   }
 
+  function securityChecklistProgress() {
+    const done = SECURITY_CHECKLIST_ITEMS.filter(item => state.securityChecklist?.[item.id]).length;
+    const total = SECURITY_CHECKLIST_ITEMS.length;
+    return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
+  }
+
+  function renderSecurityChecklist() {
+    return SECURITY_CHECKLIST_ITEMS.map(item => {
+      const checked = Boolean(state.securityChecklist?.[item.id]);
+      return `
+        <label class="admin-security-runbook-item ${checked ? 'checked' : ''}">
+          <input type="checkbox" data-security-checklist="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}>
+          <strong>${escapeHtml(item.label)}</strong>
+          <small>${escapeHtml(item.detail)}</small>
+        </label>`;
+    }).join('');
+  }
+
+  function securityExposureRow(label, surface, boundary, status = 'ok') {
+    return `
+      <div class="admin-security-exposure-row ${securityStatusClass(status)}">
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(surface)}</span>
+        <small>${escapeHtml(boundary)}</small>
+      </div>`;
+  }
+
   function formatSecurityDate(value) {
     if (!value) return 'No timestamp';
     const date = new Date(value);
@@ -665,6 +717,13 @@
     if (input.errorText) {
       score -= 14;
       issues.push('One or more backend security checks failed.');
+    }
+    if (Number.isFinite(input.checklistPercent) && input.checklistPercent < 50) {
+      score -= 10;
+      issues.push('Incident runbook is less than half complete.');
+    } else if (Number.isFinite(input.checklistPercent) && input.checklistPercent < 100) {
+      score -= 4;
+      issues.push('Incident runbook still has open checks.');
     }
     const clamped = Math.max(0, Math.min(100, score));
     return {
@@ -778,7 +837,7 @@
       return state.securitySnapshot;
     }).finally(() => {
       state.securitySnapshotLoading = null;
-      if (state.activeTab === 'security') renderActiveTab();
+      if (state.activeTab === 'security' || state.activeTab === 'overview') renderActiveTab();
     });
     return state.securitySnapshotLoading;
   }
@@ -802,6 +861,29 @@
         : syncDisabled
           ? 'Public sync needs setup'
           : 'Backend and public site synced';
+    const siteStatus = normalizedSiteStatus();
+    const maintenance = siteStatus.mode === 'maintenance';
+    if (!state.securitySnapshot?.checkedAt && !state.securitySnapshotLoading) loadSecuritySnapshot().catch(() => {});
+    const snapshot = state.securitySnapshot || {};
+    const checklist = securityChecklistProgress();
+    const backupCount = Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups.length : null;
+    const privacy = snapshot.analytics?.privacy;
+    const privacyOk = privacy
+      ? !privacy.storesPersonalData && !privacy.storesIpAddresses && !privacy.storesUserAgents && !privacy.usesCookies
+      : null;
+    const overviewRisk = securityRiskModel({
+      checking: Boolean(state.securitySnapshotLoading),
+      maintenance,
+      syncError,
+      syncDisabled,
+      settingsStorage,
+      auditStorage,
+      backupStorage: snapshot.backups?.storage,
+      backupCount,
+      privacyOk,
+      errorText: snapshot.errors?.join(' | ') || '',
+      checklistPercent: checklist.percent
+    });
 
     host.innerHTML = `
       <div class="admin-overview-grid">
@@ -838,6 +920,32 @@
           <button type="button" class="admin-btn admin-btn-sm" id="overview-preview">${ICON.eye}<span>Preview</span></button>
           ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-sm admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
         </div>
+      </div>
+      <div class="admin-overview-control-grid">
+        <section class="admin-overview-control ${overviewRisk.status}">
+          <div>
+            <span>Security readiness</span>
+            <strong>${overviewRisk.score}/100</strong>
+            <small>${escapeHtml(overviewRisk.label)} · ${checklist.done}/${checklist.total} runbook checks complete.</small>
+          </div>
+          <div class="admin-security-scorebar"><i style="width:${overviewRisk.score}%"></i></div>
+        </section>
+        <section class="admin-overview-control ${maintenance ? 'attention' : 'ok'}">
+          <div>
+            <span>Public availability</span>
+            <strong>${maintenance ? 'Maintenance staged' : 'Live staged'}</strong>
+            <small>${escapeHtml(maintenance ? siteStatus.title : 'Public site is set to normal visitor mode.')}</small>
+          </div>
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Manage</span></button>
+        </section>
+        <section class="admin-overview-control ${backupCount === null ? 'muted' : backupCount > 0 ? 'ok' : 'attention'}">
+          <div>
+            <span>Rollback evidence</span>
+            <strong>${backupCount === null ? 'Checking' : backupCount > 0 ? `${backupCount} recent` : 'None returned'}</strong>
+            <small>${backupCount === null ? 'Waiting for backup status.' : backupCount > 0 ? 'Published backups are available in History.' : 'Publish once to create a rollback point.'}</small>
+          </div>
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="history">${ICON.backup}<span>History</span></button>
+        </section>
       </div>
       <div class="admin-system-strip">
         <span>Settings storage: <strong>${escapeHtml(settingsStorage?.type || 'unknown')}</strong>${settingsStorage?.durable ? ' durable' : ''}</span>
@@ -1156,6 +1264,8 @@
     const recentBackups = Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups : [];
     const latestAudit = auditEntries[0];
     const latestBackup = recentBackups[0];
+    const checklist = securityChecklistProgress();
+    const composerOpen = state.securityComposerOpen || maintenance;
     const model = securityRiskModel({
       checking,
       maintenance,
@@ -1166,7 +1276,8 @@
       backupStorage,
       backupCount,
       privacyOk,
-      errorText
+      errorText,
+      checklistPercent: checklist.percent
     });
     const summaryText = securitySummaryText(model, {
       mode: maintenance ? 'maintenance' : 'live',
@@ -1203,6 +1314,12 @@
     const timelineItems = [
       securityTimelineItem(latestAudit, 'No recent audit event returned.'),
       securityTimelineItem(latestBackup, 'No recent backup returned.')
+    ].join('');
+    const exposureRows = [
+      securityExposureRow('Public app', 'Static frontend and public settings JSON', 'No logs, sessions, IPs, or admin identity fields sync forward.', syncError ? 'attention' : 'ok'),
+      securityExposureRow('Admin API', 'Authenticated backend endpoints', 'Settings, audit logs, backups, and identity stay behind admin auth.', authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention'),
+      securityExposureRow('GradeViewer embed', 'Browser-routed iframe URL', 'Production and localhost URLs are editable but treated as public app config.', 'muted'),
+      securityExposureRow('Analytics', 'Aggregate usage dashboard', privacyOk === false ? 'Review reported collection risk before publishing.' : 'Expected to stay aggregate and privacy-safe.', privacyOk === false ? 'danger' : privacyOk === true ? 'ok' : 'muted')
     ].join('');
     const statusChecks = [
       securityCheck(authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention',
@@ -1299,28 +1416,40 @@
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
             <h2>Main-site availability</h2>
-            <span>Maintenance switch</span>
+            <span>Controlled shutdown composer</span>
           </div>
           <div class="admin-security-mode-row">
             <button type="button" class="admin-btn ${maintenance ? 'admin-btn-ghost' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live site</span></button>
-            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" data-site-mode="maintenance">${ICON.close}<span>Force main-site shutdown</span></button>
+            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" id="security-open-maintenance">${ICON.close}<span>Force main-site shutdown</span></button>
           </div>
-          <div class="admin-field">
-            <label for="site-status-title">Maintenance title</label>
-            <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}">
-          </div>
-          <div class="admin-field">
-            <label for="site-status-message">Maintenance message</label>
-            <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
-          </div>
-          <div class="admin-security-template-grid" aria-label="Incident templates">
-            ${templateButtons}
-          </div>
-          <div class="admin-security-note">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
-          <div class="admin-readiness-actions admin-security-actions">
-            <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish security change</span></button>
-            <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview</span></button>
-            ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+          <div class="admin-security-composer ${composerOpen ? 'is-open' : ''}" aria-hidden="${composerOpen ? 'false' : 'true'}">
+            <div class="admin-security-composer-body">
+              <div class="admin-security-composer-head">
+                <div>
+                  <strong>Public maintenance page</strong>
+                  <span>Review the exact visitor-facing copy before staging shutdown.</span>
+                </div>
+                <em>${maintenance ? 'Maintenance mode staged' : 'Draft not staged yet'}</em>
+              </div>
+              <div class="admin-field">
+                <label for="site-status-title">Maintenance title</label>
+                <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}">
+              </div>
+              <div class="admin-field">
+                <label for="site-status-message">Maintenance message</label>
+                <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
+              </div>
+              <div class="admin-security-template-grid" aria-label="Incident templates">
+                ${templateButtons}
+              </div>
+              <div class="admin-security-note">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
+              <div class="admin-readiness-actions admin-security-actions">
+                <button type="button" class="admin-btn admin-btn-danger" id="security-stage-maintenance">${ICON.close}<span>${maintenance ? 'Update shutdown draft' : 'Stage shutdown draft'}</span></button>
+                <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview maintenance page</span></button>
+                <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish security change</span></button>
+                ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1363,6 +1492,31 @@
       <div class="admin-security-ops-grid admin-security-ops-grid--wide">
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
+            <h2>Response runbook</h2>
+            <span>${checklist.percent}% complete</span>
+          </div>
+          <div class="admin-security-progress">
+            <i style="width:${checklist.percent}%"></i>
+          </div>
+          <div class="admin-security-runbook">
+            ${renderSecurityChecklist()}
+          </div>
+        </section>
+
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Exposure map</h2>
+            <span>Public vs private surfaces</span>
+          </div>
+          <div class="admin-security-exposure-map">
+            ${exposureRows}
+          </div>
+        </section>
+      </div>
+
+      <div class="admin-security-ops-grid admin-security-ops-grid--wide">
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
             <h2>Incident workspace</h2>
             <span>Local to this browser</span>
           </div>
@@ -1397,11 +1551,18 @@
     `;
 
     host.querySelector('[data-site-mode="live"]')?.addEventListener('click', () => {
+      state.securityComposerOpen = false;
       updateSiteStatusDraft({ mode: 'live' }, true);
       toast('Live mode staged. Publish to restore the public site.', 'success', 3500);
     });
-    host.querySelector('[data-site-mode="maintenance"]')?.addEventListener('click', () => {
+    host.querySelector('#security-open-maintenance')?.addEventListener('click', () => {
+      state.securityComposerOpen = true;
+      renderActiveTab();
+      requestAnimationFrame(() => document.getElementById('site-status-title')?.focus());
+    });
+    host.querySelector('#security-stage-maintenance')?.addEventListener('click', () => {
       if (!maintenance && !confirm('Show the maintenance page on the main site after publishing?')) return;
+      state.securityComposerOpen = true;
       updateSiteStatusDraft({ mode: 'maintenance' }, true);
       toast('Maintenance mode staged. Publish to pause the public site.', 'success', 3500);
     });
@@ -1415,9 +1576,16 @@
     host.querySelectorAll('[data-security-template]').forEach(btn => btn.addEventListener('click', () => {
       const template = SECURITY_TEMPLATES.find(t => t.id === btn.dataset.securityTemplate);
       if (!template) return;
+      state.securityComposerOpen = true;
       updateSiteStatusDraft({ mode: 'maintenance', title: template.title, message: template.message }, true);
       toast(`${template.label} template staged. Preview before publishing.`, 'success', 3500);
     }));
+    host.querySelectorAll('[data-security-checklist]').forEach(input => {
+      input.addEventListener('change', () => {
+        toggleSecurityChecklist(input.dataset.securityChecklist, input.checked);
+        renderActiveTab();
+      });
+    });
     host.querySelector('#security-copy-summary')?.addEventListener('click', () => {
       copyText(summaryText)
         .then(() => toast('Incident brief copied.', 'success', 2200))
@@ -2645,22 +2813,85 @@
     api('/admin/audit-log?limit=200').then(j => {
       const storage = j.storage;
       const storageNote = storage ? `<div class="admin-privacy-note" style="margin-bottom:14px">Audit storage: ${escapeHtml(storage.type)}${storage.durable ? ` · ${escapeHtml(storage.repo || '')}/${escapeHtml(storage.path || '')}` : ' · local development only'}</div>` : '';
-      if (!j.entries?.length) { host.innerHTML = storageNote + '<div class="admin-field-help">No events yet.</div>'; return; }
+      const entries = Array.isArray(j.entries) ? j.entries : [];
+      if (!entries.length) { host.innerHTML = storageNote + '<div class="admin-field-help">No events yet.</div>'; return; }
+      const detailFor = (entry) => [entry.sections?.join(','), entry.patchKeys?.join(','), entry.section, entry.file, entry.type, entry.rowCount && `${entry.rowCount} rows`, entry.imageCount && `${entry.imageCount} images`, entry.message].filter(Boolean).join(' · ') || '—';
+      const actorFor = (entry) => entry.actor?.email || entry.email || entry.actor?.name || '—';
+      const actions = [...new Set(entries.map(entry => entry.action).filter(Boolean))].sort();
       host.innerHTML = `
         ${storageNote}
-        <table class="admin-audit-table">
-          <thead><tr><th>When</th><th>Actor</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
-          <tbody>
-            ${j.entries.map(e => `
-              <tr>
-                <td class="muted">${new Date(e.ts).toLocaleString()}</td>
-                <td class="muted">${escapeHtml(e.actor?.email || e.email || e.actor?.name || '—')}</td>
-                <td class="muted">${escapeHtml(e.ip || '—')}</td>
-                <td class="action">${escapeHtml(e.action)}</td>
-                <td class="muted">${escapeHtml([e.sections?.join(','), e.patchKeys?.join(','), e.section, e.file, e.type, e.rowCount && `${e.rowCount} rows`, e.imageCount && `${e.imageCount} images`, e.message].filter(Boolean).join(' · ') || '—')}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>`;
+        <div class="admin-history-toolbar">
+          <label class="admin-history-search">
+            ${ICON.search}
+            <input class="admin-input" id="audit-search" type="search" placeholder="Search actor, action, IP, section, or detail">
+          </label>
+          <select class="admin-select" id="audit-action-filter" aria-label="Filter audit action">
+            <option value="">All actions</option>
+            ${actions.map(action => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`).join('')}
+          </select>
+          <button type="button" class="admin-btn admin-btn-sm" id="audit-copy-csv">${ICON.audit}<span>Copy CSV</span></button>
+        </div>
+        <div id="audit-result-count" class="admin-field-help"></div>
+        <div id="audit-table-host"></div>`;
+      const tableHost = host.querySelector('#audit-table-host');
+      const resultCount = host.querySelector('#audit-result-count');
+      const search = host.querySelector('#audit-search');
+      const filter = host.querySelector('#audit-action-filter');
+      function filteredEntries() {
+        const q = search.value.trim().toLowerCase();
+        const action = filter.value;
+        return entries.filter(entry => {
+          if (action && entry.action !== action) return false;
+          if (!q) return true;
+          const haystack = [
+            new Date(entry.ts || entry.timestamp || entry.time || Date.now()).toLocaleString(),
+            actorFor(entry),
+            entry.ip || '',
+            entry.action || '',
+            detailFor(entry)
+          ].join(' ').toLowerCase();
+          return haystack.includes(q);
+        });
+      }
+      function paintAuditTable() {
+        const rows = filteredEntries();
+        resultCount.textContent = `${rows.length} of ${entries.length} events shown`;
+        tableHost.innerHTML = `
+          <table class="admin-audit-table">
+            <thead><tr><th>When</th><th>Actor</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
+            <tbody>
+              ${rows.map(entry => `
+                <tr>
+                  <td class="muted">${new Date(entry.ts || entry.timestamp || entry.time || Date.now()).toLocaleString()}</td>
+                  <td class="muted">${escapeHtml(actorFor(entry))}</td>
+                  <td class="muted">${escapeHtml(entry.ip || '—')}</td>
+                  <td class="action">${escapeHtml(entry.action || 'event')}</td>
+                  <td class="muted">${escapeHtml(detailFor(entry))}</td>
+                </tr>`).join('') || '<tr><td colspan="5" class="muted">No matching audit events.</td></tr>'}
+            </tbody>
+          </table>`;
+      }
+      function csvCell(value) {
+        return `"${String(value ?? '').replace(/"/g, '""')}"`;
+      }
+      search.addEventListener('input', paintAuditTable);
+      filter.addEventListener('change', paintAuditTable);
+      host.querySelector('#audit-copy-csv')?.addEventListener('click', () => {
+        const csv = [
+          ['When', 'Actor', 'IP', 'Action', 'Detail'].map(csvCell).join(','),
+          ...filteredEntries().map(entry => [
+            new Date(entry.ts || entry.timestamp || entry.time || Date.now()).toISOString(),
+            actorFor(entry),
+            entry.ip || '',
+            entry.action || 'event',
+            detailFor(entry)
+          ].map(csvCell).join(','))
+        ].join('\n');
+        copyText(csv)
+          .then(() => toast('Audit CSV copied.', 'success', 2200))
+          .catch(e => toast('Copy failed: ' + e.message, 'error', 5000));
+      });
+      paintAuditTable();
     }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`; });
     return host;
   }

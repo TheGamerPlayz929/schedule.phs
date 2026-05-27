@@ -88,9 +88,17 @@
     panel.setAttribute('role', 'status');
     panel.setAttribute('aria-live', 'polite');
 
-    const mark = document.createElement('div');
+    const mark = document.createElement('a');
     mark.className = 'site-maintenance__mark';
-    mark.textContent = 'PHS';
+    mark.href = 'index.html';
+    mark.setAttribute('aria-label', 'Poolesville schedule home');
+    const logo = document.createElement('img');
+    logo.src = 'phs-logo-96.png';
+    logo.alt = 'PHS Logo';
+    logo.width = 48;
+    logo.height = 40;
+    logo.decoding = 'async';
+    mark.appendChild(logo);
 
     const title = document.createElement('h1');
     title.id = 'site-maintenance-title';
@@ -100,7 +108,7 @@
 
     const note = document.createElement('span');
     note.className = 'site-maintenance__note';
-    note.textContent = 'poolesville.web';
+    note.textContent = 'Poolesville Schedule';
 
     panel.append(mark, title, message, note);
     document.body.appendChild(panel);
@@ -117,8 +125,18 @@
     });
     panel.hidden = !maintenance;
     if (!maintenance) return;
+    const branding = settings?.branding || {};
+    const mark = panel.querySelector('.site-maintenance__mark');
+    const logo = mark?.querySelector('img');
+    const logoSrc = safeUrl(branding.logoSrc || 'phs-logo-96.png');
+    const logoLink = safeUrl(branding.logoLink || 'index.html');
+    if (logo && logoSrc) logo.setAttribute('src', logoSrc);
+    if (logo) logo.setAttribute('alt', cleanStatusText(branding.logoAlt, 'Poolesville Schedule logo', 120));
+    if (mark && logoLink) mark.setAttribute('href', logoLink);
     document.getElementById('site-maintenance-title').textContent = cleanStatusText(status.title, 'Site paused for maintenance', 120);
     document.getElementById('site-maintenance-message').textContent = cleanStatusText(status.message, 'Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon.', 500);
+    const note = panel.querySelector('.site-maintenance__note');
+    if (note) note.textContent = cleanStatusText(settings?.branding?.siteTitle, 'Poolesville Schedule', 80);
   }
 
   function applyBindings(settings) {
