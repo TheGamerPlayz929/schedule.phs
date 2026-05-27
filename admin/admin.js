@@ -126,6 +126,7 @@
     { id: 'bellSchedules',label: 'Schedule', title: 'Schedule', icon: 'bell', section: 'Workflows',
       sub: 'Use a custom schedule for today, choose the active schedule, and edit reusable schedule types.',
       groups: [
+        { title: '', custom: 'scheduleQualityPanel' },
         { title: 'Active override', custom: 'scheduleOverrideEditor' },
         { title: 'Reusable schedules', custom: 'bellEditor' },
         { title: 'Custom schedule from image', custom: 'scheduleImageImport' }
@@ -133,11 +134,16 @@
     },
     { id: 'announcements',label: 'Announcements', icon: 'announce', section: 'Workflows',
       sub: 'Cards shown on the announcements page.',
-      groups: [{ title: 'Cards', custom: 'announcementsEditor' }]
+      groups: [
+        { title: '', custom: 'announcementsQualityPanel' },
+        { title: 'Cards', custom: 'announcementsEditor' }
+      ]
     },
     { id: 'appearance', label: 'Site', title: 'Site controls', icon: 'theme', section: 'Workflows',
       sub: 'Branding, navigation, page copy, theme defaults, and footer content.',
       groups: [{
+        title: '', custom: 'siteLaunchPanel'
+      },{
         title: 'Theme colors', fields: [
           { path: 'theme.accent',  label: 'Accent',           kind: 'color' },
           { path: 'theme.accent2', label: 'Accent (deep)',    kind: 'color' },
@@ -172,6 +178,8 @@
     { id: 'safety', label: 'Privacy', title: 'Privacy and analytics', icon: 'privacy', section: 'Workflows',
       sub: 'Privacy text, GradeViewer copy, analytics visibility, and policy-sensitive settings.',
       groups: [{
+        title: '', custom: 'privacyRiskPanel'
+      },{
         title: 'Privacy / Safety FAQ', fields: [
           { path: 'gradeMelon.privacyButtonLabel', label: 'Link button label', kind: 'text' },
           { path: 'gradeMelon.privacyTitle',       label: 'Modal title',       kind: 'text' },
@@ -185,6 +193,8 @@
     { id: 'history', label: 'History', title: 'History and rollback', icon: 'backup', section: 'System',
       sub: 'Recent admin actions and published backups.',
       groups: [{
+        title: '', custom: 'historyEvidencePanel'
+      },{
         title: 'Recent events', custom: 'auditLog'
       },{
         title: 'Published versions', custom: 'backupManager'
@@ -193,6 +203,8 @@
     { id: 'advanced', label: 'Advanced', title: 'Advanced settings', icon: 'grades', section: 'System',
       sub: 'Low-frequency controls. Change these only when the public app contract changes.',
       groups: [{
+        title: '', custom: 'advancedIntegrityPanel'
+      },{
         title: 'GradeViewer iframe', fields: [
           { path: 'grades.iframeUrlLocal', label: 'Local-development URL', kind: 'url', help: 'Used when site runs on localhost.' },
           { path: 'grades.iframeUrlProd',  label: 'Production URL',         kind: 'url' },
@@ -667,6 +679,79 @@
         <span>${escapeHtml(surface)}</span>
         <small>${escapeHtml(boundary)}</small>
       </div>`;
+  }
+
+  function asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function countWords(value) {
+    const matches = String(value || '').trim().match(/\S+/g);
+    return matches ? matches.length : 0;
+  }
+
+  function hostFromUrl(value) {
+    try {
+      const url = new URL(String(value || ''), location.origin);
+      return url.host || 'Relative URL';
+    } catch {
+      return 'Invalid URL';
+    }
+  }
+
+  function isHttpsUrl(value) {
+    try {
+      return new URL(String(value || ''), location.origin).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  function statusPill(status) {
+    const normalized = securityStatusClass(status);
+    return normalized === 'ok' ? 'Pass' : normalized === 'danger' ? 'Block' : normalized === 'attention' ? 'Watch' : 'Check';
+  }
+
+  function insightCard(status, label, value, detail) {
+    return `
+      <section class="admin-insight-card ${securityStatusClass(status)}">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+        <small>${escapeHtml(detail)}</small>
+      </section>`;
+  }
+
+  function insightRow(status, label, detail) {
+    return `
+      <div class="admin-insight-row ${securityStatusClass(status)}">
+        <span>${escapeHtml(statusPill(status))}</span>
+        <strong>${escapeHtml(label)}</strong>
+        <small>${escapeHtml(detail)}</small>
+      </div>`;
+  }
+
+  function settingsPathStatus(path, label) {
+    const value = get(state.draft || {}, path);
+    const ok = String(value || '').trim().length > 0;
+    return insightRow(ok ? 'ok' : 'attention', label, ok ? String(value).slice(0, 120) : 'Missing or empty.');
+  }
+
+  function renderInsightPanel({ kicker, title, detail, cards = [], rows = [], actions = '' }) {
+    const host = document.createElement('div');
+    host.className = 'admin-insight-panel';
+    host.innerHTML = `
+      <div class="admin-panel-heading admin-insight-heading">
+        <div>
+          ${kicker ? `<span class="admin-insight-kicker">${escapeHtml(kicker)}</span>` : ''}
+          <h2>${escapeHtml(title)}</h2>
+          ${detail ? `<p>${escapeHtml(detail)}</p>` : ''}
+        </div>
+        ${actions ? `<div class="admin-insight-actions">${actions}</div>` : ''}
+      </div>
+      ${cards.length ? `<div class="admin-insight-grid">${cards.join('')}</div>` : ''}
+      ${rows.length ? `<div class="admin-insight-list">${rows.join('')}</div>` : ''}
+    `;
+    return host;
   }
 
   function formatSecurityDate(value) {
@@ -1214,6 +1299,155 @@
     if (rerender) renderActiveTab();
   }
 
+  function renderScheduleQualityPanel() {
+    const schedules = state.draft?.bellSchedules && typeof state.draft.bellSchedules === 'object' ? state.draft.bellSchedules : {};
+    const scheduleEntries = Object.entries(schedules);
+    const periodCount = scheduleEntries.reduce((sum, [, periods]) => sum + asArray(periods).length, 0);
+    const emptyTemplates = scheduleEntries.filter(([, periods]) => asArray(periods).length === 0).length;
+    const override = state.draft?.scheduleOverride;
+    const overrideMode = override?.enabled || override?.active || override?.date || override?.periods ? (override.type || override.label || 'Custom') : 'None';
+    const importState = state.importAssistant;
+    return renderInsightPanel({
+      kicker: 'Schedule QA',
+      title: 'Publishing checks for bell schedules',
+      detail: 'Fast validation for today overrides, reusable templates, imported schedules, and publish impact.',
+      cards: [
+        insightCard(overrideMode === 'None' ? 'ok' : 'attention', 'Active override', overrideMode, overrideMode === 'None' ? 'Normal reusable schedule is active.' : 'Preview today before publishing.'),
+        insightCard(scheduleEntries.length ? 'ok' : 'attention', 'Templates', String(scheduleEntries.length), scheduleEntries.length ? `${periodCount} total period rows.` : 'No reusable bell schedules are configured.'),
+        insightCard(emptyTemplates ? 'attention' : 'ok', 'Empty templates', String(emptyTemplates), emptyTemplates ? 'Remove or complete empty templates.' : 'Every template with a key has rows.'),
+        insightCard(importState?.fileName ? 'muted' : 'ok', 'Image import', importState?.fileName || 'Idle', importState?.fileName ? 'Review parsed rows before saving.' : 'No pending imported image.')
+      ],
+      rows: [
+        insightRow(changedSections().includes('Schedule') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Schedule') ? 'Schedule has unpublished changes.' : 'No schedule changes are staged.'),
+        insightRow(periodCount >= 6 || !scheduleEntries.length ? 'ok' : 'attention', 'Period coverage', periodCount ? `${periodCount} period rows across templates.` : 'No schedule rows were found in saved templates.'),
+        insightRow(override?.message || override?.title || overrideMode === 'None' ? 'ok' : 'attention', 'Visitor clarity', overrideMode === 'None' ? 'No override banner needed.' : 'Add clear copy for students if the override changes the day.')
+      ]
+    });
+  }
+
+  function renderAnnouncementsQualityPanel() {
+    const items = asArray(state.draft?.announcements?.items);
+    const bulletCount = items.reduce((sum, item) => sum + asArray(item.bullets).length, 0);
+    const missingTitles = items.filter(item => !String(item.title || '').trim()).length;
+    const emptyBullets = items.reduce((sum, item) => sum + asArray(item.bullets).filter(b => !String(b || '').trim()).length, 0);
+    const urlCount = items.reduce((sum, item) => sum + asArray(item.bullets).filter(b => /https?:\/\//i.test(String(b))).length, 0);
+    const longestWords = Math.max(0, ...items.flatMap(item => [countWords(item.title), ...asArray(item.bullets).map(countWords)]));
+    return renderInsightPanel({
+      kicker: 'Announcement QA',
+      title: 'Content checks before publish',
+      detail: 'Scans cards for missing titles, empty bullets, links, and overly long copy.',
+      cards: [
+        insightCard(items.length ? 'ok' : 'attention', 'Cards', String(items.length), items.length ? `${bulletCount} total bullet lines.` : 'Announcements page would be empty.'),
+        insightCard(missingTitles ? 'attention' : 'ok', 'Missing titles', String(missingTitles), missingTitles ? 'Every card should have a visible title.' : 'All cards are titled.'),
+        insightCard(emptyBullets ? 'attention' : 'ok', 'Empty bullets', String(emptyBullets), emptyBullets ? 'Delete empty rows before publishing.' : 'No empty bullet rows.'),
+        insightCard(longestWords > 34 ? 'attention' : 'ok', 'Longest line', `${longestWords} words`, longestWords > 34 ? 'Consider splitting the longest line.' : `${urlCount} public link${urlCount === 1 ? '' : 's'} detected.`)
+      ],
+      rows: [
+        insightRow(changedSections().includes('Announcements') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Announcements') ? 'Announcements have unpublished changes.' : 'No announcement changes are staged.'),
+        insightRow(urlCount ? 'muted' : 'ok', 'External links', urlCount ? 'Check links in preview after publishing copy changes.' : 'No full external URLs detected in bullets.')
+      ]
+    });
+  }
+
+  function renderSiteLaunchPanel() {
+    const navItems = asArray(state.draft?.nav?.items);
+    const logo = String(state.draft?.branding?.logoSrc || '').trim();
+    const favicon = String(state.draft?.branding?.favicon || '').trim();
+    const feedbackUrl = String(state.draft?.footer?.feedbackUrl || '').trim();
+    return renderInsightPanel({
+      kicker: 'Site launch checks',
+      title: 'Brand, nav, and public links',
+      detail: 'Uses the wide layout for launch-critical settings that used to be buried lower on the page.',
+      cards: [
+        insightCard(logo ? 'ok' : 'attention', 'Logo', logo || 'Missing', logo ? 'Logo is configured for public pages.' : 'Add a logo before a polished publish.'),
+        insightCard(favicon ? 'ok' : 'attention', 'Favicon', favicon || 'Missing', favicon ? 'Browser tab icon is configured.' : 'Browser tab icon is blank.'),
+        insightCard(navItems.length >= 3 ? 'ok' : 'attention', 'Navigation', `${navItems.length} links`, navItems.length >= 3 ? 'Core pages are present.' : 'Students may lose access to a core page.'),
+        insightCard(isHttpsUrl(feedbackUrl) ? 'ok' : feedbackUrl ? 'attention' : 'muted', 'Feedback', feedbackUrl ? hostFromUrl(feedbackUrl) : 'Not set', feedbackUrl ? 'Public feedback target configured.' : 'Optional, but useful for issue reports.')
+      ],
+      rows: [
+        settingsPathStatus('branding.siteTitle', 'Browser tab title'),
+        settingsPathStatus('branding.siteDescription', 'Meta description'),
+        insightRow(changedSections().includes('Site') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Site') ? 'Site appearance/navigation has unpublished changes.' : 'No site control changes are staged.')
+      ]
+    });
+  }
+
+  function renderPrivacyRiskPanel() {
+    const snapshot = state.securitySnapshot || {};
+    if (!snapshot.checkedAt && !state.securitySnapshotLoading) loadSecuritySnapshot().catch(() => {});
+    const paragraphs = asArray(state.draft?.gradeMelon?.privacyParagraphs);
+    const prodUrl = String(state.draft?.grades?.iframeUrlProd || '').trim();
+    const support = String(state.draft?.footer?.supportEmail || '').trim();
+    const privacy = snapshot.analytics?.privacy;
+    const privacyOk = privacy
+      ? !privacy.storesPersonalData && !privacy.storesIpAddresses && !privacy.storesUserAgents && !privacy.usesCookies
+      : null;
+    return renderInsightPanel({
+      kicker: 'Privacy risk',
+      title: 'Policy and telemetry guardrails',
+      detail: 'Checks student-facing copy, GradeViewer embedding, support contact, and analytics collection posture.',
+      cards: [
+        insightCard(paragraphs.length ? 'ok' : 'attention', 'FAQ paragraphs', String(paragraphs.length), paragraphs.length ? `${paragraphs.reduce((sum, p) => sum + countWords(p), 0)} words total.` : 'Privacy modal has no explanatory paragraphs.'),
+        insightCard(isHttpsUrl(prodUrl) ? 'ok' : 'danger', 'GradeViewer prod', prodUrl ? hostFromUrl(prodUrl) : 'Missing', isHttpsUrl(prodUrl) ? 'Production iframe uses HTTPS.' : 'Production iframe must be HTTPS.'),
+        insightCard(support.includes('@') ? 'ok' : support ? 'attention' : 'danger', 'Support contact', support ? 'Configured' : 'Missing', support.includes('@') ? 'At least one email-like contact is present.' : 'Use a reachable support/removal contact.'),
+        insightCard(privacyOk === true ? 'ok' : privacyOk === false ? 'danger' : 'muted', 'Analytics', privacyOk === true ? 'Aggregate' : privacyOk === false ? 'Review' : 'Checking', privacy?.note || 'Loading analytics privacy report.')
+      ],
+      rows: [
+        settingsPathStatus('gradeMelon.privacyTitle', 'Modal title'),
+        settingsPathStatus('gradeMelon.privacyButtonLabel', 'Privacy button'),
+        insightRow(changedSections().includes('Privacy') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Privacy') ? 'Privacy/GradeViewer copy has unpublished changes.' : 'No privacy changes are staged.')
+      ]
+    });
+  }
+
+  function renderHistoryEvidencePanel() {
+    const snapshot = state.securitySnapshot || {};
+    if (!snapshot.checkedAt && !state.securitySnapshotLoading) loadSecuritySnapshot().catch(() => {});
+    const auditEntries = asArray(snapshot.auditLog?.entries);
+    const backups = asArray(snapshot.backups?.backups);
+    const latestAudit = auditEntries[0];
+    const latestBackup = backups[0];
+    const changed = changedSections();
+    return renderInsightPanel({
+      kicker: 'Evidence',
+      title: 'Rollback and accountability status',
+      detail: 'A compact view of whether a publish can be explained, traced, and rolled back.',
+      cards: [
+        insightCard(auditEntries.length ? 'ok' : 'muted', 'Audit events', String(auditEntries.length), latestAudit ? `${latestAudit.action || 'admin_event'} at ${formatSecurityDate(latestAudit.timestamp || latestAudit.createdAt)}` : 'No recent audit event loaded.'),
+        insightCard(backups.length ? 'ok' : 'attention', 'Backups', String(backups.length), latestBackup ? `Latest ${formatSecurityDate(latestBackup.createdAt || latestBackup.timestamp)}` : 'No rollback backup loaded.'),
+        insightCard(state.lastPublishAt ? 'ok' : 'muted', 'Last publish', state.lastPublishAt ? formatSecurityDate(state.lastPublishAt) : 'None this session', state.lastPublishResult ? 'Publish result is available in this browser.' : 'No publish result in this session.'),
+        insightCard(changed.length ? 'attention' : 'ok', 'Draft changes', changed.length ? String(changed.length) : '0', changed.length ? changed.join(', ') : 'Nothing staged.')
+      ],
+      rows: [
+        insightRow(backups.length ? 'ok' : 'attention', 'Rollback proof', backups.length ? 'A backup is visible before the next risky publish.' : 'Run a publish/backup check before changing public availability.'),
+        insightRow(auditEntries.length ? 'ok' : 'muted', 'Audit proof', latestAudit ? `Latest actor: ${latestAudit.actor?.email || latestAudit.actor?.name || latestAudit.email || 'admin'}` : 'No actor loaded yet.')
+      ]
+    });
+  }
+
+  function renderAdvancedIntegrityPanel() {
+    const localUrl = String(state.draft?.grades?.iframeUrlLocal || '').trim();
+    const prodUrl = String(state.draft?.grades?.iframeUrlProd || '').trim();
+    const heroTitleSize = Number(state.draft?.appearance?.heroTitleSize);
+    const periodRadius = Number(state.draft?.appearance?.periodCardRadius);
+    const footerSize = Number(state.draft?.appearance?.footerSize);
+    return renderInsightPanel({
+      kicker: 'Advanced integrity',
+      title: 'Integration and display safeguards',
+      detail: 'Checks the low-frequency settings most likely to break the public app contract.',
+      cards: [
+        insightCard(localUrl ? 'ok' : 'attention', 'Local iframe', localUrl ? hostFromUrl(localUrl) : 'Missing', localUrl ? 'Local GradeViewer route configured.' : 'Local preview may fail.'),
+        insightCard(isHttpsUrl(prodUrl) ? 'ok' : 'danger', 'Production iframe', prodUrl ? hostFromUrl(prodUrl) : 'Missing', isHttpsUrl(prodUrl) ? 'Production embed is HTTPS.' : 'Production embed must be HTTPS.'),
+        insightCard(heroTitleSize >= 42 && heroTitleSize <= 160 ? 'ok' : 'attention', 'Hero size', Number.isFinite(heroTitleSize) ? `${heroTitleSize}px` : 'Invalid', 'Keep hero text inside configured range.'),
+        insightCard(footerSize >= 9 && footerSize <= 24 && periodRadius >= 0 && periodRadius <= 28 ? 'ok' : 'attention', 'Display bounds', `${footerSize || '?'}px / ${periodRadius || '?'}px`, 'Footer size and period radius stay within UI bounds.')
+      ],
+      rows: [
+        settingsPathStatus('grades.pageTitle', 'Grades browser title'),
+        insightRow(changedSections().includes('Advanced') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Advanced') ? 'Advanced settings have unpublished changes.' : 'No advanced changes are staged.')
+      ]
+    });
+  }
+
   function renderSiteSecurityCenter() {
     const host = document.createElement('div');
     const status = normalizedSiteStatus();
@@ -1251,6 +1485,9 @@
     const privacyOk = privacy
       ? !privacy.storesPersonalData && !privacy.storesIpAddresses && !privacy.storesUserAgents && !privacy.usesCookies
       : null;
+    const draftSections = changedSections();
+    const siteStatusChanged = draftSections.includes('Security');
+    const publishScope = draftSections.length ? draftSections.join(', ') : 'No staged changes';
     const sessionDetail = identity.email || identity.name || 'Current admin session';
     const storageDetail = settingsStorage
       ? `Settings ${storageCopy(settingsStorage)}; audit ${storageCopy(auditStorage)}; backups ${storageCopy(backupStorage)}.`
@@ -1297,6 +1534,7 @@
     const releaseGates = [
       ['Authentication', authMethod === 'google' || authMethod === 'local-dev', `${authText}: ${sessionDetail}`],
       ['Public sync', !syncError && !syncDisabled, syncError || (syncDisabled ? 'Sync setup required.' : 'Ready to publish public-safe settings.')],
+      ['Draft scope', !draftSections.length || siteStatusChanged || draftSections.length <= 2, publishScope],
       ['Durable data', dataDurable, storageDetail],
       ['Rollback path', backupCount === null ? null : backupCount > 0, backupDetail],
       ['Privacy telemetry', privacyOk, privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.']
@@ -1317,6 +1555,7 @@
     ].join('');
     const exposureRows = [
       securityExposureRow('Public app', 'Static frontend and public settings JSON', 'No logs, sessions, IPs, or admin identity fields sync forward.', syncError ? 'attention' : 'ok'),
+      securityExposureRow('Settings payload', 'Public-safe JSON snapshot', `Current draft scope: ${publishScope}.`, draftSections.length > 2 ? 'attention' : 'ok'),
       securityExposureRow('Admin API', 'Authenticated backend endpoints', 'Settings, audit logs, backups, and identity stay behind admin auth.', authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention'),
       securityExposureRow('GradeViewer embed', 'Browser-routed iframe URL', 'Production and localhost URLs are editable but treated as public app config.', 'muted'),
       securityExposureRow('Analytics', 'Aggregate usage dashboard', privacyOk === false ? 'Review reported collection risk before publishing.' : 'Expected to stay aggregate and privacy-safe.', privacyOk === false ? 'danger' : privacyOk === true ? 'ok' : 'muted')
@@ -1340,6 +1579,9 @@
       securityCheck(backupCount === null ? 'muted' : backupCount > 0 ? 'ok' : 'attention',
         'Rollback readiness',
         backupDetail),
+      securityCheck(!draftSections.length || draftSections.length <= 2 ? 'ok' : 'attention',
+        'Publish scope',
+        publishScope),
       securityCheck('ok',
         'Local dev kill switch',
         'Hidden from the public admin surface; public site control only stages maintenance mode.'),
@@ -1354,9 +1596,9 @@
         <div class="admin-security-hero-main">
           <span class="admin-security-kicker">Security command center</span>
           <h2>${maintenance ? 'Main site maintenance is staged' : 'Public site is staged live'}</h2>
-          <p>${escapeHtml(errorText || 'Company-style response console for availability, publishing risk, custody, rollback evidence, and incident handoff.')}</p>
+          <p>${escapeHtml(errorText || 'Live checks for admin auth, public sync, private data boundaries, rollback proof, telemetry privacy, and publish scope.')}</p>
           <div class="admin-security-hero-actions">
-            <button type="button" class="admin-btn admin-btn-sm" id="security-copy-summary">${ICON.audit}<span>Copy incident brief</span></button>
+            <button type="button" class="admin-btn admin-btn-sm" id="security-copy-summary">${ICON.audit}<span>Copy audit packet</span></button>
             <button type="button" class="admin-btn admin-btn-sm" data-security-go-tab="history">${ICON.backup}<span>Open evidence</span></button>
           </div>
         </div>
@@ -1446,7 +1688,7 @@
               <div class="admin-readiness-actions admin-security-actions">
                 <button type="button" class="admin-btn admin-btn-danger" id="security-stage-maintenance">${ICON.close}<span>${maintenance ? 'Update shutdown draft' : 'Stage shutdown draft'}</span></button>
                 <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview maintenance page</span></button>
-                <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish security change</span></button>
+                <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish staged site status</span></button>
                 ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
               </div>
             </div>
@@ -1455,8 +1697,8 @@
 
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
-            <h2>Response actions</h2>
-            <span>Security shortcuts</span>
+            <h2>Preflight shortcuts</h2>
+            <span>Jump to risk areas</span>
           </div>
           <div class="admin-security-action-grid">
             <button type="button" class="admin-btn" data-security-go-tab="history">${ICON.backup}<span>Audit history</span></button>
@@ -1466,7 +1708,7 @@
           </div>
           <div class="admin-security-meta">
             <strong>Admin-only surfaces</strong>
-            <span>Use history for accountability, privacy for GradeViewer copy, site controls for public links, and advanced config for embedded integrations.</span>
+            <span>History proves accountability, Privacy controls student-facing disclosure, Site controls public links, and Advanced owns embedded integrations.</span>
           </div>
         </section>
       </div>
@@ -1474,7 +1716,7 @@
       <div class="admin-security-ops-grid">
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
-            <h2>Data custody</h2>
+            <h2>Private data boundary</h2>
             <span>Private backend only</span>
           </div>
           <div class="admin-security-storage-map">${custodyRows}</div>
@@ -1529,14 +1771,14 @@
 
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
-            <h2>Operations matrix</h2>
-            <span>Company controls</span>
+            <h2>Control coverage</h2>
+            <span>Security-critical settings</span>
           </div>
           <div class="admin-security-control-list">
-            <div><strong>Change freeze</strong><span>Stage maintenance, preview, publish, then record evidence in History.</span></div>
+            <div><strong>Publish scope</strong><span>${escapeHtml(publishScope)}</span></div>
             <div><strong>Rollback target</strong><span>${escapeHtml(latestBackup ? formatSecurityDate(latestBackup.createdAt || latestBackup.timestamp) : 'Waiting for backup evidence.')}</span></div>
-            <div><strong>Public data rule</strong><span>Only public settings sync forward; logs, IPs, sessions, and admin identity stay backend-only.</span></div>
-            <div><strong>Session rule</strong><span>Admin actions require the current authenticated session or local development bypass.</span></div>
+            <div><strong>Public data rule</strong><span>Only settings required by the public app sync forward; logs, sessions, and admin identity stay behind admin auth.</span></div>
+            <div><strong>Session rule</strong><span>${escapeHtml(`${authText}: ${sessionDetail}`)}</span></div>
           </div>
         </section>
       </div>
@@ -1588,7 +1830,7 @@
     });
     host.querySelector('#security-copy-summary')?.addEventListener('click', () => {
       copyText(summaryText)
-        .then(() => toast('Incident brief copied.', 'success', 2200))
+        .then(() => toast('Audit packet copied.', 'success', 2200))
         .catch(e => toast('Copy failed: ' + e.message, 'error', 5000));
     });
     host.querySelector('#security-notes')?.addEventListener('input', e => saveSecurityNotes(e.target.value));
@@ -3039,12 +3281,21 @@
   // ── Tab body render ────────────────────────────────────────────────────
   function renderActiveTab() {
     const tab = SCHEMA.find(t => t.id === state.activeTab) || SCHEMA[0];
-    $('#app-shell').classList.toggle('admin-shell--jarvis', tab.id === 'jarvis');
+    const shell = $('#app-shell');
+    [...shell.classList].filter(cls => cls.startsWith('admin-shell--tab-')).forEach(cls => shell.classList.remove(cls));
+    shell.classList.toggle('admin-shell--jarvis', tab.id === 'jarvis');
+    shell.classList.add(`admin-shell--tab-${tab.id}`);
     $('#tab-title').textContent = tab.title || tab.label;
     $('#tab-sub').textContent   = tab.sub;
     const panels = $('#panels');
     panels.innerHTML = '';
-    panels.className = tab.id === 'appearance' ? 'admin-panels admin-panels--appearance' : 'admin-panels';
+    const wideTabs = new Set(['overview', 'security', 'bellSchedules', 'announcements', 'appearance', 'safety', 'history', 'advanced']);
+    panels.className = [
+      'admin-panels',
+      `admin-panels--${tab.id}`,
+      wideTabs.has(tab.id) ? 'admin-panels--wide' : '',
+      tab.id === 'appearance' ? 'admin-panels--appearance' : ''
+    ].filter(Boolean).join(' ');
 
     const q = state.search.trim().toLowerCase();
     const matches = (label) => !q || (label || '').toLowerCase().includes(q);
@@ -3054,10 +3305,17 @@
       const card = document.createElement('section');
       card.className = 'admin-card';
       if (group.custom === 'jarvisAssistant') card.classList.add('admin-card--jarvis');
+      if (group.custom) card.classList.add(`admin-card--${group.custom}`);
       if (tab.id === 'appearance') card.classList.add(`admin-appearance-card-${group.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
       card.innerHTML = group.title ? `<h2>${escapeHtml(group.title)}</h2>` : '';
 
       if (group.custom === 'overviewDashboard')         { card.classList.add('admin-card--flush'); card.appendChild(renderOverviewDashboard()); anyVisible = true; }
+      else if (group.custom === 'scheduleQualityPanel') { card.appendChild(renderScheduleQualityPanel()); anyVisible = true; }
+      else if (group.custom === 'announcementsQualityPanel') { card.appendChild(renderAnnouncementsQualityPanel()); anyVisible = true; }
+      else if (group.custom === 'siteLaunchPanel')      { card.appendChild(renderSiteLaunchPanel()); anyVisible = true; }
+      else if (group.custom === 'privacyRiskPanel')     { card.appendChild(renderPrivacyRiskPanel()); anyVisible = true; }
+      else if (group.custom === 'historyEvidencePanel') { card.appendChild(renderHistoryEvidencePanel()); anyVisible = true; }
+      else if (group.custom === 'advancedIntegrityPanel') { card.appendChild(renderAdvancedIntegrityPanel()); anyVisible = true; }
       else if (group.custom === 'navEditor')            { card.appendChild(renderNavEditor()); anyVisible = true; }
       else if (group.custom === 'jarvisAssistant')      { card.appendChild(renderJarvisAssistant()); anyVisible = true; }
       else if (group.custom === 'siteSecurityCenter')   { card.classList.add('admin-card--flush'); card.appendChild(renderSiteSecurityCenter()); anyVisible = true; }
@@ -3092,6 +3350,7 @@
     const tab = SCHEMA.find(t => t.id === state.activeTab) || SCHEMA[0];
     const readOnly = Boolean(tab.readOnly);
     $('#app-shell')?.classList.toggle('admin-shell--has-unsaved', dirty && !readOnly);
+    document.body?.classList.toggle('admin-body--has-unsaved', dirty && !readOnly);
     $('#discard-btn').classList.toggle('hidden', readOnly);
     $('#publish-btn').classList.toggle('hidden', readOnly);
     $('#dirty-pill').classList.toggle('hidden', readOnly);

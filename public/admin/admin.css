@@ -382,18 +382,19 @@ select:focus-visible,
 
 @supports not selector(:has(*)) {
   .admin-main {
-    max-width: 1320px;
+    max-width: none;
   }
 }
 
 /* ── Main column ─────────────────────────────────────────────────── */
 .admin-main {
-  padding: 36px 56px 80px;
-  max-width: 880px;
+  width: 100%;
+  padding: 36px clamp(24px, 3vw, 56px) 96px;
+  max-width: none;
   min-width: 0;
 }
 .admin-main:has(.admin-panels--appearance) {
-  max-width: 1320px;
+  max-width: none;
 }
 .admin-main-header {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -619,6 +620,57 @@ select:focus-visible,
   grid-column: 1 / -1;
   grid-row: auto;
   position: static;
+}
+.admin-panels--wide {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.admin-panels--wide > .admin-card {
+  grid-column: span 6;
+  margin-bottom: 0;
+  min-width: 0;
+}
+.admin-panels--wide > .admin-card--flush {
+  grid-column: 1 / -1;
+}
+.admin-panels--bellSchedules > .admin-card--scheduleQualityPanel,
+.admin-panels--announcements > .admin-card--announcementsQualityPanel,
+.admin-panels--appearance > .admin-card--siteLaunchPanel,
+.admin-panels--safety > .admin-card--privacyRiskPanel,
+.admin-panels--history > .admin-card--historyEvidencePanel,
+.admin-panels--advanced > .admin-card--advancedIntegrityPanel,
+.admin-panels--safety > .admin-card--analyticsDashboard,
+.admin-panels--bellSchedules > .admin-card--scheduleImageImport {
+  grid-column: 1 / -1;
+}
+.admin-panels--bellSchedules > .admin-card--scheduleOverrideEditor {
+  grid-column: span 4;
+}
+.admin-panels--bellSchedules > .admin-card--bellEditor {
+  grid-column: span 8;
+}
+.admin-panels--history > .admin-card--auditLog,
+.admin-panels--history > .admin-card--backupManager {
+  grid-column: span 6;
+}
+.admin-panels--advanced > .admin-card {
+  grid-column: span 4;
+}
+.admin-panels--advanced > .admin-card--advancedIntegrityPanel {
+  grid-column: 1 / -1;
+}
+.admin-panels--appearance > .admin-card,
+.admin-panels--safety > .admin-card,
+.admin-panels--announcements > .admin-card {
+  grid-column: span 6;
+}
+.admin-panels--announcements > .admin-card--announcementsQualityPanel,
+.admin-panels--appearance > .admin-card--siteLaunchPanel,
+.admin-panels--safety > .admin-card--privacyRiskPanel,
+.admin-panels--safety > .admin-card--analyticsDashboard {
+  grid-column: 1 / -1;
 }
 
 /* ── Fields ──────────────────────────────────────────────────────── */
@@ -901,6 +953,115 @@ select:focus-visible,
 }
 .admin-local-dev-actions {
   justify-content: flex-start;
+}
+
+.admin-insight-panel {
+  display: grid;
+  gap: 14px;
+}
+.admin-insight-heading {
+  align-items: flex-start;
+}
+.admin-insight-heading h2 {
+  margin-top: 4px;
+}
+.admin-insight-heading p {
+  max-width: 860px;
+  margin: 6px 0 0;
+  color: var(--fg-3);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.admin-insight-kicker {
+  color: var(--fg-3);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.admin-insight-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.admin-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.admin-insight-card,
+.admin-insight-row {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.018);
+}
+.admin-insight-card {
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+  min-height: 112px;
+}
+.admin-insight-card span {
+  color: var(--fg-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.admin-insight-card strong {
+  color: var(--fg-0);
+  font-size: 20px;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+.admin-insight-card small,
+.admin-insight-row small {
+  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+.admin-insight-card.ok,
+.admin-insight-row.ok { border-color: rgba(74,222,128,0.20); }
+.admin-insight-card.attention,
+.admin-insight-row.attention { border-color: rgba(240,180,50,0.24); }
+.admin-insight-card.danger,
+.admin-insight-row.danger { border-color: rgba(248,113,113,0.30); }
+.admin-insight-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.admin-insight-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 10px;
+  padding: 12px;
+}
+.admin-insight-row > span {
+  grid-row: 1 / span 2;
+  align-self: start;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: rgba(255,255,255,0.055);
+  color: var(--fg-2);
+  font-size: 10px;
+}
+.admin-insight-row.ok > span {
+  color: #86efac;
+  background: rgba(74,222,128,0.11);
+}
+.admin-insight-row.attention > span {
+  color: #f8d17a;
+  background: rgba(240,180,50,0.12);
+}
+.admin-insight-row.danger > span {
+  color: #fca5a5;
+  background: rgba(248,113,113,0.12);
+}
+.admin-insight-row strong {
+  color: var(--fg-1);
+  font-size: 13px;
 }
 
 .admin-security-tools {
@@ -1425,7 +1586,12 @@ select:focus-visible,
 /* ── Toast ───────────────────────────────────────────────────────── */
 .admin-toast-host {
   position: fixed; right: 22px; bottom: 22px;
-  display: flex; flex-direction: column; gap: 8px; z-index: 9999;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 9999;
+  pointer-events: none;
+}
+.admin-body--has-unsaved .admin-toast-host,
+body:has(.admin-shell--has-unsaved) .admin-toast-host {
+  bottom: clamp(96px, 11vh, 126px);
 }
 .admin-toast {
   padding: 11px 16px; border-radius: 8px;
@@ -1433,8 +1599,10 @@ select:focus-visible,
   border: 1px solid var(--line-strong);
   color: var(--fg-1); font-size: 12.5px;
   min-width: 240px;
+  max-width: min(520px, calc(100vw - 44px));
   box-shadow: 0 14px 28px rgba(0,0,0,0.5);
   animation: toastIn 0.16s ease-out;
+  pointer-events: auto;
 }
 .admin-toast.success { border-color: rgba(74,222,128,0.36); }
 .admin-toast.error   { border-color: rgba(248,113,113,0.36); color: #fca5a5; }
@@ -1702,8 +1870,21 @@ select:focus-visible,
   .admin-security-split,
   .admin-security-ops-grid,
   .admin-security-ops-grid--wide,
-  .admin-security-risk-grid {
+  .admin-security-risk-grid,
+  .admin-insight-grid,
+  .admin-insight-list {
     grid-template-columns: 1fr;
+  }
+  .admin-panels--wide > .admin-card,
+  .admin-panels--bellSchedules > .admin-card--scheduleOverrideEditor,
+  .admin-panels--bellSchedules > .admin-card--bellEditor,
+  .admin-panels--history > .admin-card--auditLog,
+  .admin-panels--history > .admin-card--backupManager,
+  .admin-panels--advanced > .admin-card,
+  .admin-panels--appearance > .admin-card,
+  .admin-panels--safety > .admin-card,
+  .admin-panels--announcements > .admin-card {
+    grid-column: 1 / -1;
   }
   .admin-security-gates {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1721,6 +1902,8 @@ select:focus-visible,
   .admin-security-checks,
   .admin-security-gates,
   .admin-security-template-grid,
+  .admin-insight-grid,
+  .admin-insight-list,
   .admin-history-toolbar,
   .admin-stat-grid {
     grid-template-columns: 1fr;
