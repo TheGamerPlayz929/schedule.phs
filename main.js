@@ -35,7 +35,8 @@ const SCHEDULE_DATA_FETCH_TIMEOUT_MS = 5000;
 const LUNCH_WEATHER_CACHE_KEY = 'phs:lunch-weather:v7';
 const LUNCH_WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
 const LUNCH_WEATHER_STALE_TTL_MS = 6 * 60 * 60 * 1000;
-const LUNCH_WEATHER_FETCH_TIMEOUT_MS = 2200;
+const LUNCH_WEATHER_FETCH_TIMEOUT_MS = 6500;
+const LUNCH_WEATHER_RETRY_COOLDOWN_MS = 60 * 1000;
 const LUNCH_WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=39.1459&longitude=-77.4169&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&minutely_15=precipitation,precipitation_probability,weather_code&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=2';
 const LUNCH_WEATHER_FALLBACK_START_SEC = 10 * 3600 + 20 * 60;
 const LUNCH_WEATHER_FALLBACK_END_SEC = 12 * 3600;
@@ -108,6 +109,7 @@ let _weatherMeta = null;
 let _weatherPayload = null;
 let _weatherLoading = false;
 let _weatherVisible = false;
+let _weatherRetryAt = 0;
 let _overrideFailureCount = 0;
 let _overrideRetryAt = 0;
 const _periodEntryCache = new WeakMap();
@@ -428,6 +430,30 @@ function _writeLunchWeatherCache(api) {
     if (!_isLunchWeatherApiValid(api)) return;
     localStorage.setItem(LUNCH_WEATHER_CACHE_KEY, JSON.stringify({ ts: Date.now(), api }));
   } catch {}
+}
+
+function _lunchWeatherFetchUrls() {
+  const urls = [];
+  if (location.protocol !== 'file:') urls.push(`${_BACKEND_URL}/weather/lunch`);
+  urls.push(LUNCH_WEATHER_URL);
+  return [...new Set(urls)];
+}
+
+async function _fetchLunchWeatherApi() {
+  let lastError = null;
+  for (const url of _lunchWeatherFetchUrls()) {
+    try {
+      const res = await fetch(url, { cache: 'no-store', signal: _timeoutSignal(LUNCH_WEATHER_FETCH_TIMEOUT_MS) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const api = _isLunchWeatherApiValid(json?.api) ? json.api : json;
+      if (!_isLunchWeatherApiValid(api)) throw new Error('Invalid weather payload');
+      return api;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Weather fetch failed');
 }
 
 function _hasWeatherArray(hourly, key, minLength) {
@@ -783,25 +809,27 @@ function _renderLunchWeather(payload, state = 'ready') {
 
 async function _loadLunchWeather(forceFresh = false) {
   if (_weatherLoading || !_syncLunchWeatherVisibility()) return;
-  _weatherLoading = true;
   const freshApi = _readLunchWeatherCache(LUNCH_WEATHER_CACHE_TTL_MS);
   const cachedApi = freshApi || _readLunchWeatherCache(LUNCH_WEATHER_STALE_TTL_MS);
   const cachedPayload = cachedApi ? _weatherPayloadFromApi(cachedApi) : null;
   if (cachedPayload) _renderLunchWeather(cachedPayload);
   else _renderLunchWeather(null, 'loading');
   if (freshApi && !forceFresh) {
-    _weatherLoading = false;
     return;
   }
+  if (_weatherRetryAt > Date.now()) {
+    if (!cachedPayload) _renderLunchWeather(null, 'error');
+    return;
+  }
+  _weatherLoading = true;
   try {
-    const res = await fetch(LUNCH_WEATHER_URL, { cache: 'no-store', signal: _timeoutSignal(LUNCH_WEATHER_FETCH_TIMEOUT_MS) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const api = await res.json();
-    if (!_isLunchWeatherApiValid(api)) throw new Error('Invalid weather payload');
+    const api = await _fetchLunchWeatherApi();
     _writeLunchWeatherCache(api);
+    _weatherRetryAt = 0;
     _renderLunchWeather(_weatherPayloadFromApi(api));
   } catch (e) {
     console.warn('Lunch weather unavailable:', e);
+    _weatherRetryAt = Date.now() + LUNCH_WEATHER_RETRY_COOLDOWN_MS;
     if (!cachedPayload) _renderLunchWeather(null, 'error');
   } finally {
     _weatherLoading = false;
@@ -830,7 +858,7 @@ function _updateLunchWeatherMode() {
   const wasVisible = _weatherVisible;
   if (!_syncLunchWeatherVisibility()) return;
   if ((!wasVisible || !_weatherPayload) && !_weatherLoading) {
-    _loadLunchWeather(true);
+    _loadLunchWeather(!wasVisible);
     return;
   }
   if (_weatherPayload) _renderLunchWeather(_weatherPayload);

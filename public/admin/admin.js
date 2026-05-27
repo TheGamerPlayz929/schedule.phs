@@ -27,6 +27,8 @@
     devControlsEnabled: false,
     lastPublishResult: null,
     lastPublishAt: null,
+    securitySnapshot: null,
+    securitySnapshotLoading: null,
     activeTab: 'overview',
     search: '',
     previewMode: 'draft', // 'draft' | 'live'
@@ -559,6 +561,74 @@
       .filter((label, idx, arr) => arr.indexOf(label) === idx);
   }
 
+  function goTab(tabId) {
+    state.activeTab = tabId;
+    closeMobileSidebar();
+    renderSidebar();
+    renderActiveTab();
+  }
+
+  function storageCopy(storage) {
+    if (!storage) return 'Unknown';
+    const type = storage.type || 'unknown';
+    return storage.durable ? `${type} durable` : `${type} only`;
+  }
+
+  function securityStatusClass(status) {
+    return ['ok', 'attention', 'danger', 'muted'].includes(status) ? status : 'muted';
+  }
+
+  function securityCheck(status, title, detail) {
+    const cls = securityStatusClass(status);
+    return `
+      <div class="admin-security-check ${cls}">
+        <span aria-hidden="true"></span>
+        <strong>${escapeHtml(title)}</strong>
+        <small>${escapeHtml(detail)}</small>
+      </div>`;
+  }
+
+  function formatSecurityCheckedAt() {
+    const ts = state.securitySnapshot?.checkedAt;
+    if (!ts) return 'Not checked yet';
+    const time = new Date(ts);
+    if (Number.isNaN(time.getTime())) return 'Check time unavailable';
+    return `Checked ${time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+
+  function loadSecuritySnapshot(force = false) {
+    if (state.securitySnapshotLoading) return state.securitySnapshotLoading;
+    const checkedAtMs = state.securitySnapshot?.checkedAt ? new Date(state.securitySnapshot.checkedAt).getTime() : 0;
+    const recent = checkedAtMs && Date.now() - checkedAtMs < 45_000;
+    if (!force && recent) return Promise.resolve(state.securitySnapshot);
+
+    state.securitySnapshotLoading = Promise.allSettled([
+      api('/admin/storage-status', { silentAuth: true }),
+      api('/admin/analytics', { silentAuth: true }),
+      api('/admin/backups?limit=1', { silentAuth: true }),
+      api('/admin/audit-log?limit=1', { silentAuth: true }),
+      api('/admin/whoami', { silentAuth: true })
+    ]).then(results => {
+      const [storage, analytics, backups, auditLog, whoami] = results.map(result => result.status === 'fulfilled' ? result.value : null);
+      state.securitySnapshot = {
+        checkedAt: new Date().toISOString(),
+        storage,
+        analytics,
+        backups,
+        auditLog,
+        whoami,
+        errors: results
+          .filter(result => result.status === 'rejected')
+          .map(result => result.reason?.message || 'Status check failed')
+      };
+      return state.securitySnapshot;
+    }).finally(() => {
+      state.securitySnapshotLoading = null;
+      if (state.activeTab === 'security') renderActiveTab();
+    });
+    return state.securitySnapshotLoading;
+  }
+
   function renderOverviewDashboard() {
     const host = document.createElement('div');
     const changed = changedSections();
@@ -621,13 +691,7 @@
         <span>Signed in as: <strong>${escapeHtml(state.identity?.email || state.identity?.name || 'local admin')}</strong></span>
       </div>`;
 
-    host.querySelectorAll('[data-go-tab]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.activeTab = btn.dataset.goTab;
-        renderSidebar();
-        renderActiveTab();
-      });
-    });
+    host.querySelectorAll('[data-go-tab]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.goTab)));
     host.querySelector('#overview-preview')?.addEventListener('click', openDraftPreview);
     host.querySelector('#overview-public-sync-retry')?.addEventListener('click', retryPublicSync);
     return host;
@@ -892,6 +956,10 @@
     const host = document.createElement('div');
     const status = normalizedSiteStatus();
     const maintenance = status.mode === 'maintenance';
+    const snapshot = state.securitySnapshot || {};
+    const needsSnapshot = !snapshot.checkedAt && !state.securitySnapshotLoading;
+    if (needsSnapshot) loadSecuritySnapshot().catch(() => {});
+    const checking = Boolean(state.securitySnapshotLoading);
     const publish = state.lastPublishResult;
     const syncError = publish?.publicFrontend?.error;
     const syncDisabled = publish?.publicFrontend?.enabled === false;
@@ -902,14 +970,76 @@
         : publish
           ? 'Synced'
           : 'Ready';
-    const authText = state.identity?.method === 'google'
+    const who = snapshot.whoami || {};
+    const identity = who.identity || state.identity || {};
+    const authMethod = who.method || identity.method || 'admin';
+    const authText = authMethod === 'google'
       ? 'Google admin'
-      : state.identity?.method === 'local-dev'
+      : authMethod === 'local-dev'
         ? 'Local admin'
         : 'Admin session';
+    const storage = snapshot.storage || state.adminHealth || {};
+    const settingsStorage = storage.settings;
+    const auditStorage = snapshot.auditLog?.storage || storage.audit;
+    const backupStorage = snapshot.backups?.storage;
+    const backupCount = Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups.length : null;
+    const privacy = snapshot.analytics?.privacy;
+    const errorText = snapshot.errors?.length ? snapshot.errors.join(' | ') : '';
+    const dataDurable = Boolean(settingsStorage?.durable && auditStorage?.durable && (backupStorage ? backupStorage.durable : true));
+    const privacyOk = privacy
+      ? !privacy.storesPersonalData && !privacy.storesIpAddresses && !privacy.storesUserAgents && !privacy.usesCookies
+      : null;
+    const sessionDetail = identity.email || identity.name || 'Current admin session';
+    const storageDetail = settingsStorage
+      ? `Settings ${storageCopy(settingsStorage)}; audit ${storageCopy(auditStorage)}; backups ${storageCopy(backupStorage)}.`
+      : 'Waiting for storage status.';
+    const backupDetail = backupCount === null
+      ? 'Checking backup history.'
+      : backupCount > 0
+        ? 'At least one settings backup is available for rollback.'
+        : 'No recent backup returned by this check yet.';
+    const statusChecks = [
+      securityCheck(authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention',
+        'Admin authentication',
+        `${authText}: ${sessionDetail}`),
+      securityCheck(maintenance ? 'attention' : 'ok',
+        'Public availability',
+        maintenance ? 'Main site is staged for maintenance after publish.' : 'Main site is staged to remain live.'),
+      securityCheck(syncError ? 'danger' : syncDisabled ? 'attention' : 'ok',
+        'Public sync path',
+        syncError || (syncDisabled ? 'GitHub public sync is not configured.' : 'Publishes use the public-safe settings snapshot.')),
+      securityCheck(settingsStorage ? (dataDurable ? 'ok' : 'attention') : 'muted',
+        'Data durability',
+        storageDetail),
+      securityCheck(privacyOk === true ? 'ok' : privacyOk === false ? 'danger' : 'muted',
+        'Analytics privacy',
+        privacy ? privacy.note || 'Aggregate analytics only; no personal fields reported.' : 'Checking analytics privacy status.'),
+      securityCheck(backupCount === null ? 'muted' : backupCount > 0 ? 'ok' : 'attention',
+        'Rollback readiness',
+        backupDetail),
+      securityCheck('ok',
+        'Local dev kill switch',
+        'Hidden from the public admin surface; public site control only stages maintenance mode.'),
+      securityCheck(errorText ? 'attention' : checking ? 'muted' : 'ok',
+        'Panel self-check',
+        errorText || (checking ? 'Checking backend security endpoints.' : formatSecurityCheckedAt()))
+    ].join('');
 
     host.className = 'admin-security-tools';
     host.innerHTML = `
+      <section class="admin-security-hero">
+        <div class="admin-security-hero-main">
+          <span class="admin-security-kicker">Security command center</span>
+          <h2>${maintenance ? 'Main site maintenance is staged' : 'Public site is staged live'}</h2>
+          <p>${escapeHtml(errorText || 'Control public availability, verify admin-only data paths, and jump straight to the panels used during an incident.')}</p>
+        </div>
+        <div class="admin-security-state ${maintenance ? 'attention' : checking ? 'muted' : 'ok'}">
+          <strong>${maintenance ? 'Maintenance' : checking ? 'Checking' : 'Operational'}</strong>
+          <span>${escapeHtml(formatSecurityCheckedAt())}</span>
+          <button type="button" class="admin-btn admin-btn-sm" id="security-refresh">${ICON.refresh}<span>${checking ? 'Checking...' : 'Run check'}</span></button>
+        </div>
+      </section>
+
       <div class="admin-overview-grid admin-security-grid">
         <section class="admin-overview-card ${maintenance ? 'danger' : 'ok'}">
           <span>Public site</span>
@@ -924,46 +1054,65 @@
         <section class="admin-overview-card ok">
           <span>Admin access</span>
           <strong>${escapeHtml(authText)}</strong>
-          <small>${escapeHtml(state.identity?.email || state.identity?.name || 'Current session')}</small>
+          <small>${escapeHtml(sessionDetail)}</small>
+        </section>
+        <section class="admin-overview-card ${dataDurable ? 'ok' : settingsStorage ? 'attention' : 'muted'}">
+          <span>Data boundary</span>
+          <strong>${dataDurable ? 'Durable' : settingsStorage ? 'Local only' : 'Checking'}</strong>
+          <small>${escapeHtml(settingsStorage ? storageDetail : 'Admin data never syncs into public settings.')}</small>
+        </section>
+      </div>
+
+      <div class="admin-security-split">
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Main-site availability</h2>
+            <span>Maintenance switch</span>
+          </div>
+          <div class="admin-security-mode-row">
+            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-ghost' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live site</span></button>
+            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" data-site-mode="maintenance">${ICON.close}<span>Force main-site shutdown</span></button>
+          </div>
+          <div class="admin-field">
+            <label for="site-status-title">Maintenance title</label>
+            <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}">
+          </div>
+          <div class="admin-field">
+            <label for="site-status-message">Maintenance message</label>
+            <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
+          </div>
+          <div class="admin-security-note">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
+          <div class="admin-readiness-actions admin-security-actions">
+            <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish security change</span></button>
+            <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview</span></button>
+            ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+          </div>
+        </section>
+
+        <section class="admin-security-panel">
+          <div class="admin-panel-heading">
+            <h2>Response actions</h2>
+            <span>Security shortcuts</span>
+          </div>
+          <div class="admin-security-action-grid">
+            <button type="button" class="admin-btn" data-security-go-tab="history">${ICON.backup}<span>Audit history</span></button>
+            <button type="button" class="admin-btn" data-security-go-tab="safety">${ICON.privacy}<span>Privacy panel</span></button>
+            <button type="button" class="admin-btn" data-security-go-tab="appearance">${ICON.nav}<span>Site controls</span></button>
+            <button type="button" class="admin-btn" data-security-go-tab="advanced">${ICON.grades}<span>Advanced config</span></button>
+          </div>
+          <div class="admin-security-meta">
+            <strong>Admin-only surfaces</strong>
+            <span>Use history for accountability, privacy for GradeViewer copy, site controls for public links, and advanced config for embedded integrations.</span>
+          </div>
         </section>
       </div>
 
       <section class="admin-security-panel">
         <div class="admin-panel-heading">
-          <h2>Main-site availability</h2>
-          <span>Maintenance switch</span>
+          <h2>Security posture</h2>
+          <span>${checking ? 'Checking live backend' : 'Live status'}</span>
         </div>
-        <div class="admin-security-mode-row">
-          <button type="button" class="admin-btn ${maintenance ? 'admin-btn-ghost' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live site</span></button>
-          <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" data-site-mode="maintenance">${ICON.close}<span>Force main-site shutdown</span></button>
-        </div>
-        <div class="admin-field">
-          <label for="site-status-title">Maintenance title</label>
-          <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}">
-        </div>
-        <div class="admin-field">
-          <label for="site-status-message">Maintenance message</label>
-          <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
-        </div>
-        <div class="admin-field-help">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
-        <div class="admin-readiness-actions admin-security-actions">
-          <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish security change</span></button>
-          <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview</span></button>
-          ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
-        </div>
-      </section>
-
-      <section class="admin-security-panel">
-        <div class="admin-panel-heading">
-          <h2>Security controls</h2>
-          <span>Current safeguards</span>
-        </div>
-        <div class="admin-security-list">
-          <div><strong>Authenticated admin only</strong><span>Security changes still go through the normal admin session and publish flow.</span></div>
-          <div><strong>Validated public settings</strong><span>The maintenance switch only accepts live or maintenance, with short plain text.</span></div>
-          <div><strong>Public-safe publishing</strong><span>Only public site settings are synced; logs, sessions, IP data, and admin records stay backend-only.</span></div>
-          <div><strong>Audit and rollback</strong><span>Each publish keeps the existing backup and event history path available.</span></div>
-        </div>
+        <div class="admin-security-checks">${statusChecks}</div>
       </section>
     `;
 
@@ -981,6 +1130,8 @@
     host.querySelector('#security-publish')?.addEventListener('click', () => publishDraft('security').catch(() => {}));
     host.querySelector('#security-preview')?.addEventListener('click', openDraftPreview);
     host.querySelector('#security-sync')?.addEventListener('click', retryPublicSync);
+    host.querySelector('#security-refresh')?.addEventListener('click', () => loadSecuritySnapshot(true).catch(e => toast(e.message, 'error', 5000)));
+    host.querySelectorAll('[data-security-go-tab]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.securityGoTab)));
     return host;
   }
 
