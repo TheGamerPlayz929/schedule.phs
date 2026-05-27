@@ -644,14 +644,79 @@
     return ['ok', 'attention', 'danger', 'muted'].includes(status) ? status : 'muted';
   }
 
-  function securityCheck(status, title, detail) {
+  function formatPxValue(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? `${n}px` : '?';
+  }
+
+  function securityMatrixRow(status, area, control, owner, detail) {
     const cls = securityStatusClass(status);
+    const label = cls === 'ok' ? 'Pass' : cls === 'danger' ? 'Block' : cls === 'attention' ? 'Watch' : 'Check';
     return `
-      <div class="admin-security-check ${cls}">
-        <span aria-hidden="true"></span>
-        <strong>${escapeHtml(title)}</strong>
-        <small>${escapeHtml(detail)}</small>
+      <div class="admin-security-matrix-row ${cls}">
+        <span>${label}</span>
+        <strong>${escapeHtml(area)}</strong>
+        <em>${escapeHtml(control)}</em>
+        <small><b>${escapeHtml(owner)}</b>${escapeHtml(detail)}</small>
       </div>`;
+  }
+
+  const CUSTOM_SEARCH_TERMS = {
+    overviewDashboard: 'overview control room status publish preview backend sync rollback evidence readiness',
+    siteSecurityCenter: 'security maintenance shutdown pause live restore publish sync privacy audit rollback backup checklist evidence storage authentication',
+    scheduleQualityPanel: 'schedule quality coverage override bell warning diagnostics today no school advisory early release',
+    announcementsQualityPanel: 'announcements cards bullets links quality diagnostics content',
+    siteLaunchPanel: 'site launch branding nav logo favicon footer theme links gradeviewer',
+    privacyRiskPanel: 'privacy analytics telemetry gradeviewer support policy faq',
+    historyEvidencePanel: 'history audit rollback backup evidence accountability csv',
+    advancedIntegrityPanel: 'advanced gradeviewer iframe hero countdown footer period size display integration',
+    navEditor: 'navigation nav links menu',
+    announcementsEditor: 'announcement cards bullets',
+    scheduleOverrideEditor: 'active override schedule type today no school advisory early release',
+    bellEditor: 'bell schedule periods times reusable',
+    scheduleImageImport: 'image import extract schedule photo ocr',
+    privacyParagraphsEditor: 'privacy modal paragraphs faq copy',
+    analyticsDashboard: 'analytics visits pages usage traffic',
+    auditLog: 'audit log history events filter csv',
+    backupManager: 'backups rollback restore versions',
+    jarvisAssistant: 'jarvis assistant ai draft preview'
+  };
+
+  function groupSearchText(tab, group) {
+    const fieldText = (group.fields || [])
+      .flatMap(f => [f.label, f.path, f.help, f.kind])
+      .filter(Boolean)
+      .join(' ');
+    return [
+      tab.label,
+      tab.title,
+      tab.sub,
+      group.title,
+      group.custom,
+      CUSTOM_SEARCH_TERMS[group.custom],
+      fieldText
+    ].filter(Boolean).join(' ').toLowerCase();
+  }
+
+  function groupMatchesSearch(tab, group, query) {
+    const q = String(query || '').trim().toLowerCase();
+    return !q || groupSearchText(tab, group).includes(q);
+  }
+
+  function tabDirtyCount(tab) {
+    const changed = changedSections();
+    if (!changed.length || tab.readOnly) return 0;
+    const byTab = {
+      overview: changed,
+      security: ['Security'],
+      bellSchedules: ['Schedule'],
+      announcements: ['Announcements'],
+      appearance: ['Site'],
+      safety: ['Privacy'],
+      advanced: ['Advanced']
+    };
+    const labels = byTab[tab.id] || [];
+    return changed.filter(label => labels.includes(label)).length;
   }
 
   function securityChecklistProgress() {
@@ -670,15 +735,6 @@
           <small>${escapeHtml(item.detail)}</small>
         </label>`;
     }).join('');
-  }
-
-  function securityExposureRow(label, surface, boundary, status = 'ok') {
-    return `
-      <div class="admin-security-exposure-row ${securityStatusClass(status)}">
-        <strong>${escapeHtml(label)}</strong>
-        <span>${escapeHtml(surface)}</span>
-        <small>${escapeHtml(boundary)}</small>
-      </div>`;
   }
 
   function asArray(value) {
@@ -819,25 +875,6 @@
     };
   }
 
-  function storageRow(label, storage) {
-    const status = storage?.durable ? 'ok' : storage ? 'attention' : 'muted';
-    const primary = storage ? storageCopy(storage) : 'Checking';
-    const detail = storage?.durable
-      ? [storage.repo, storage.branch, storage.path].filter(Boolean).join(' / ')
-      : storage
-        ? 'Local development only. Do not treat this as durable production storage.'
-        : 'Waiting for backend storage status.';
-    return `
-      <div class="admin-security-storage-row ${status}">
-        <span aria-hidden="true"></span>
-        <div>
-          <strong>${escapeHtml(label)}</strong>
-          <em>${escapeHtml(primary)}</em>
-          <small>${escapeHtml(detail || 'No path reported.')}</small>
-        </div>
-      </div>`;
-  }
-
   function securityTimelineItem(item, fallback) {
     if (!item) {
       return `<div class="admin-security-timeline-empty">${escapeHtml(fallback)}</div>`;
@@ -922,7 +959,7 @@
       return state.securitySnapshot;
     }).finally(() => {
       state.securitySnapshotLoading = null;
-      if (state.activeTab === 'security' || state.activeTab === 'overview') renderActiveTab();
+      if (['security', 'overview', 'safety', 'history'].includes(state.activeTab)) renderActiveTab();
     });
     return state.securitySnapshotLoading;
   }
@@ -969,9 +1006,50 @@
       errorText: snapshot.errors?.join(' | ') || '',
       checklistPercent: checklist.percent
     });
+    const commandSummary = dirty
+      ? `${changed.length} unpublished ${changed.length === 1 ? 'section' : 'sections'}`
+      : maintenance
+        ? 'Maintenance mode is staged'
+        : syncError
+          ? 'Public sync needs attention'
+          : 'Ready for daily updates';
+    const securityChecks = [
+      !syncError && !syncDisabled,
+      !maintenance,
+      settingsStorage ? Boolean(settingsStorage.durable) : null,
+      backupCount === null ? null : backupCount > 0,
+      privacyOk
+    ];
+    const knownSecurityChecks = securityChecks.filter(value => value !== null);
+    const passedSecurityChecks = knownSecurityChecks.filter(Boolean).length;
+    const securitySummary = knownSecurityChecks.length
+      ? `${passedSecurityChecks}/${knownSecurityChecks.length} checks pass`
+      : 'Checks loading';
+    const attentionItems = [
+      dirty ? `${changed.join(', ')} waiting to publish.` : '',
+      maintenance ? 'Visitors will see the maintenance page after publish.' : '',
+      syncError ? `Public sync failed: ${syncError}` : '',
+      syncDisabled ? 'Public sync is not configured for this environment.' : '',
+      backupCount === 0 ? 'No rollback backup was returned by the latest check.' : '',
+      privacyOk === false ? 'Analytics privacy report needs review.' : ''
+    ].filter(Boolean);
 
     host.innerHTML = `
-      <div class="admin-overview-grid">
+      <section class="admin-overview-command">
+        <div>
+          <span>Admin command center</span>
+          <h2>${escapeHtml(commandSummary)}</h2>
+          <p>${escapeHtml(attentionItems[0] || 'Use the workflow buttons for the common work. Security and History stay one click away when a publish is risky.')}</p>
+        </div>
+        <div class="admin-readiness-actions">
+          <button type="button" class="admin-btn admin-btn-sm admin-btn-primary" data-go-tab="bellSchedules">${ICON.bell}<span>Schedule</span></button>
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="announcements">${ICON.announce}<span>Announcements</span></button>
+          <button type="button" class="admin-btn admin-btn-sm" id="overview-preview">${ICON.eye}<span>Preview draft</span></button>
+          ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-sm admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+        </div>
+      </section>
+
+      <div class="admin-overview-grid admin-overview-grid--dense">
         <section class="admin-overview-card ${dirty ? 'attention' : 'ok'}">
           <span>Draft state</span>
           <strong>${dirty ? `${changed.length} changed ${changed.length === 1 ? 'section' : 'sections'}` : 'Ready'}</strong>
@@ -993,32 +1071,19 @@
           <small>${announcementCount} announcement ${announcementCount === 1 ? 'card' : 'cards'} live in draft.</small>
         </section>
       </div>
-      <div class="admin-readiness-panel">
-        <div>
-          <h2>Next move</h2>
-          <p>${dirty ? 'Preview the draft, then publish only the sections listed below.' : 'Pick a workflow from the left. Schedule and announcements are the daily paths.'}</p>
-        </div>
-        <div class="admin-readiness-actions">
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="bellSchedules">${ICON.bell}<span>Schedule</span></button>
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="announcements">${ICON.announce}<span>Announcements</span></button>
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Security</span></button>
-          <button type="button" class="admin-btn admin-btn-sm" id="overview-preview">${ICON.eye}<span>Preview</span></button>
-          ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-sm admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
-        </div>
-      </div>
       <div class="admin-overview-control-grid">
         <section class="admin-overview-control ${overviewRisk.status}">
           <div>
-            <span>Security readiness</span>
-            <strong>${overviewRisk.score}/100</strong>
-            <small>${escapeHtml(overviewRisk.label)} · ${checklist.done}/${checklist.total} runbook checks complete.</small>
+            <span>Security checks</span>
+            <strong>${escapeHtml(securitySummary)}</strong>
+            <small>${escapeHtml(overviewRisk.issues[0] || `${checklist.done}/${checklist.total} runbook checks complete.`)}</small>
           </div>
-          <div class="admin-security-scorebar"><i style="width:${overviewRisk.score}%"></i></div>
+          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Review</span></button>
         </section>
         <section class="admin-overview-control ${maintenance ? 'attention' : 'ok'}">
           <div>
             <span>Public availability</span>
-            <strong>${maintenance ? 'Maintenance staged' : 'Live staged'}</strong>
+            <strong>${maintenance ? 'Maintenance page' : 'Live site'}</strong>
             <small>${escapeHtml(maintenance ? siteStatus.title : 'Public site is set to normal visitor mode.')}</small>
           </div>
           <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Manage</span></button>
@@ -1062,7 +1127,8 @@
       b.className = 'admin-tab-btn' + (tab.id === state.activeTab ? ' active' : '');
       b.dataset.tab = tab.id;
       b.title = tab.label;
-      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span class="admin-tab-label">${escapeHtml(tab.label)}</span>`;
+      const dirtyCount = tabDirtyCount(tab);
+      b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span class="admin-tab-label">${escapeHtml(tab.label)}</span>${dirtyCount ? `<span class="admin-tab-dirty" aria-label="${dirtyCount} changed ${dirtyCount === 1 ? 'section' : 'sections'}">${dirtyCount}</span>` : ''}`;
       b.addEventListener('click', () => { state.activeTab = tab.id; closeMobileSidebar(); renderSidebar(); renderActiveTab(); });
       nav.appendChild(b);
     }
@@ -1439,7 +1505,7 @@
         insightCard(localUrl ? 'ok' : 'attention', 'Local iframe', localUrl ? hostFromUrl(localUrl) : 'Missing', localUrl ? 'Local GradeViewer route configured.' : 'Local preview may fail.'),
         insightCard(isHttpsUrl(prodUrl) ? 'ok' : 'danger', 'Production iframe', prodUrl ? hostFromUrl(prodUrl) : 'Missing', isHttpsUrl(prodUrl) ? 'Production embed is HTTPS.' : 'Production embed must be HTTPS.'),
         insightCard(heroTitleSize >= 42 && heroTitleSize <= 160 ? 'ok' : 'attention', 'Hero size', Number.isFinite(heroTitleSize) ? `${heroTitleSize}px` : 'Invalid', 'Keep hero text inside configured range.'),
-        insightCard(footerSize >= 9 && footerSize <= 24 && periodRadius >= 0 && periodRadius <= 28 ? 'ok' : 'attention', 'Display bounds', `${footerSize || '?'}px / ${periodRadius || '?'}px`, 'Footer size and period radius stay within UI bounds.')
+        insightCard(footerSize >= 9 && footerSize <= 24 && periodRadius >= 0 && periodRadius <= 28 ? 'ok' : 'attention', 'Display bounds', `${formatPxValue(footerSize)} / ${formatPxValue(periodRadius)}`, 'Footer size and period radius stay within UI bounds.')
       ],
       rows: [
         settingsPathStatus('grades.pageTitle', 'Grades browser title'),
@@ -1525,69 +1591,45 @@
       latestAudit: latestAudit ? `${latestAudit.action || 'admin_event'} by ${latestAudit.actor?.email || latestAudit.actor?.name || latestAudit.email || 'admin'}` : '',
       notes: state.securityNotes
     });
-    const riskIssues = model.issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('');
+    const riskIssues = model.issues.slice(0, 5).map(issue => `<li>${escapeHtml(issue)}</li>`).join('');
     const templateButtons = SECURITY_TEMPLATES.map(t => `
       <button type="button" class="admin-security-template" data-security-template="${escapeHtml(t.id)}">
         <strong>${escapeHtml(t.label)}</strong>
         <span>${escapeHtml(t.title)}</span>
       </button>`).join('');
-    const releaseGates = [
-      ['Authentication', authMethod === 'google' || authMethod === 'local-dev', `${authText}: ${sessionDetail}`],
-      ['Public sync', !syncError && !syncDisabled, syncError || (syncDisabled ? 'Sync setup required.' : 'Ready to publish public-safe settings.')],
-      ['Draft scope', !draftSections.length || siteStatusChanged || draftSections.length <= 2, publishScope],
-      ['Durable data', dataDurable, storageDetail],
-      ['Rollback path', backupCount === null ? null : backupCount > 0, backupDetail],
-      ['Privacy telemetry', privacyOk, privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.']
-    ].map(([label, passed, detail]) => `
-      <div class="admin-security-gate ${passed === true ? 'ok' : passed === false ? 'attention' : 'muted'}">
-        <span>${passed === true ? 'Pass' : passed === false ? 'Watch' : 'Check'}</span>
-        <strong>${escapeHtml(label)}</strong>
-        <small>${escapeHtml(detail)}</small>
+    const releaseGateData = [
+      { area: 'Admin access', control: 'Signed-in admin session', passed: authMethod === 'google' || authMethod === 'local-dev', detail: `${authText}: ${sessionDetail}` },
+      { area: 'Public sync', control: 'Public-safe settings push', passed: !syncError && !syncDisabled, detail: syncError || (syncDisabled ? 'Sync setup required.' : 'Ready to publish public-safe settings.') },
+      { area: 'Draft scope', control: 'Change blast radius', passed: !draftSections.length || siteStatusChanged || draftSections.length <= 2, detail: publishScope },
+      { area: 'Private storage', control: 'Admin data custody', passed: settingsStorage ? dataDurable : null, detail: storageDetail },
+      { area: 'Rollback', control: 'Backup before risky publish', passed: backupCount === null ? null : backupCount > 0, detail: backupDetail },
+      { area: 'Privacy', control: 'Aggregate analytics only', passed: privacyOk, detail: privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.' }
+    ];
+    const knownGates = releaseGateData.filter(gate => gate.passed !== null);
+    const passedGates = knownGates.filter(gate => gate.passed).length;
+    const gatePercent = knownGates.length ? Math.round((passedGates / knownGates.length) * 100) : 0;
+    const readinessLabel = knownGates.length ? `${passedGates}/${knownGates.length}` : 'Check';
+    const releaseGates = releaseGateData.map(gate => `
+      <div class="admin-security-gate ${gate.passed === true ? 'ok' : gate.passed === false ? 'attention' : 'muted'}">
+        <span>${gate.passed === true ? 'Pass' : gate.passed === false ? 'Watch' : 'Check'}</span>
+        <strong>${escapeHtml(gate.area)}</strong>
+        <small>${escapeHtml(gate.detail)}</small>
       </div>`).join('');
-    const custodyRows = [
-      storageRow('Settings store', settingsStorage),
-      storageRow('Audit log', auditStorage),
-      storageRow('Backup vault', backupStorage)
-    ].join('');
     const timelineItems = [
       securityTimelineItem(latestAudit, 'No recent audit event returned.'),
       securityTimelineItem(latestBackup, 'No recent backup returned.')
     ].join('');
-    const exposureRows = [
-      securityExposureRow('Public app', 'Static frontend and public settings JSON', 'No logs, sessions, IPs, or admin identity fields sync forward.', syncError ? 'attention' : 'ok'),
-      securityExposureRow('Settings payload', 'Public-safe JSON snapshot', `Current draft scope: ${publishScope}.`, draftSections.length > 2 ? 'attention' : 'ok'),
-      securityExposureRow('Admin API', 'Authenticated backend endpoints', 'Settings, audit logs, backups, and identity stay behind admin auth.', authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention'),
-      securityExposureRow('GradeViewer embed', 'Browser-routed iframe URL', 'Production and localhost URLs are editable but treated as public app config.', 'muted'),
-      securityExposureRow('Analytics', 'Aggregate usage dashboard', privacyOk === false ? 'Review reported collection risk before publishing.' : 'Expected to stay aggregate and privacy-safe.', privacyOk === false ? 'danger' : privacyOk === true ? 'ok' : 'muted')
-    ].join('');
-    const statusChecks = [
-      securityCheck(authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention',
-        'Admin authentication',
-        `${authText}: ${sessionDetail}`),
-      securityCheck(maintenance ? 'attention' : 'ok',
-        'Public availability',
-        maintenance ? 'Main site is staged for maintenance after publish.' : 'Main site is staged to remain live.'),
-      securityCheck(syncError ? 'danger' : syncDisabled ? 'attention' : 'ok',
-        'Public sync path',
-        syncError || (syncDisabled ? 'GitHub public sync is not configured.' : 'Publishes use the public-safe settings snapshot.')),
-      securityCheck(settingsStorage ? (dataDurable ? 'ok' : 'attention') : 'muted',
-        'Data durability',
-        storageDetail),
-      securityCheck(privacyOk === true ? 'ok' : privacyOk === false ? 'danger' : 'muted',
-        'Analytics privacy',
-        privacy ? privacy.note || 'Aggregate analytics only; no personal fields reported.' : 'Checking analytics privacy status.'),
-      securityCheck(backupCount === null ? 'muted' : backupCount > 0 ? 'ok' : 'attention',
-        'Rollback readiness',
-        backupDetail),
-      securityCheck(!draftSections.length || draftSections.length <= 2 ? 'ok' : 'attention',
-        'Publish scope',
-        publishScope),
-      securityCheck('ok',
-        'Local dev kill switch',
-        'Hidden from the public admin surface; public site control only stages maintenance mode.'),
-      securityCheck(errorText ? 'attention' : checking ? 'muted' : 'ok',
-        'Panel self-check',
-        errorText || (checking ? 'Checking backend security endpoints.' : formatSecurityCheckedAt()))
+    const securityMatrix = [
+      securityMatrixRow(authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention', 'Authentication', 'Admin-only backend', 'Session: ', `${authText}: ${sessionDetail}`),
+      securityMatrixRow(syncError ? 'danger' : syncDisabled ? 'attention' : 'ok', 'Public sync', 'Public-safe JSON only', 'Status: ', syncError || (syncDisabled ? 'GitHub sync not configured.' : 'Ready for public publish.')),
+      securityMatrixRow(maintenance ? 'attention' : 'ok', 'Availability', 'Visitor-facing mode', 'Mode: ', maintenance ? `Maintenance page: ${status.title}` : 'Live site remains visible.'),
+      securityMatrixRow(settingsStorage ? (settingsStorage.durable ? 'ok' : 'attention') : 'muted', 'Settings store', 'Private admin storage', 'Storage: ', settingsStorage ? storageCopy(settingsStorage) : 'Checking storage status.'),
+      securityMatrixRow(auditStorage ? (auditStorage.durable ? 'ok' : 'attention') : 'muted', 'Audit log', 'Private admin events', 'Storage: ', auditStorage ? storageCopy(auditStorage) : 'Checking audit status.'),
+      securityMatrixRow(backupStorage ? (backupStorage.durable ? 'ok' : 'attention') : backupCount === null ? 'muted' : 'attention', 'Backups', 'Rollback vault', 'Evidence: ', backupDetail),
+      securityMatrixRow(privacyOk === true ? 'ok' : privacyOk === false ? 'danger' : 'muted', 'Telemetry', 'Aggregate analytics', 'Privacy: ', privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.'),
+      securityMatrixRow(draftSections.length > 2 ? 'attention' : 'ok', 'Publish scope', 'Staged change set', 'Scope: ', publishScope),
+      securityMatrixRow('ok', 'Public app', 'Static frontend boundary', 'Rule: ', 'Logs, sessions, IPs, and admin identity do not sync forward.'),
+      securityMatrixRow('muted', 'GradeViewer', 'Browser-routed iframe', 'Config: ', 'Editable public integration URL; no admin data is embedded.')
     ].join('');
 
     host.className = 'admin-security-tools';
@@ -1596,16 +1638,16 @@
         <div class="admin-security-hero-main">
           <span class="admin-security-kicker">Security command center</span>
           <h2>${maintenance ? 'Main site maintenance is staged' : 'Public site is staged live'}</h2>
-          <p>${escapeHtml(errorText || 'Live checks for admin auth, public sync, private data boundaries, rollback proof, telemetry privacy, and publish scope.')}</p>
+          <p>${escapeHtml(errorText || 'One compact control surface for public availability, publish safety, rollback proof, private data boundaries, and telemetry posture.')}</p>
           <div class="admin-security-hero-actions">
-            <button type="button" class="admin-btn admin-btn-sm" id="security-copy-summary">${ICON.audit}<span>Copy audit packet</span></button>
+            <button type="button" class="admin-btn admin-btn-sm" id="security-copy-summary">${ICON.audit}<span>Copy security brief</span></button>
             <button type="button" class="admin-btn admin-btn-sm" data-security-go-tab="history">${ICON.backup}<span>Open evidence</span></button>
           </div>
         </div>
         <div class="admin-security-state ${model.status}">
-          <strong>${model.score}</strong>
-          <span>${escapeHtml(model.label)} risk score</span>
-          <div class="admin-security-scorebar"><i style="width:${model.score}%"></i></div>
+          <strong>${escapeHtml(readinessLabel)}</strong>
+          <span>${escapeHtml(knownGates.length ? 'release gates pass' : 'checks loading')}</span>
+          <div class="admin-security-scorebar"><i style="width:${gatePercent}%"></i></div>
           <button type="button" class="admin-btn admin-btn-sm" id="security-refresh">${ICON.refresh}<span>${checking ? 'Checking...' : 'Run check'}</span></button>
         </div>
       </section>
@@ -1633,43 +1675,22 @@
         </section>
       </div>
 
-      <section class="admin-security-panel admin-security-risk-panel">
-        <div class="admin-panel-heading">
-          <h2>Risk model</h2>
-          <span>${escapeHtml(formatSecurityCheckedAt())}</span>
-        </div>
-        <div class="admin-security-risk-grid">
-          <div class="admin-security-risk-readout ${model.status}">
-            <strong>${model.score}</strong>
-            <span>${escapeHtml(model.label)}</span>
-            <small>Calculated from live sync, storage, rollback, privacy, and active mode checks.</small>
-          </div>
-          <div class="admin-security-risk-issues">
-            <strong>Current findings</strong>
-            <ul>${riskIssues}</ul>
-          </div>
-          <div class="admin-security-gates">
-            ${releaseGates}
-          </div>
-        </div>
-      </section>
-
       <div class="admin-security-split">
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
             <h2>Main-site availability</h2>
-            <span>Controlled shutdown composer</span>
+            <span>Visitor-facing mode</span>
           </div>
           <div class="admin-security-mode-row">
             <button type="button" class="admin-btn ${maintenance ? 'admin-btn-ghost' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live site</span></button>
-            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" id="security-open-maintenance">${ICON.close}<span>Force main-site shutdown</span></button>
+            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" id="security-open-maintenance">${ICON.close}<span>Stage maintenance mode</span></button>
           </div>
           <div class="admin-security-composer ${composerOpen ? 'is-open' : ''}" aria-hidden="${composerOpen ? 'false' : 'true'}">
             <div class="admin-security-composer-body">
               <div class="admin-security-composer-head">
                 <div>
                   <strong>Public maintenance page</strong>
-                  <span>Review the exact visitor-facing copy before staging shutdown.</span>
+                  <span>Review the exact visitor-facing copy before staging maintenance.</span>
                 </div>
                 <em>${maintenance ? 'Maintenance mode staged' : 'Draft not staged yet'}</em>
               </div>
@@ -1686,7 +1707,7 @@
               </div>
               <div class="admin-security-note">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
               <div class="admin-readiness-actions admin-security-actions">
-                <button type="button" class="admin-btn admin-btn-danger" id="security-stage-maintenance">${ICON.close}<span>${maintenance ? 'Update shutdown draft' : 'Stage shutdown draft'}</span></button>
+                <button type="button" class="admin-btn admin-btn-danger" id="security-stage-maintenance">${ICON.close}<span>${maintenance ? 'Update maintenance draft' : 'Stage maintenance draft'}</span></button>
                 <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview maintenance page</span></button>
                 <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish staged site status</span></button>
                 ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
@@ -1697,31 +1718,32 @@
 
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
-            <h2>Preflight shortcuts</h2>
-            <span>Jump to risk areas</span>
+            <h2>Publish impact</h2>
+            <span>${escapeHtml(formatSecurityCheckedAt())}</span>
+          </div>
+          <div class="admin-security-risk-issues">
+            <strong>Current findings</strong>
+            <ul>${riskIssues}</ul>
+          </div>
+          <div class="admin-security-gates">
+            ${releaseGates}
           </div>
           <div class="admin-security-action-grid">
-            <button type="button" class="admin-btn" data-security-go-tab="history">${ICON.backup}<span>Audit history</span></button>
-            <button type="button" class="admin-btn" data-security-go-tab="safety">${ICON.privacy}<span>Privacy panel</span></button>
-            <button type="button" class="admin-btn" data-security-go-tab="appearance">${ICON.nav}<span>Site controls</span></button>
-            <button type="button" class="admin-btn" data-security-go-tab="advanced">${ICON.grades}<span>Advanced config</span></button>
-          </div>
-          <div class="admin-security-meta">
-            <strong>Admin-only surfaces</strong>
-            <span>History proves accountability, Privacy controls student-facing disclosure, Site controls public links, and Advanced owns embedded integrations.</span>
+            <button type="button" class="admin-btn" data-security-go-tab="history">${ICON.backup}<span>History</span></button>
+            <button type="button" class="admin-btn" data-security-go-tab="safety">${ICON.privacy}<span>Privacy</span></button>
           </div>
         </section>
       </div>
 
-      <div class="admin-security-ops-grid">
-        <section class="admin-security-panel">
-          <div class="admin-panel-heading">
-            <h2>Private data boundary</h2>
-            <span>Private backend only</span>
-          </div>
-          <div class="admin-security-storage-map">${custodyRows}</div>
-        </section>
+      <section class="admin-security-panel">
+        <div class="admin-panel-heading">
+          <h2>Security matrix</h2>
+          <span>Public vs private boundaries</span>
+        </div>
+        <div class="admin-security-matrix">${securityMatrix}</div>
+      </section>
 
+      <div class="admin-security-ops-grid admin-security-ops-grid--compact">
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
             <h2>Evidence timeline</h2>
@@ -1729,9 +1751,7 @@
           </div>
           <div class="admin-security-timeline">${timelineItems}</div>
         </section>
-      </div>
 
-      <div class="admin-security-ops-grid admin-security-ops-grid--wide">
         <section class="admin-security-panel">
           <div class="admin-panel-heading">
             <h2>Response runbook</h2>
@@ -1744,52 +1764,7 @@
             ${renderSecurityChecklist()}
           </div>
         </section>
-
-        <section class="admin-security-panel">
-          <div class="admin-panel-heading">
-            <h2>Exposure map</h2>
-            <span>Public vs private surfaces</span>
-          </div>
-          <div class="admin-security-exposure-map">
-            ${exposureRows}
-          </div>
-        </section>
       </div>
-
-      <div class="admin-security-ops-grid admin-security-ops-grid--wide">
-        <section class="admin-security-panel">
-          <div class="admin-panel-heading">
-            <h2>Incident workspace</h2>
-            <span>Local to this browser</span>
-          </div>
-          <textarea id="security-notes" class="admin-textarea admin-security-notes" maxlength="1200" placeholder="Track scope, suspected cause, mitigation, rollback decision, and next owner.">${escapeHtml(state.securityNotes)}</textarea>
-          <div class="admin-readiness-actions admin-security-actions">
-            <button type="button" class="admin-btn" id="security-save-notes">${ICON.audit}<span>Save notes</span></button>
-            <button type="button" class="admin-btn admin-btn-ghost" id="security-clear-notes"><span>Clear notes</span></button>
-          </div>
-        </section>
-
-        <section class="admin-security-panel">
-          <div class="admin-panel-heading">
-            <h2>Control coverage</h2>
-            <span>Security-critical settings</span>
-          </div>
-          <div class="admin-security-control-list">
-            <div><strong>Publish scope</strong><span>${escapeHtml(publishScope)}</span></div>
-            <div><strong>Rollback target</strong><span>${escapeHtml(latestBackup ? formatSecurityDate(latestBackup.createdAt || latestBackup.timestamp) : 'Waiting for backup evidence.')}</span></div>
-            <div><strong>Public data rule</strong><span>Only settings required by the public app sync forward; logs, sessions, and admin identity stay behind admin auth.</span></div>
-            <div><strong>Session rule</strong><span>${escapeHtml(`${authText}: ${sessionDetail}`)}</span></div>
-          </div>
-        </section>
-      </div>
-
-      <section class="admin-security-panel">
-        <div class="admin-panel-heading">
-          <h2>Security posture</h2>
-          <span>${checking ? 'Checking live backend' : 'Live status'}</span>
-        </div>
-        <div class="admin-security-checks">${statusChecks}</div>
-      </section>
     `;
 
     host.querySelector('[data-site-mode="live"]')?.addEventListener('click', () => {
@@ -1860,9 +1835,9 @@
           <div class="admin-list-item-head">
             <span class="handle">Item ${i + 1}</span>
             <div class="admin-list-item-actions">
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Up" data-act="up"   ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Down" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>${ICON.down}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" title="Remove" data-act="del">${ICON.trash}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Move up" aria-label="Move nav item ${i + 1} up" data-act="up" ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Move down" aria-label="Move nav item ${i + 1} down" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" title="Remove" aria-label="Remove nav item ${i + 1}" data-act="del">${ICON.trash}</button>
             </div>
           </div>
           <div class="admin-grid-2">
@@ -1904,9 +1879,9 @@
           <div class="admin-list-item-head">
             <span class="handle">Card ${i + 1}</span>
             <div class="admin-list-item-actions">
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="up"   ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>${ICON.down}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" data-act="del">${ICON.trash}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Move up" aria-label="Move announcement card ${i + 1} up" data-act="up" ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Move down" aria-label="Move announcement card ${i + 1} down" data-act="down" ${i===items.length-1 ? 'disabled' : ''}>${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" title="Remove" aria-label="Remove announcement card ${i + 1}" data-act="del">${ICON.trash}</button>
             </div>
           </div>
           <div class="admin-field">
@@ -1927,9 +1902,9 @@
             row.className = 'admin-bullet-row';
             row.innerHTML = `
               <input class="admin-input" value="${escapeHtml(b)}" maxlength="2000">
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" type="button">${ICON.up}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" type="button">${ICON.down}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" type="button">${ICON.trash}</button>`;
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" type="button" title="Move bullet up" aria-label="Move bullet ${j + 1} up">${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" type="button" title="Move bullet down" aria-label="Move bullet ${j + 1} down">${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" type="button" title="Remove bullet" aria-label="Remove bullet ${j + 1}">${ICON.trash}</button>`;
             const [inp, up, dn, del] = row.children;
             inp.addEventListener('input', () => { card.bullets[j] = inp.value; markDirty(); pushPreview(); });
             up.addEventListener('click', () => { if (j>0) { card.bullets.splice(j-1,0,card.bullets.splice(j,1)[0]); markDirty(); paintBullets(); pushPreview(); } });
@@ -1964,6 +1939,8 @@
     function curType() { return state.draft.scheduleOverride?.type || 'none'; }
     function paint() {
       const cur = curType();
+      const override = state.draft.scheduleOverride || null;
+      const overrideDate = override?.date || todayISODate();
       host.innerHTML = `
         <div class="admin-field">
           <div class="admin-field-row"><label>Active override</label></div>
@@ -1972,10 +1949,27 @@
           </select>
           <div class="admin-field-help">This changes the draft. Click Publish when you are ready for visitors to see it.</div>
         </div>
-        ${state.draft.scheduleOverride ? `<div class="admin-field-help">Set at ${new Date(state.draft.scheduleOverride.timestamp).toLocaleString()}.</div>` : ''}`;
+        <div class="admin-grid-2 admin-schedule-override-grid">
+          <div class="admin-field">
+            <div class="admin-field-row"><label for="sched-override-date">Applies on</label></div>
+            <input class="admin-input" id="sched-override-date" type="date" value="${escapeHtml(overrideDate)}" ${override ? '' : 'disabled'}>
+          </div>
+          <div class="admin-field">
+            <div class="admin-field-row"><label>Override status</label></div>
+            <div class="admin-schedule-override-status ${override ? 'active' : ''}">
+              <strong>${override ? escapeHtml(override.type) : 'Automatic schedule'}</strong>
+              <span>${override ? `Applies ${escapeHtml(overrideDate)}. Set ${new Date(override.timestamp || Date.now()).toLocaleString()}.` : 'Uses data.json and the normal schedule resolver.'}</span>
+            </div>
+          </div>
+        </div>`;
       host.querySelector('#sched-override-select').addEventListener('change', (e) => {
         const v = e.target.value;
-        state.draft.scheduleOverride = (v === 'none') ? null : { type: v, timestamp: Date.now() };
+        state.draft.scheduleOverride = (v === 'none') ? null : { type: v, date: overrideDate, timestamp: Date.now() };
+        markDirty(); paint(); pushPreview();
+      });
+      host.querySelector('#sched-override-date')?.addEventListener('change', (e) => {
+        if (!state.draft.scheduleOverride) return;
+        state.draft.scheduleOverride = { ...state.draft.scheduleOverride, date: e.target.value || todayISODate(), timestamp: Date.now() };
         markDirty(); paint(); pushPreview();
       });
     }
@@ -2099,9 +2093,9 @@
           <div class="admin-list-item-head">
             <span class="handle">Paragraph ${i+1}</span>
             <div class="admin-list-item-actions">
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="up"   ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" data-act="down" ${i===arr.length-1 ? 'disabled' : ''}>${ICON.down}</button>
-              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" data-act="del">${ICON.trash}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Move up" aria-label="Move paragraph ${i + 1} up" data-act="up" ${i===0 ? 'disabled' : ''}>${ICON.up}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-ghost admin-btn-icon" title="Move down" aria-label="Move paragraph ${i + 1} down" data-act="down" ${i===arr.length-1 ? 'disabled' : ''}>${ICON.down}</button>
+              <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" title="Remove" aria-label="Remove paragraph ${i + 1}" data-act="del">${ICON.trash}</button>
             </div>
           </div>
           <textarea class="admin-textarea" maxlength="4000">${escapeHtml(p)}</textarea>`;
@@ -2381,7 +2375,7 @@
                                   img.status === 'error' ? `Error: ${escapeHtml(img.error || 'unknown')}` :
                                   'Ready'}</div>
           </figcaption>
-          <button class="admin-btn admin-btn-sm admin-btn-ghost" data-act="rm">×</button>
+          <button class="admin-btn admin-btn-sm admin-btn-ghost" data-act="rm" title="Remove image" aria-label="Remove ${escapeHtml(img.name)}">×</button>
         </figure>
       `).join('');
       wrap.querySelectorAll('[data-act=rm]').forEach(b => {
@@ -2404,11 +2398,11 @@
         <tbody>${data.rows.map((r, i) => {
           const dur = (hhmmToSecs(r.end) ?? 0) - (hhmmToSecs(r.start) ?? 0);
           return `<tr data-i="${i}">
-            <td><input class="admin-input admin-input-sm" data-f="name" value="${escapeHtml(r.name)}" maxlength="60"></td>
-            <td><input class="admin-input admin-input-sm" data-f="start" value="${escapeHtml(r.start)}" placeholder="HH:MM" maxlength="5"></td>
-            <td><input class="admin-input admin-input-sm" data-f="end" value="${escapeHtml(r.end)}" placeholder="HH:MM" maxlength="5"></td>
-            <td class="muted">${dur > 0 ? Math.round(dur / 60) + ' min' : '—'}</td>
-            <td><button type="button" class="admin-btn admin-btn-sm admin-btn-danger" data-act="del">Delete</button></td>
+            <td data-label="Period"><input class="admin-input admin-input-sm" data-f="name" value="${escapeHtml(r.name)}" maxlength="60"></td>
+            <td data-label="Start"><input class="admin-input admin-input-sm" data-f="start" value="${escapeHtml(r.start)}" placeholder="HH:MM" maxlength="5"></td>
+            <td data-label="End"><input class="admin-input admin-input-sm" data-f="end" value="${escapeHtml(r.end)}" placeholder="HH:MM" maxlength="5"></td>
+            <td data-label="Duration" class="muted">${dur > 0 ? Math.round(dur / 60) + ' min' : '—'}</td>
+            <td data-label="Action"><button type="button" class="admin-btn admin-btn-sm admin-btn-danger" data-act="del">Delete</button></td>
           </tr>`;
         }).join('')}</tbody>
       `;
@@ -3302,6 +3296,7 @@
 
     let anyVisible = false;
     for (const group of tab.groups) {
+      if (group.custom && q && !groupMatchesSearch(tab, group, q)) continue;
       const card = document.createElement('section');
       card.className = 'admin-card';
       if (group.custom === 'jarvisAssistant') card.classList.add('admin-card--jarvis');
@@ -3328,7 +3323,8 @@
       else if (group.custom === 'auditLog')             { card.appendChild(renderAuditLog()); anyVisible = true; }
       else if (group.custom === 'backupManager')        { card.appendChild(renderBackupManager()); anyVisible = true; }
       else if (group.fields) {
-        const visible = group.fields.filter(f => matches(f.label) || matches(f.path));
+        if (q && !groupMatchesSearch(tab, group, q)) continue;
+        const visible = group.fields.filter(f => matches(f.label) || matches(f.path) || matches(f.help) || matches(f.kind));
         if (!visible.length) continue;
         anyVisible = true;
         for (const f of visible) card.appendChild(renderField(f));
@@ -3454,8 +3450,9 @@
   $('#search-input').addEventListener('input', (e) => {
     state.search = e.target.value;
     if (state.search) {
+      const q = state.search.toLowerCase();
       for (const tab of SCHEMA) {
-        const hits = tab.groups.some(g => (g.fields || []).some(f => (f.label || '').toLowerCase().includes(state.search.toLowerCase())));
+        const hits = tab.groups.some(g => groupMatchesSearch(tab, g, q));
         if (hits) { state.activeTab = tab.id; break; }
       }
       renderSidebar();
