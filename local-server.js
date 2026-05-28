@@ -237,6 +237,14 @@ function injectLocalSwitcher(html, currentView) {
   return `${html}\n${switcher}`;
 }
 
+function shouldInjectLocalSwitcher(urlPath) {
+  return !(
+    urlPath === "/admin.html" ||
+    urlPath.startsWith("/admin/") ||
+    urlPath.startsWith("/public/admin")
+  );
+}
+
 function sendFile(res, filePath, urlPath, currentView) {
   if (!filePath || isBlockedStaticFile(filePath)) {
     res.writeHead(403, { "Content-Type": "text/plain" });
@@ -256,7 +264,8 @@ function sendFile(res, filePath, urlPath, currentView) {
 
     if (ext === ".html") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(injectLocalSwitcher(data.toString("utf8"), currentView));
+      const html = data.toString("utf8");
+      res.end(shouldInjectLocalSwitcher(urlPath) ? injectLocalSwitcher(html, currentView) : html);
       return;
     }
 

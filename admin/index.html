@@ -68,10 +68,13 @@
         <h1 id="tab-title">Branding</h1>
         <div class="sub" id="tab-sub">Identity & visual basics for the public site.</div>
       </div>
-      <div class="admin-actions">
-        <span id="dirty-pill" class="admin-dirty-pill">Unsaved changes</span>
-        <button id="discard-btn" class="admin-btn admin-btn-ghost" disabled>Discard</button>
-        <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish</button>
+      <div class="admin-header-tools">
+        <button id="theme-toggle-btn" class="admin-btn admin-btn-ghost admin-theme-toggle" type="button" aria-pressed="false">Dark</button>
+        <div class="admin-actions">
+          <span id="dirty-pill" class="admin-dirty-pill">Unsaved changes</span>
+          <button id="discard-btn" class="admin-btn admin-btn-ghost" disabled>Discard</button>
+          <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish</button>
+        </div>
       </div>
     </header>
 
@@ -83,11 +86,21 @@
 <div id="preview-host" class="admin-preview-host">
   <div class="admin-preview-bar">
     <div class="row-gap-8">
-      <div class="seg" id="preview-mode-seg" style="margin-left:6px">
+      <div class="seg" id="preview-page-seg">
+        <button data-preview-page="schedule" class="active">Schedule</button>
+        <button data-preview-page="announcements">Announcements</button>
+        <button data-preview-page="grades">Grades</button>
+        <button data-preview-page="privacy">Privacy</button>
+      </div>
+      <div class="seg" id="preview-mode-seg">
         <button data-mode="draft" class="active">Draft</button>
         <button data-mode="live">Published</button>
       </div>
-      <span class="mode-pill draft" id="preview-mode-pill" style="margin-left:6px">Showing draft (un-published)</span>
+      <div class="seg" id="preview-size-seg">
+        <button data-preview-size="desktop" class="active">Desktop</button>
+        <button data-preview-size="mobile">Mobile</button>
+      </div>
+      <span class="mode-pill draft" id="preview-mode-pill">Showing draft (un-published)</span>
     </div>
     <div class="row-gap-8">
       <button id="preview-refresh-btn" class="admin-btn admin-btn-sm" type="button">
@@ -97,7 +110,9 @@
       <button id="preview-close-btn" class="admin-btn admin-btn-sm admin-btn-ghost" type="button">Close</button>
     </div>
   </div>
-  <iframe id="preview-frame" class="admin-preview-frame" src="about:blank" title="Preview"></iframe>
+  <div id="preview-frame-shell" class="admin-preview-frame-shell">
+    <iframe id="preview-frame" class="admin-preview-frame" src="about:blank" title="Preview"></iframe>
+  </div>
 </div>
 
 <div class="admin-toast-host" id="toast-host" role="status" aria-live="polite" aria-atomic="true"></div>

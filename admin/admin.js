@@ -14,8 +14,10 @@
   const TOKEN_KEY = 'phs:admin-token:v1';
   const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
   const SIDEBAR_COLLAPSED_KEY = 'phs:admin-sidebar-collapsed:v1';
-  const SECURITY_NOTES_KEY = 'phs:admin-security-notes:v1';
-  const SECURITY_CHECKLIST_KEY = 'phs:admin-security-checklist:v1';
+  const ACTIVE_TAB_KEY = 'phs:admin-active-tab:v2';
+  const THEME_KEY = 'phs:admin-theme:v1';
+  const PREVIEW_PAGE_KEY = 'phs:admin-preview-page:v2';
+  const PREVIEW_SIZE_KEY = 'phs:admin-preview-size:v2';
   const SECURITY_TEMPLATES = [
     {
       id: 'security-review',
@@ -36,15 +38,6 @@
       message: 'Poolesville Schedule is temporarily unavailable while we review posted content. Please check back soon.'
     }
   ];
-  const SECURITY_CHECKLIST_ITEMS = [
-    { id: 'scope', label: 'Scope confirmed', detail: 'Confirm the affected public page, setting, or workflow.' },
-    { id: 'maintenance', label: 'Availability decision', detail: 'Decide whether the public site needs maintenance mode.' },
-    { id: 'preview', label: 'Draft preview checked', detail: 'Open preview and verify title, message, logo, and navigation state.' },
-    { id: 'publish', label: 'Published safely', detail: 'Publish only after the draft matches the intended public state.' },
-    { id: 'evidence', label: 'Evidence recorded', detail: 'Copy the incident brief or confirm the History entry exists.' },
-    { id: 'rollback', label: 'Rollback path ready', detail: 'Confirm a recent backup exists before risky public changes.' }
-  ];
-
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
     token: null,
@@ -54,17 +47,20 @@
     draft: null,       // working copy with unsaved edits
     identity: null,
     adminHealth: null,
+    opsSummary: null,
+    opsSummaryLoading: null,
     devControlsEnabled: false,
     lastPublishResult: null,
     lastPublishAt: null,
     securitySnapshot: null,
     securitySnapshotLoading: null,
-    securityNotes: loadSecurityNotes(),
-    securityChecklist: loadSecurityChecklist(),
     securityComposerOpen: false,
+    theme: loadThemePreference(),
     activeTab: 'overview',
     search: '',
     previewMode: 'draft', // 'draft' | 'live'
+    previewPage: loadPreviewPagePreference(),
+    previewSize: loadPreviewSizePreference(),
     importAssistant: null,
     jarvis: {
       messages: [
@@ -75,6 +71,8 @@
       busy: false
     }
   };
+  let securityAutoRefreshTimer = null;
+  let workspaceMasonryFrame = 0;
 
   // ── SVG icons (Lucide-style stroke icons, no emoji) ────────────────────
   const ICON = {
@@ -87,6 +85,8 @@
     grades:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>`,
     grademelon:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18"/></svg>`,
     theme:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a4 4 0 010 8 4 4 0 010 8"/></svg>`,
+    sun:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`,
+    moon:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 019.5 3.5a8.5 8.5 0 1011 11z"/></svg>`,
     footer:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v10H4z"/><path d="M4 13h16"/></svg>`,
     countdown:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 3h6"/></svg>`,
     privacy:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-4 8-8 9-4-1-8-4-8-9V7z"/></svg>`,
@@ -112,15 +112,15 @@
   // ── Schema (drives the entire UI) ──────────────────────────────────────
   const SCHEMA = [
     { id: 'overview', label: 'Overview', title: 'Control room', icon: 'analytics', section: 'Control',
-      sub: 'Publish readiness, backend status, and the shortest path to safe changes.',
+      sub: 'Draft state, public status, sync health, rollback proof, and preview in one place.',
       groups: [{ title: '', custom: 'overviewDashboard' }]
     },
     { id: 'jarvis', label: 'Jarvis', title: 'Jarvis', icon: 'jarvis', section: 'Control',
       sub: 'AI drafting for safe admin changes. Review the draft before anything publishes.',
       groups: [{ title: '', custom: 'jarvisAssistant' }]
     },
-    { id: 'security', label: 'Security', title: 'Site security', icon: 'privacy', section: 'Control',
-      sub: 'Main-site availability, public sync status, and admin safety controls.',
+    { id: 'security', label: 'Security', title: 'Security', icon: 'privacy', section: 'Control',
+      sub: 'Public site mode, private admin data, rollback points, and publish risk.',
       groups: [{ title: '', custom: 'siteSecurityCenter' }]
     },
     { id: 'bellSchedules',label: 'Schedule', title: 'Schedule', icon: 'bell', section: 'Workflows',
@@ -140,18 +140,10 @@
       ]
     },
     { id: 'appearance', label: 'Site', title: 'Site controls', icon: 'theme', section: 'Workflows',
-      sub: 'Branding, navigation, page copy, theme defaults, and footer content.',
+      sub: 'Branding, navigation, page copy, public identity, and footer content.',
       groups: [{
         title: '', custom: 'siteLaunchPanel'
       },{
-        title: 'Theme colors', fields: [
-          { path: 'theme.accent',  label: 'Accent',           kind: 'color' },
-          { path: 'theme.accent2', label: 'Accent (deep)',    kind: 'color' },
-          { path: 'theme.bg1',     label: 'Background outer', kind: 'color' },
-          { path: 'theme.bg2',     label: 'Background inner', kind: 'color' },
-          { path: 'theme.fg1',     label: 'Foreground',       kind: 'color' },
-          { path: 'theme.fg2',     label: 'Muted foreground', kind: 'color' },
-        ]},{
         title: 'Identity', fields: [
           { path: 'branding.siteTitle',       label: 'Site title (browser tab)', kind: 'text', max: 200 },
           { path: 'branding.siteDescription', label: 'Meta description',         kind: 'text', max: 300 },
@@ -236,6 +228,9 @@
     }
   ];
 
+  const VALID_TAB_IDS = new Set(SCHEMA.map(tab => tab.id));
+  state.activeTab = loadActiveTabPreference();
+
   // ── Helpers ────────────────────────────────────────────────────────────
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -264,26 +259,65 @@
   function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-  function loadSecurityNotes() {
-    try { return localStorage.getItem(SECURITY_NOTES_KEY) || ''; } catch { return ''; }
-  }
-  function saveSecurityNotes(value) {
-    state.securityNotes = String(value || '').slice(0, 1200);
-    try { localStorage.setItem(SECURITY_NOTES_KEY, state.securityNotes); } catch {}
-  }
-  function loadSecurityChecklist() {
+  function loadThemePreference() {
     try {
-      const saved = JSON.parse(localStorage.getItem(SECURITY_CHECKLIST_KEY) || '{}');
-      if (saved && typeof saved === 'object') return saved;
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === 'dark' || saved === 'light') return saved;
     } catch {}
-    return {};
+    try {
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
   }
-  function saveSecurityChecklist(next) {
-    state.securityChecklist = next && typeof next === 'object' ? next : {};
-    try { localStorage.setItem(SECURITY_CHECKLIST_KEY, JSON.stringify(state.securityChecklist)); } catch {}
+
+  function syncThemePreference() {
+    const dark = state.theme === 'dark';
+    document.body?.classList.toggle('admin-theme-dark', dark);
+    document.documentElement?.style.setProperty('color-scheme', dark ? 'dark' : 'light');
+    const btn = $('#theme-toggle-btn');
+    if (btn) {
+      btn.setAttribute('aria-pressed', String(dark));
+      btn.setAttribute('title', dark ? 'Switch to light mode' : 'Switch to dark mode');
+      btn.innerHTML = `${dark ? ICON.sun : ICON.moon}<span>${dark ? 'Light' : 'Dark'}</span>`;
+    }
   }
-  function toggleSecurityChecklist(id, checked) {
-    saveSecurityChecklist(Object.assign({}, state.securityChecklist, { [id]: Boolean(checked) }));
+
+  function toggleThemePreference() {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(THEME_KEY, state.theme); } catch {}
+    syncThemePreference();
+  }
+
+  function loadActiveTabPreference() {
+    try {
+      const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+      return VALID_TAB_IDS.has(saved) ? saved : 'overview';
+    } catch {
+      return 'overview';
+    }
+  }
+
+  function saveActiveTabPreference(tabId) {
+    if (!VALID_TAB_IDS.has(tabId)) return;
+    try { localStorage.setItem(ACTIVE_TAB_KEY, tabId); } catch {}
+  }
+
+  function loadPreviewPagePreference() {
+    try {
+      const saved = localStorage.getItem(PREVIEW_PAGE_KEY);
+      return ['schedule', 'announcements', 'grades', 'privacy'].includes(saved) ? saved : 'schedule';
+    } catch {
+      return 'schedule';
+    }
+  }
+
+  function loadPreviewSizePreference() {
+    try {
+      return localStorage.getItem(PREVIEW_SIZE_KEY) === 'mobile' ? 'mobile' : 'desktop';
+    } catch {
+      return 'desktop';
+    }
   }
   function safeDataImageSrc(src) {
     const raw = String(src || '').trim();
@@ -550,6 +584,7 @@
       renderActiveTab();
       renderAdminIdentity();
       pingConnection();
+      syncSecurityAutoRefresh();
     } catch (e) {
       console.warn('boot error', e);
       if (isLocal && !state.token) {
@@ -563,20 +598,20 @@
     }
   }
   function pingConnection() {
-    api('/admin/storage-status', { silentAuth: true })
+    loadOpsSummary(true)
       .then(j => {
-        state.adminHealth = j;
         const el = $('#conn-status');
         el.classList.remove('offline');
-        el.textContent = 'Backend online · ' + (j?.settings?.type || 'settings ready');
-        if (state.activeTab === 'overview') renderActiveTab();
+        el.textContent = 'Ops online · ' + (j?.storage?.settings?.type || 'settings ready');
+        if (['overview', 'security', 'history', 'safety'].includes(state.activeTab)) renderActiveTab();
       })
       .catch(() => {
         state.adminHealth = null;
+        state.opsSummary = null;
         const el = $('#conn-status');
         el.classList.add('offline');
         el.textContent = 'Admin health offline';
-        if (state.activeTab === 'overview') renderActiveTab();
+        if (['overview', 'security'].includes(state.activeTab)) renderActiveTab();
       });
   }
 
@@ -627,11 +662,85 @@
       .filter((label, idx, arr) => arr.indexOf(label) === idx);
   }
 
+  function buildSettingsPatch(allowedKeys = null) {
+    const patch = {};
+    const allow = allowedKeys ? new Set(allowedKeys) : null;
+    const keys = new Set([...Object.keys(state.settings || {}), ...Object.keys(state.draft || {})]);
+    for (const k of keys) {
+      if (k === 'updatedAt') continue;
+      if (allow && !allow.has(k)) continue;
+      if (!eq(state.settings?.[k], state.draft?.[k])) patch[k] = state.draft[k];
+    }
+    return patch;
+  }
+
+  function fieldElementId(path) {
+    return fieldId(path);
+  }
+
+  function backupTimestamp(backup) {
+    return backup?.ts || backup?.createdAt || backup?.timestamp || backup?.time || null;
+  }
+
   function goTab(tabId) {
     state.activeTab = tabId;
+    saveActiveTabPreference(tabId);
     closeMobileSidebar();
     renderSidebar();
     renderActiveTab();
+    resetMainScroll();
+    syncSecurityAutoRefresh();
+    if (tabId === 'security') loadSecuritySnapshot(true).catch(e => toast(e.message, 'error', 5000));
+  }
+
+  function resetMainScroll() {
+    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
+  }
+
+  function scheduleWorkspaceMasonry(container = document.querySelector('.admin-workspace-main')) {
+    if (!container || !container.classList.contains('admin-workspace-main')) return;
+    cancelAnimationFrame(workspaceMasonryFrame);
+    workspaceMasonryFrame = requestAnimationFrame(() => {
+      const cards = [...container.children].filter(el => el.classList.contains('admin-card') || el.classList.contains('admin-workspace-banner'));
+      if (!cards.length) return;
+      cards.forEach(card => { card.style.gridRowEnd = 'auto'; });
+      const styles = getComputedStyle(container);
+      const rowHeight = Number.parseFloat(styles.gridAutoRows) || 8;
+      const rowGap = Number.parseFloat(styles.rowGap) || 12;
+      const spans = cards.map(card => {
+        const height = card.getBoundingClientRect().height;
+        return Math.max(1, Math.ceil((height + rowGap) / (rowHeight + rowGap)));
+      });
+      cards.forEach((card, index) => {
+        card.style.gridRowEnd = `span ${spans[index]}`;
+      });
+    });
+  }
+
+  function refreshWorkspaceLayoutSoon() {
+    scheduleWorkspaceMasonry();
+    requestAnimationFrame(() => scheduleWorkspaceMasonry());
+    setTimeout(() => scheduleWorkspaceMasonry(), 160);
+  }
+
+  function syncSecurityAutoRefresh() {
+    if (state.activeTab !== 'security') {
+      if (securityAutoRefreshTimer) {
+        clearInterval(securityAutoRefreshTimer);
+        securityAutoRefreshTimer = null;
+      }
+      return;
+    }
+    if (securityAutoRefreshTimer) return;
+    securityAutoRefreshTimer = setInterval(() => {
+      if (state.activeTab !== 'security') {
+        syncSecurityAutoRefresh();
+        return;
+      }
+      if (!state.securitySnapshotLoading) {
+        loadSecuritySnapshot(true).catch(e => toast(e.message, 'error', 5000));
+      }
+    }, 45_000);
   }
 
   function storageCopy(storage) {
@@ -649,24 +758,16 @@
     return Number.isFinite(n) ? `${n}px` : '?';
   }
 
-  function securityMatrixRow(status, area, control, owner, detail) {
-    const cls = securityStatusClass(status);
-    const label = cls === 'ok' ? 'Pass' : cls === 'danger' ? 'Block' : cls === 'attention' ? 'Watch' : 'Check';
-    return `
-      <div class="admin-security-matrix-row ${cls}">
-        <span>${label}</span>
-        <strong>${escapeHtml(area)}</strong>
-        <em>${escapeHtml(control)}</em>
-        <small><b>${escapeHtml(owner)}</b>${escapeHtml(detail)}</small>
-      </div>`;
+  function classSlug(value) {
+    return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled';
   }
 
   const CUSTOM_SEARCH_TERMS = {
-    overviewDashboard: 'overview control room status publish preview backend sync rollback evidence readiness',
+    overviewDashboard: 'overview control room status publish preview backend sync rollback evidence readiness v2 command center',
     siteSecurityCenter: 'security maintenance shutdown pause live restore publish sync privacy audit rollback backup checklist evidence storage authentication',
     scheduleQualityPanel: 'schedule quality coverage override bell warning diagnostics today no school advisory early release',
     announcementsQualityPanel: 'announcements cards bullets links quality diagnostics content',
-    siteLaunchPanel: 'site launch branding nav logo favicon footer theme links gradeviewer',
+    siteLaunchPanel: 'site launch branding nav logo favicon footer links gradeviewer',
     privacyRiskPanel: 'privacy analytics telemetry gradeviewer support policy faq',
     historyEvidencePanel: 'history audit rollback backup evidence accountability csv',
     advancedIntegrityPanel: 'advanced gradeviewer iframe hero countdown footer period size display integration',
@@ -717,24 +818,6 @@
     };
     const labels = byTab[tab.id] || [];
     return changed.filter(label => labels.includes(label)).length;
-  }
-
-  function securityChecklistProgress() {
-    const done = SECURITY_CHECKLIST_ITEMS.filter(item => state.securityChecklist?.[item.id]).length;
-    const total = SECURITY_CHECKLIST_ITEMS.length;
-    return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
-  }
-
-  function renderSecurityChecklist() {
-    return SECURITY_CHECKLIST_ITEMS.map(item => {
-      const checked = Boolean(state.securityChecklist?.[item.id]);
-      return `
-        <label class="admin-security-runbook-item ${checked ? 'checked' : ''}">
-          <input type="checkbox" data-security-checklist="${escapeHtml(item.id)}" ${checked ? 'checked' : ''}>
-          <strong>${escapeHtml(item.label)}</strong>
-          <small>${escapeHtml(item.detail)}</small>
-        </label>`;
-    }).join('');
   }
 
   function asArray(value) {
@@ -817,61 +900,61 @@
     return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
-  function securityRiskModel(input) {
-    const issues = [];
-    let score = 100;
-    if (input.checking) {
-      score -= 6;
-      issues.push('Live backend check is still running.');
-    }
-    if (input.maintenance) {
-      score -= 8;
-      issues.push('Public site is staged for maintenance.');
-    }
-    if (input.syncError) {
-      score -= 30;
-      issues.push('Public sync reported an error.');
-    } else if (input.syncDisabled) {
-      score -= 18;
-      issues.push('Public sync is not fully configured.');
-    }
-    if (input.settingsStorage && !input.settingsStorage.durable) {
-      score -= 10;
-      issues.push('Settings storage is local only.');
-    }
-    if (input.auditStorage && !input.auditStorage.durable) {
-      score -= 10;
-      issues.push('Audit storage is local only.');
-    }
-    if (input.backupStorage && !input.backupStorage.durable) {
-      score -= 8;
-      issues.push('Backups are local only.');
-    }
-    if (input.backupCount === 0) {
-      score -= 8;
-      issues.push('No recent backup was returned.');
-    }
-    if (input.privacyOk === false) {
-      score -= 24;
-      issues.push('Analytics privacy check reported a collection risk.');
-    }
-    if (input.errorText) {
-      score -= 14;
-      issues.push('One or more backend security checks failed.');
-    }
-    if (Number.isFinite(input.checklistPercent) && input.checklistPercent < 50) {
-      score -= 10;
-      issues.push('Incident runbook is less than half complete.');
-    } else if (Number.isFinite(input.checklistPercent) && input.checklistPercent < 100) {
-      score -= 4;
-      issues.push('Incident runbook still has open checks.');
-    }
-    const clamped = Math.max(0, Math.min(100, score));
+  function securityProtectionModel(input) {
+    const checks = [];
+    const add = (status, label, detail) => checks.push({ status: securityStatusClass(status), label, detail });
+    const rateLimitControls = asArray(input.rateLimits?.controls);
+    const trafficDetail = input.rateLimits?.active
+      ? `${rateLimitControls.length || 5} app flood limits are live. Edge DDoS/WAF status is outside this backend.`
+      : 'Traffic flood limits were not returned by the backend.';
+
+    add(input.rateLimits?.active ? 'ok' : 'attention', 'Traffic shield', trafficDetail);
+    add(input.authOk ? 'ok' : 'attention', 'Admin access', input.authDetail || 'Admin session is being checked.');
+    add(
+      input.syncError ? 'danger' : input.syncDisabled ? 'attention' : 'ok',
+      'Public sync',
+      input.syncError || (input.syncDisabled ? 'Public GitHub sync needs setup before external visitors see published settings.' : 'Public-safe settings can publish.')
+    );
+    add(
+      input.maintenance ? 'attention' : 'ok',
+      'Availability',
+      input.maintenance ? 'Visitors will see the maintenance page after publish.' : 'Public site is staged for normal visitor mode.'
+    );
+    add(
+      input.settingsStorage && input.auditStorage
+        ? (input.settingsStorage.durable && input.auditStorage.durable ? 'ok' : 'attention')
+        : 'muted',
+      'Admin data',
+      input.settingsStorage ? `Settings ${storageCopy(input.settingsStorage)}; audit ${storageCopy(input.auditStorage)}.` : 'Storage status is loading.'
+    );
+    add(
+      input.backupCount === null ? 'muted' : input.backupCount > 0 ? 'ok' : 'attention',
+      'Rollback',
+      input.backupCount === null ? 'Backup history is loading.' : input.backupCount > 0 ? `${input.backupCount} rollback point${input.backupCount === 1 ? '' : 's'} available.` : 'No recent rollback backup was returned.'
+    );
+    add(
+      input.privacyOk === true ? 'ok' : input.privacyOk === false ? 'danger' : 'muted',
+      'Privacy',
+      input.privacyDetail || (input.privacyOk === true ? 'Aggregate analytics only.' : input.privacyOk === false ? 'Analytics privacy needs review.' : 'Privacy summary is loading.')
+    );
+    add(
+      input.uploadOk ? 'ok' : 'muted',
+      'Upload filter',
+      input.uploadOk ? 'Uploads are restricted to verified image files.' : 'Upload policy is loading.'
+    );
+    if (input.checking) add('muted', 'Auto check', 'Live status is refreshing now.');
+    if (input.errorText) add('danger', 'Backend check', input.errorText);
+    const known = checks.filter(check => check.status !== 'muted');
+    const open = checks.filter(check => check.status === 'danger' || check.status === 'attention');
+    const ready = known.filter(check => check.status === 'ok').length;
+    const status = checks.some(check => check.status === 'danger') ? 'danger' : open.length ? 'attention' : 'ok';
     return {
-      score: clamped,
-      status: clamped >= 88 ? 'ok' : clamped >= 68 ? 'attention' : 'danger',
-      label: clamped >= 88 ? 'Hardened' : clamped >= 68 ? 'Watch' : 'Action needed',
-      issues: issues.length ? issues : ['No blocking issues found in the latest check.']
+      status,
+      label: status === 'ok' ? 'Protected' : status === 'attention' ? 'Needs review' : 'Action needed',
+      ready,
+      known: known.length,
+      checks,
+      findings: open.length ? open.map(check => `${check.label}: ${check.detail}`) : ['Automatic live checks are stable.']
     };
   }
 
@@ -896,7 +979,7 @@
     const notes = String(data.notes || '').trim();
     return [
       `PHS admin security summary (${new Date().toLocaleString()})`,
-      `Risk: ${model.score}/100 (${model.label})`,
+      `Protection: ${model.ready}/${model.known || 1} automatic checks passing (${model.label})`,
       `Public mode: ${data.mode}`,
       `Public sync: ${data.syncText}`,
       `Admin: ${data.authText} (${data.sessionDetail})`,
@@ -931,30 +1014,69 @@
     return `Checked ${time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
   }
 
+  function securitySnapshotFromOps(summary) {
+    if (!summary) return null;
+    return {
+      checkedAt: summary.checkedAt || new Date().toISOString(),
+      storage: {
+        settings: summary.storage?.settings || null,
+        audit: summary.storage?.audit || null
+      },
+      analytics: summary.analytics || null,
+      backups: {
+        backups: asArray(summary.backups?.entries),
+        storage: summary.storage?.backups || null
+      },
+      auditLog: {
+        entries: asArray(summary.audit?.entries),
+        storage: summary.storage?.audit || null
+      },
+      whoami: {
+        method: summary.security?.adminAuth || 'admin',
+        identity: summary.actor || state.identity || null
+      },
+      security: summary.security || null,
+      publicSync: summary.publicSync || null,
+      environment: summary.environment || null,
+      errors: asArray(summary.failures)
+    };
+  }
+
+  function loadOpsSummary(force = false) {
+    if (state.opsSummaryLoading) return state.opsSummaryLoading;
+    const checkedAtMs = state.opsSummary?.checkedAt ? new Date(state.opsSummary.checkedAt).getTime() : 0;
+    const recent = checkedAtMs && Date.now() - checkedAtMs < 45_000;
+    if (!force && recent) return Promise.resolve(state.opsSummary);
+
+    state.opsSummaryLoading = api('/admin/ops-summary', { silentAuth: true })
+      .then(summary => {
+        state.opsSummary = summary;
+        state.adminHealth = {
+          settings: summary.storage?.settings || null,
+          audit: summary.storage?.audit || null,
+          backups: summary.storage?.backups || null,
+          publicSync: summary.publicSync || null
+        };
+        const snapshot = securitySnapshotFromOps(summary);
+        if (snapshot) state.securitySnapshot = snapshot;
+        return summary;
+      })
+      .finally(() => {
+        state.opsSummaryLoading = null;
+      });
+    return state.opsSummaryLoading;
+  }
+
   function loadSecuritySnapshot(force = false) {
     if (state.securitySnapshotLoading) return state.securitySnapshotLoading;
     const checkedAtMs = state.securitySnapshot?.checkedAt ? new Date(state.securitySnapshot.checkedAt).getTime() : 0;
     const recent = checkedAtMs && Date.now() - checkedAtMs < 45_000;
     if (!force && recent) return Promise.resolve(state.securitySnapshot);
 
-    state.securitySnapshotLoading = Promise.allSettled([
-      api('/admin/storage-status', { silentAuth: true }),
-      api('/admin/analytics', { silentAuth: true }),
-      api('/admin/backups?limit=3', { silentAuth: true }),
-      api('/admin/audit-log?limit=6', { silentAuth: true }),
-      api('/admin/whoami', { silentAuth: true })
-    ]).then(results => {
-      const [storage, analytics, backups, auditLog, whoami] = results.map(result => result.status === 'fulfilled' ? result.value : null);
-      state.securitySnapshot = {
+    state.securitySnapshotLoading = loadOpsSummary(force).then(summary => {
+      state.securitySnapshot = securitySnapshotFromOps(summary) || {
         checkedAt: new Date().toISOString(),
-        storage,
-        analytics,
-        backups,
-        auditLog,
-        whoami,
-        errors: results
-          .filter(result => result.status === 'rejected')
-          .map(result => result.reason?.message || 'Status check failed')
+        errors: ['Ops summary did not return a security snapshot.']
       };
       return state.securitySnapshot;
     }).finally(() => {
@@ -966,45 +1088,58 @@
 
   function renderOverviewDashboard() {
     const host = document.createElement('div');
+    host.className = 'admin-ops-v3';
     const changed = changedSections();
     const dirty = changed.length > 0;
+    const summary = state.opsSummary || {};
+    if (!summary.checkedAt && !state.opsSummaryLoading) {
+      loadOpsSummary().then(() => {
+        if (state.activeTab === 'overview') renderActiveTab();
+      }).catch(() => {});
+    }
     const override = state.draft?.scheduleOverride?.type || 'Auto / data.json';
     const announcementCount = state.draft?.announcements?.items?.length || 0;
-    const health = state.adminHealth;
-    const settingsStorage = health?.settings;
-    const auditStorage = health?.audit;
+    const health = state.adminHealth || {};
+    const settingsStorage = summary.storage?.settings || health.settings;
+    const auditStorage = summary.storage?.audit || health.audit;
+    const backupStorage = summary.storage?.backups || health.backups;
     const publish = state.lastPublishResult;
     const syncError = publish?.publicFrontend?.error;
-    const syncDisabled = publish?.publicFrontend?.enabled === false;
-    const syncState = !publish
-      ? 'No publish this session'
-      : syncError
+    const syncConfigured = summary.publicSync?.configured === true;
+    const syncDisabled = publish?.publicFrontend?.enabled === false || !syncConfigured;
+    const syncState = syncError
         ? 'GitHub sync failed'
         : syncDisabled
-          ? 'Public sync needs setup'
-          : 'Backend and public site synced';
+          ? 'Needs setup'
+          : publish
+            ? 'Synced'
+            : 'Ready';
     const siteStatus = normalizedSiteStatus();
     const maintenance = siteStatus.mode === 'maintenance';
-    if (!state.securitySnapshot?.checkedAt && !state.securitySnapshotLoading) loadSecuritySnapshot().catch(() => {});
     const snapshot = state.securitySnapshot || {};
-    const checklist = securityChecklistProgress();
-    const backupCount = Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups.length : null;
-    const privacy = snapshot.analytics?.privacy;
+    const backupCount = Number.isFinite(summary.backups?.count) ? summary.backups.count : (Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups.length : null);
+    const latestAudit = summary.audit?.latest || snapshot.auditLog?.entries?.[0] || null;
+    const latestBackup = summary.backups?.latest || snapshot.backups?.backups?.[0] || null;
+    const privacy = summary.analytics?.privacy || snapshot.analytics?.privacy;
     const privacyOk = privacy
       ? !privacy.storesPersonalData && !privacy.storesIpAddresses && !privacy.storesUserAgents && !privacy.usesCookies
       : null;
-    const overviewRisk = securityRiskModel({
+    const overviewProtection = securityProtectionModel({
       checking: Boolean(state.securitySnapshotLoading),
       maintenance,
       syncError,
       syncDisabled,
+      rateLimits: snapshot.security?.rateLimits || summary.security?.rateLimits,
+      authOk: Boolean(state.identity || isLocal),
+      authDetail: state.identity?.email || state.identity?.name || (isLocal ? 'Local development admin session.' : 'Admin session active.'),
       settingsStorage,
       auditStorage,
       backupStorage: snapshot.backups?.storage,
       backupCount,
       privacyOk,
-      errorText: snapshot.errors?.join(' | ') || '',
-      checklistPercent: checklist.percent
+      privacyDetail: privacy?.note || '',
+      uploadOk: Boolean(snapshot.security?.upload || summary.security?.upload),
+      errorText: snapshot.errors?.join(' | ') || summary.failures?.join(' | ') || ''
     });
     const commandSummary = dirty
       ? `${changed.length} unpublished ${changed.length === 1 ? 'section' : 'sections'}`
@@ -1012,19 +1147,21 @@
         ? 'Maintenance mode is staged'
         : syncError
           ? 'Public sync needs attention'
-          : 'Ready for daily updates';
-    const securityChecks = [
-      !syncError && !syncDisabled,
+          : 'Ready to operate';
+    const publishIssues = collectPublishIssues();
+    const gateValues = [
+      publishIssues.blocking.length === 0,
       !maintenance,
+      !syncError && !syncDisabled,
       settingsStorage ? Boolean(settingsStorage.durable) : null,
+      auditStorage ? Boolean(auditStorage.durable) : null,
       backupCount === null ? null : backupCount > 0,
       privacyOk
     ];
-    const knownSecurityChecks = securityChecks.filter(value => value !== null);
-    const passedSecurityChecks = knownSecurityChecks.filter(Boolean).length;
-    const securitySummary = knownSecurityChecks.length
-      ? `${passedSecurityChecks}/${knownSecurityChecks.length} checks pass`
-      : 'Checks loading';
+    const knownGates = gateValues.filter(value => value !== null);
+    const passedGates = knownGates.filter(Boolean).length;
+    const readinessPercent = knownGates.length ? Math.round((passedGates / knownGates.length) * 100) : 0;
+    const readinessStatus = readinessPercent >= 86 ? 'ok' : readinessPercent >= 66 ? 'attention' : 'danger';
     const attentionItems = [
       dirty ? `${changed.join(', ')} waiting to publish.` : '',
       maintenance ? 'Visitors will see the maintenance page after publish.' : '',
@@ -1033,78 +1170,110 @@
       backupCount === 0 ? 'No rollback backup was returned by the latest check.' : '',
       privacyOk === false ? 'Analytics privacy report needs review.' : ''
     ].filter(Boolean);
+    const validationState = publishIssues.blocking.length ? 'danger' : publishIssues.warnings.length ? 'attention' : 'ok';
+    const validationItems = [
+      ...publishIssues.blocking.map(issue => `Block: ${issue}`),
+      ...publishIssues.warnings.map(issue => `Watch: ${issue}`)
+    ].slice(0, 5);
+    const lanes = [
+      {
+        status: dirty ? 'attention' : 'ok',
+        label: 'Draft',
+        value: dirty ? `${changed.length} staged` : 'Clean',
+        detail: dirty ? changed.join(', ') : 'No unpublished edits.'
+      },
+      {
+        status: maintenance ? 'attention' : 'ok',
+        label: 'Availability',
+        value: maintenance ? 'Maintenance' : 'Live',
+        detail: maintenance ? siteStatus.title : 'Normal public site mode.'
+      },
+      {
+        status: syncError ? 'danger' : syncDisabled ? 'attention' : 'ok',
+        label: 'Public sync',
+        value: syncState,
+        detail: syncError || (syncDisabled ? summary.publicSync?.reason || 'Sync credentials are missing.' : `${summary.publicSync?.paths?.length || 2} public file targets.`)
+      },
+      {
+        status: backupCount === null ? 'muted' : backupCount > 0 ? 'ok' : 'attention',
+        label: 'Rollback',
+        value: backupCount === null ? 'Checking' : backupCount > 0 ? `${backupCount} points` : 'None',
+        detail: latestBackup ? `Latest ${formatSecurityDate(backupTimestamp(latestBackup))}` : 'Publish creates the next restore point.'
+      },
+      {
+        status: privacyOk === true ? 'ok' : privacyOk === false ? 'danger' : 'muted',
+        label: 'Privacy',
+        value: privacyOk === true ? 'Aggregate' : privacyOk === false ? 'Review' : 'Checking',
+        detail: privacy?.note || 'First-party privacy summary loads from backend.'
+      },
+      {
+        status: settingsStorage?.durable && auditStorage?.durable && (backupStorage?.durable || backupCount === null) ? 'ok' : 'attention',
+        label: 'Admin data',
+        value: settingsStorage?.durable ? 'Durable' : settingsStorage ? 'Local' : 'Unknown',
+        detail: `Settings ${storageCopy(settingsStorage)}; audit ${storageCopy(auditStorage)}.`
+      }
+    ];
 
     host.innerHTML = `
-      <section class="admin-overview-command">
-        <div>
-          <span>Admin command center</span>
+      <section class="admin-command-center ${readinessStatus}">
+        <div class="admin-command-center-main">
+          <div class="admin-command-eyebrow">
+            <span>Admin desk</span>
+            <b>${escapeHtml(formatSecurityCheckedAt())}</b>
+          </div>
           <h2>${escapeHtml(commandSummary)}</h2>
-          <p>${escapeHtml(attentionItems[0] || 'Use the workflow buttons for the common work. Security and History stay one click away when a publish is risky.')}</p>
+          <p>${escapeHtml(attentionItems[0] || 'Use this desk to decide what needs action now: schedule, content, release safety, rollback, and the public preview all stay in one frame.')}</p>
+          <div class="admin-command-actions">
+            <button type="button" class="admin-btn admin-btn-primary" data-go-tab="bellSchedules">${ICON.bell}<span>Schedule desk</span></button>
+            <button type="button" class="admin-btn" data-go-tab="announcements">${ICON.announce}<span>Content desk</span></button>
+            <button type="button" class="admin-btn" id="overview-preview">${ICON.eye}<span>Preview</span></button>
+            ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Repair sync</span></button>` : ''}
+          </div>
         </div>
-        <div class="admin-readiness-actions">
-          <button type="button" class="admin-btn admin-btn-sm admin-btn-primary" data-go-tab="bellSchedules">${ICON.bell}<span>Schedule</span></button>
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="announcements">${ICON.announce}<span>Announcements</span></button>
-          <button type="button" class="admin-btn admin-btn-sm" id="overview-preview">${ICON.eye}<span>Preview draft</span></button>
-          ${syncError || syncDisabled ? `<button type="button" class="admin-btn admin-btn-sm admin-btn-danger" id="overview-public-sync-retry">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+        <div class="admin-command-meter">
+          <div class="admin-command-meter-card">
+            <span>Launch gates</span>
+            <strong>${passedGates} passing</strong>
+            <small>${knownGates.length || 1} automatic checks</small>
+          </div>
         </div>
       </section>
 
-      <div class="admin-overview-grid admin-overview-grid--dense">
-        <section class="admin-overview-card ${dirty ? 'attention' : 'ok'}">
-          <span>Draft state</span>
-          <strong>${dirty ? `${changed.length} changed ${changed.length === 1 ? 'section' : 'sections'}` : 'Ready'}</strong>
-          <small>${dirty ? escapeHtml(changed.join(', ')) : 'No unpublished edits.'}</small>
-        </section>
-        <section class="admin-overview-card ${health ? 'ok' : 'muted'}">
-          <span>Backend</span>
-          <strong>${health ? 'Online' : 'Checking'}</strong>
-          <small>${health ? escapeHtml(new URL(BACKEND).host) : 'Waiting for admin health.'}</small>
-        </section>
-        <section class="admin-overview-card ${syncError ? 'danger' : syncDisabled ? 'attention' : 'ok'}">
-          <span>Public sync</span>
-          <strong>${escapeHtml(syncState)}</strong>
-          <small>${syncError ? escapeHtml(syncError) : state.lastPublishAt ? `Last publish ${new Date(state.lastPublishAt).toLocaleTimeString()}` : 'Status appears after publishing.'}</small>
-        </section>
-        <section class="admin-overview-card">
-          <span>Active schedule</span>
-          <strong>${escapeHtml(override)}</strong>
-          <small>${announcementCount} announcement ${announcementCount === 1 ? 'card' : 'cards'} live in draft.</small>
-        </section>
+      <div class="admin-signal-strip" aria-label="Current operating state">
+        ${lanes.map(lane => `
+          <section class="admin-signal ${lane.status}">
+            <span>${escapeHtml(lane.label)}</span>
+            <strong>${escapeHtml(lane.value)}</strong>
+            <small>${escapeHtml(lane.detail)}</small>
+          </section>`).join('')}
       </div>
-      <div class="admin-overview-control-grid">
-        <section class="admin-overview-control ${overviewRisk.status}">
-          <div>
-            <span>Security checks</span>
-            <strong>${escapeHtml(securitySummary)}</strong>
-            <small>${escapeHtml(overviewRisk.issues[0] || `${checklist.done}/${checklist.total} runbook checks complete.`)}</small>
+
+      <div class="admin-command-layout">
+        <section class="admin-command-board ${validationState}">
+          <div class="admin-panel-heading">
+            <h2>Publish check</h2>
+            <span>${publishIssues.blocking.length ? `${publishIssues.blocking.length} blockers` : publishIssues.warnings.length ? `${publishIssues.warnings.length} warnings` : 'Clear'}</span>
           </div>
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Review</span></button>
-        </section>
-        <section class="admin-overview-control ${maintenance ? 'attention' : 'ok'}">
-          <div>
-            <span>Public availability</span>
-            <strong>${maintenance ? 'Maintenance page' : 'Live site'}</strong>
-            <small>${escapeHtml(maintenance ? siteStatus.title : 'Public site is set to normal visitor mode.')}</small>
+          <div class="admin-release-list">
+            ${validationItems.length ? validationItems.map(item => `<div>${escapeHtml(item)}</div>`).join('') : '<div>No validation blockers. Preview the draft, then publish.</div>'}
           </div>
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="security">${ICON.privacy}<span>Manage</span></button>
         </section>
-        <section class="admin-overview-control ${backupCount === null ? 'muted' : backupCount > 0 ? 'ok' : 'attention'}">
-          <div>
-            <span>Rollback evidence</span>
-            <strong>${backupCount === null ? 'Checking' : backupCount > 0 ? `${backupCount} recent` : 'None returned'}</strong>
-            <small>${backupCount === null ? 'Waiting for backup status.' : backupCount > 0 ? 'Published backups are available in History.' : 'Publish once to create a rollback point.'}</small>
+        <section class="admin-command-board admin-command-board--workflow">
+          <div class="admin-panel-heading">
+            <h2>Work queue</h2>
+            <span>${escapeHtml(override)}</span>
           </div>
-          <button type="button" class="admin-btn admin-btn-sm" data-go-tab="history">${ICON.backup}<span>History</span></button>
+          <div class="admin-work-queue">
+            <button type="button" data-go-tab="bellSchedules">${ICON.bell}<strong>Schedule</strong><span>Override today, import from image, edit reusable bells.</span></button>
+            <button type="button" data-go-tab="announcements">${ICON.announce}<strong>Announcements</strong><span>${announcementCount} card${announcementCount === 1 ? '' : 's'} in draft content.</span></button>
+            <button type="button" data-go-tab="security">${ICON.privacy}<strong>Security</strong><span>${overviewProtection.findings[0] || 'Traffic shield, sync, and privacy checks are current.'}</span></button>
+            <button type="button" data-go-tab="history">${ICON.backup}<strong>Evidence</strong><span>${latestAudit ? `${latestAudit.action || 'event'} by ${latestAudit.actor?.email || latestAudit.actor?.name || latestAudit.email || 'admin'}` : 'Open audit and rollback history.'}</span></button>
+          </div>
         </section>
-      </div>
-      <div class="admin-system-strip">
-        <span>Settings storage: <strong>${escapeHtml(settingsStorage?.type || 'unknown')}</strong>${settingsStorage?.durable ? ' durable' : ''}</span>
-        <span>Audit storage: <strong>${escapeHtml(auditStorage?.type || 'unknown')}</strong>${auditStorage?.durable ? ' durable' : ''}</span>
-        <span>Signed in as: <strong>${escapeHtml(state.identity?.email || state.identity?.name || 'local admin')}</strong></span>
       </div>`;
 
     host.querySelectorAll('[data-go-tab]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.goTab)));
-    host.querySelector('#overview-preview')?.addEventListener('click', openDraftPreview);
+    host.querySelector('#overview-preview')?.addEventListener('click', () => openDraftPreview(null, { fromActiveTab: true }));
     host.querySelector('#overview-public-sync-retry')?.addEventListener('click', retryPublicSync);
     return host;
   }
@@ -1129,7 +1298,15 @@
       b.title = tab.label;
       const dirtyCount = tabDirtyCount(tab);
       b.innerHTML = `<span class="admin-tab-icon">${ICON[tab.icon] || ICON.audit}</span><span class="admin-tab-label">${escapeHtml(tab.label)}</span>${dirtyCount ? `<span class="admin-tab-dirty" aria-label="${dirtyCount} changed ${dirtyCount === 1 ? 'section' : 'sections'}">${dirtyCount}</span>` : ''}`;
-      b.addEventListener('click', () => { state.activeTab = tab.id; closeMobileSidebar(); renderSidebar(); renderActiveTab(); });
+      b.addEventListener('click', () => {
+        state.activeTab = tab.id;
+        saveActiveTabPreference(tab.id);
+        closeMobileSidebar();
+        renderSidebar();
+        renderActiveTab();
+        resetMainScroll();
+        if (tab.id === 'security') loadSecuritySnapshot(true).catch(e => toast(e.message, 'error', 5000));
+      });
       nav.appendChild(b);
     }
   }
@@ -1272,6 +1449,7 @@
     markDirty();
     refreshDirtyMarkers();
     pushPreview();
+    syncSecurityAutoRefresh();
   }
 
   function renderImageField(field, value) {
@@ -1420,18 +1598,21 @@
     const logo = String(state.draft?.branding?.logoSrc || '').trim();
     const favicon = String(state.draft?.branding?.favicon || '').trim();
     const feedbackUrl = String(state.draft?.footer?.feedbackUrl || '').trim();
+    const gradeUrl = String(state.draft?.grades?.iframeUrlProd || '').trim();
+    const siteTitle = String(state.draft?.branding?.siteTitle || '').trim();
     return renderInsightPanel({
       kicker: 'Site launch checks',
-      title: 'Brand, nav, and public links',
-      detail: 'Uses the wide layout for launch-critical settings that used to be buried lower on the page.',
+      title: 'Brand, nav, and public links are launch-ready',
+      detail: 'A compact readiness board for the settings students actually touch.',
       cards: [
-        insightCard(logo ? 'ok' : 'attention', 'Logo', logo || 'Missing', logo ? 'Logo is configured for public pages.' : 'Add a logo before a polished publish.'),
+        insightCard(siteTitle ? 'ok' : 'attention', 'Identity', siteTitle || 'Missing', siteTitle ? 'Browser title and page identity are configured.' : 'Set the public site title before publishing.'),
+        insightCard(isHttpsUrl(gradeUrl) ? 'ok' : gradeUrl ? 'attention' : 'danger', 'GradeViewer', gradeUrl ? hostFromUrl(gradeUrl) : 'Missing', isHttpsUrl(gradeUrl) ? 'Production embed uses HTTPS.' : 'Production GradeViewer link needs review.'),
         insightCard(favicon ? 'ok' : 'attention', 'Favicon', favicon || 'Missing', favicon ? 'Browser tab icon is configured.' : 'Browser tab icon is blank.'),
-        insightCard(navItems.length >= 3 ? 'ok' : 'attention', 'Navigation', `${navItems.length} links`, navItems.length >= 3 ? 'Core pages are present.' : 'Students may lose access to a core page.'),
-        insightCard(isHttpsUrl(feedbackUrl) ? 'ok' : feedbackUrl ? 'attention' : 'muted', 'Feedback', feedbackUrl ? hostFromUrl(feedbackUrl) : 'Not set', feedbackUrl ? 'Public feedback target configured.' : 'Optional, but useful for issue reports.')
+        insightCard(logo ? 'ok' : 'attention', 'Logo', logo || 'Missing', logo ? 'Logo is configured for public pages.' : 'Add a logo before a polished publish.')
       ],
       rows: [
-        settingsPathStatus('branding.siteTitle', 'Browser tab title'),
+        insightRow(navItems.length >= 3 ? 'ok' : 'attention', 'Navigation', navItems.length >= 3 ? `${navItems.length} public links are configured.` : 'Students may lose access to a core page.'),
+        insightRow(isHttpsUrl(feedbackUrl) ? 'ok' : feedbackUrl ? 'attention' : 'muted', 'Feedback', feedbackUrl ? `Feedback target: ${hostFromUrl(feedbackUrl)}.` : 'No public feedback target configured.'),
         settingsPathStatus('branding.siteDescription', 'Meta description'),
         insightRow(changedSections().includes('Site') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Site') ? 'Site appearance/navigation has unpublished changes.' : 'No site control changes are staged.')
       ]
@@ -1450,8 +1631,8 @@
       : null;
     return renderInsightPanel({
       kicker: 'Privacy risk',
-      title: 'Policy and telemetry guardrails',
-      detail: 'Checks student-facing copy, GradeViewer embedding, support contact, and analytics collection posture.',
+      title: 'Student-facing disclosure is complete',
+      detail: 'Checks privacy copy, GradeViewer embedding, support contact, and aggregate usage reporting.',
       cards: [
         insightCard(paragraphs.length ? 'ok' : 'attention', 'FAQ paragraphs', String(paragraphs.length), paragraphs.length ? `${paragraphs.reduce((sum, p) => sum + countWords(p), 0)} words total.` : 'Privacy modal has no explanatory paragraphs.'),
         insightCard(isHttpsUrl(prodUrl) ? 'ok' : 'danger', 'GradeViewer prod', prodUrl ? hostFromUrl(prodUrl) : 'Missing', isHttpsUrl(prodUrl) ? 'Production iframe uses HTTPS.' : 'Production iframe must be HTTPS.'),
@@ -1461,6 +1642,7 @@
       rows: [
         settingsPathStatus('gradeMelon.privacyTitle', 'Modal title'),
         settingsPathStatus('gradeMelon.privacyButtonLabel', 'Privacy button'),
+        settingsPathStatus('gradeMelon.privacyDoneLabel', 'Close button'),
         insightRow(changedSections().includes('Privacy') ? 'attention' : 'ok', 'Draft impact', changedSections().includes('Privacy') ? 'Privacy/GradeViewer copy has unpublished changes.' : 'No privacy changes are staged.')
       ]
     });
@@ -1524,7 +1706,10 @@
     const checking = Boolean(state.securitySnapshotLoading);
     const publish = state.lastPublishResult;
     const syncError = publish?.publicFrontend?.error;
-    const syncDisabled = publish?.publicFrontend?.enabled === false;
+    const publicSync = snapshot.publicSync || state.opsSummary?.publicSync || {};
+    const syncConfigured = publicSync.configured === true;
+    const syncDisabled = publish?.publicFrontend?.enabled === false || !syncConfigured;
+    const syncSetupReason = publicSync.reason || 'Public sync credentials are missing.';
     const syncText = syncError
       ? 'Sync failed'
       : syncDisabled
@@ -1567,20 +1752,29 @@
     const recentBackups = Array.isArray(snapshot.backups?.backups) ? snapshot.backups.backups : [];
     const latestAudit = auditEntries[0];
     const latestBackup = recentBackups[0];
-    const checklist = securityChecklistProgress();
     const composerOpen = state.securityComposerOpen || maintenance;
-    const model = securityRiskModel({
+    const composerDisabled = composerOpen ? '' : ' disabled tabindex="-1"';
+    const rateLimits = snapshot.security?.rateLimits || state.opsSummary?.security?.rateLimits || null;
+    const rateLimitControls = asArray(rateLimits?.controls);
+    const trafficDetail = rateLimits?.active
+      ? `${rateLimitControls.length || 0} backend flood limits live.`
+      : 'Rate-limit status was not returned.';
+    const model = securityProtectionModel({
       checking,
       maintenance,
       syncError,
       syncDisabled,
+      rateLimits,
+      authOk: authMethod === 'google' || authMethod === 'local-dev',
+      authDetail: `${authText}: ${sessionDetail}`,
       settingsStorage,
       auditStorage,
       backupStorage,
       backupCount,
       privacyOk,
-      errorText,
-      checklistPercent: checklist.percent
+      privacyDetail: privacy?.note || '',
+      uploadOk: Boolean(snapshot.security?.upload),
+      errorText
     });
     const summaryText = securitySummaryText(model, {
       mode: maintenance ? 'maintenance' : 'live',
@@ -1589,180 +1783,167 @@
       sessionDetail,
       storageDetail,
       latestAudit: latestAudit ? `${latestAudit.action || 'admin_event'} by ${latestAudit.actor?.email || latestAudit.actor?.name || latestAudit.email || 'admin'}` : '',
-      notes: state.securityNotes
+      notes: ''
     });
-    const riskIssues = model.issues.slice(0, 5).map(issue => `<li>${escapeHtml(issue)}</li>`).join('');
+    const protectionFindings = model.findings.slice(0, 4).map(issue => `<li>${escapeHtml(issue)}</li>`).join('');
     const templateButtons = SECURITY_TEMPLATES.map(t => `
-      <button type="button" class="admin-security-template" data-security-template="${escapeHtml(t.id)}">
+      <button type="button" class="admin-security-template" data-security-template="${escapeHtml(t.id)}"${composerDisabled}>
         <strong>${escapeHtml(t.label)}</strong>
         <span>${escapeHtml(t.title)}</span>
       </button>`).join('');
-    const releaseGateData = [
-      { area: 'Admin access', control: 'Signed-in admin session', passed: authMethod === 'google' || authMethod === 'local-dev', detail: `${authText}: ${sessionDetail}` },
-      { area: 'Public sync', control: 'Public-safe settings push', passed: !syncError && !syncDisabled, detail: syncError || (syncDisabled ? 'Sync setup required.' : 'Ready to publish public-safe settings.') },
-      { area: 'Draft scope', control: 'Change blast radius', passed: !draftSections.length || siteStatusChanged || draftSections.length <= 2, detail: publishScope },
-      { area: 'Private storage', control: 'Admin data custody', passed: settingsStorage ? dataDurable : null, detail: storageDetail },
-      { area: 'Rollback', control: 'Backup before risky publish', passed: backupCount === null ? null : backupCount > 0, detail: backupDetail },
-      { area: 'Privacy', control: 'Aggregate analytics only', passed: privacyOk, detail: privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.' }
-    ];
-    const knownGates = releaseGateData.filter(gate => gate.passed !== null);
-    const passedGates = knownGates.filter(gate => gate.passed).length;
-    const gatePercent = knownGates.length ? Math.round((passedGates / knownGates.length) * 100) : 0;
-    const readinessLabel = knownGates.length ? `${passedGates}/${knownGates.length}` : 'Check';
-    const releaseGates = releaseGateData.map(gate => `
-      <div class="admin-security-gate ${gate.passed === true ? 'ok' : gate.passed === false ? 'attention' : 'muted'}">
-        <span>${gate.passed === true ? 'Pass' : gate.passed === false ? 'Watch' : 'Check'}</span>
-        <strong>${escapeHtml(gate.area)}</strong>
-        <small>${escapeHtml(gate.detail)}</small>
-      </div>`).join('');
+    const autoCheckLabel = model.status === 'ok' ? 'Stable' : model.status === 'danger' ? 'Action needed' : 'Watch';
     const timelineItems = [
       securityTimelineItem(latestAudit, 'No recent audit event returned.'),
       securityTimelineItem(latestBackup, 'No recent backup returned.')
     ].join('');
-    const securityMatrix = [
-      securityMatrixRow(authMethod === 'google' || authMethod === 'local-dev' ? 'ok' : 'attention', 'Authentication', 'Admin-only backend', 'Session: ', `${authText}: ${sessionDetail}`),
-      securityMatrixRow(syncError ? 'danger' : syncDisabled ? 'attention' : 'ok', 'Public sync', 'Public-safe JSON only', 'Status: ', syncError || (syncDisabled ? 'GitHub sync not configured.' : 'Ready for public publish.')),
-      securityMatrixRow(maintenance ? 'attention' : 'ok', 'Availability', 'Visitor-facing mode', 'Mode: ', maintenance ? `Maintenance page: ${status.title}` : 'Live site remains visible.'),
-      securityMatrixRow(settingsStorage ? (settingsStorage.durable ? 'ok' : 'attention') : 'muted', 'Settings store', 'Private admin storage', 'Storage: ', settingsStorage ? storageCopy(settingsStorage) : 'Checking storage status.'),
-      securityMatrixRow(auditStorage ? (auditStorage.durable ? 'ok' : 'attention') : 'muted', 'Audit log', 'Private admin events', 'Storage: ', auditStorage ? storageCopy(auditStorage) : 'Checking audit status.'),
-      securityMatrixRow(backupStorage ? (backupStorage.durable ? 'ok' : 'attention') : backupCount === null ? 'muted' : 'attention', 'Backups', 'Rollback vault', 'Evidence: ', backupDetail),
-      securityMatrixRow(privacyOk === true ? 'ok' : privacyOk === false ? 'danger' : 'muted', 'Telemetry', 'Aggregate analytics', 'Privacy: ', privacy ? privacy.note || 'Aggregate analytics only.' : 'Checking analytics privacy.'),
-      securityMatrixRow(draftSections.length > 2 ? 'attention' : 'ok', 'Publish scope', 'Staged change set', 'Scope: ', publishScope),
-      securityMatrixRow('ok', 'Public app', 'Static frontend boundary', 'Rule: ', 'Logs, sessions, IPs, and admin identity do not sync forward.'),
-      securityMatrixRow('muted', 'GradeViewer', 'Browser-routed iframe', 'Config: ', 'Editable public integration URL; no admin data is embedded.')
-    ].join('');
+    const boundaryCards = [
+      {
+        status: rateLimits?.active ? 'ok' : 'muted',
+        label: 'Traffic shield',
+        value: rateLimits?.active ? 'Active' : 'Checking',
+        detail: rateLimits?.note || 'Backend rate-limit status loads automatically.'
+      },
+      {
+        status: 'ok',
+        label: 'Public snapshot',
+        value: `${asArray(snapshot.security?.publicSnapshotKeys).length || asArray(state.opsSummary?.security?.publicSnapshotKeys).length || 15} keys`,
+        detail: 'Only approved public settings keys are mirrored to the public site.'
+      },
+      {
+        status: 'ok',
+        label: 'Private key guard',
+        value: `${asArray(snapshot.security?.privateKeyGuard).length || asArray(state.opsSummary?.security?.privateKeyGuard).length || 'Active'} blocked`,
+        detail: 'Tokens, sessions, IPs, actor data, and audit data are blocked from public snapshots.'
+      },
+      {
+        status: isHttpsUrl(state.draft?.grades?.iframeUrlProd) ? 'ok' : 'danger',
+        label: 'GradeViewer',
+        value: state.draft?.grades?.iframeUrlProd ? hostFromUrl(state.draft.grades.iframeUrlProd) : 'Missing',
+        detail: 'Production embed must stay on HTTPS.'
+      },
+      {
+        status: 'ok',
+        label: 'Upload filter',
+        value: 'Images only',
+        detail: 'Backend verifies file bytes after MIME filtering before storing assets.'
+      },
+      {
+        status: syncError ? 'danger' : syncDisabled ? 'attention' : 'ok',
+        label: 'Sync channel',
+        value: syncText,
+        detail: syncError || (syncDisabled ? syncSetupReason : 'Public-safe JSON publish path is available.')
+      },
+      {
+        status: dataDurable ? 'ok' : 'attention',
+        label: 'Admin custody',
+        value: dataDurable ? 'Durable' : 'Local',
+        detail: storageDetail
+      }
+    ];
 
-    host.className = 'admin-security-tools';
+    host.className = 'admin-release-room';
     host.innerHTML = `
-      <section class="admin-security-hero">
-        <div class="admin-security-hero-main">
-          <span class="admin-security-kicker">Security command center</span>
-          <h2>${maintenance ? 'Main site maintenance is staged' : 'Public site is staged live'}</h2>
-          <p>${escapeHtml(errorText || 'One compact control surface for public availability, publish safety, rollback proof, private data boundaries, and telemetry posture.')}</p>
+      <section class="admin-release-hero ${model.status}">
+        <div class="admin-release-hero-copy">
+          <div class="admin-command-eyebrow">
+            <span>Security desk</span>
+            <b>Auto-checks every 45s</b>
+          </div>
+          <h2>${maintenance ? 'Maintenance page is staged' : 'Live protection checks are running'}</h2>
+          <p>${escapeHtml(errorText || 'This panel watches traffic limits, public sync, admin access, rollback points, private data boundaries, upload policy, and visitor availability. It stays read-only until you stage or publish site status.')}</p>
           <div class="admin-security-hero-actions">
-            <button type="button" class="admin-btn admin-btn-sm" id="security-copy-summary">${ICON.audit}<span>Copy security brief</span></button>
-            <button type="button" class="admin-btn admin-btn-sm" data-security-go-tab="history">${ICON.backup}<span>Open evidence</span></button>
+            <button type="button" class="admin-btn admin-btn-primary" id="security-open-maintenance">${ICON.close}<span>Stage maintenance</span></button>
+            <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview public page</span></button>
+            <button type="button" class="admin-btn" id="security-copy-summary">${ICON.audit}<span>Copy packet</span></button>
+            <button type="button" class="admin-btn" data-security-go-tab="history">${ICON.backup}<span>Open evidence</span></button>
           </div>
         </div>
-        <div class="admin-security-state ${model.status}">
-          <strong>${escapeHtml(readinessLabel)}</strong>
-          <span>${escapeHtml(knownGates.length ? 'release gates pass' : 'checks loading')}</span>
-          <div class="admin-security-scorebar"><i style="width:${gatePercent}%"></i></div>
-          <button type="button" class="admin-btn admin-btn-sm" id="security-refresh">${ICON.refresh}<span>${checking ? 'Checking...' : 'Run check'}</span></button>
+        <div class="admin-release-meter admin-auto-check-panel">
+          <div class="admin-auto-check-card ${model.status}">
+            <span>Auto checks</span>
+            <strong>${escapeHtml(autoCheckLabel)}</strong>
+            <small>${escapeHtml(formatSecurityCheckedAt())}</small>
+          </div>
+          <button type="button" class="admin-btn admin-btn-sm" id="security-refresh">${ICON.refresh}<span>${checking ? 'Checking...' : 'Refresh now'}</span></button>
         </div>
       </section>
 
-      <div class="admin-overview-grid admin-security-grid">
-        <section class="admin-overview-card ${maintenance ? 'danger' : 'ok'}">
-          <span>Public site</span>
-          <strong>${maintenance ? 'Maintenance' : 'Live'}</strong>
-          <small>${maintenance ? 'Visitors see a clean maintenance page.' : 'Visitors see the normal site.'}</small>
-        </section>
-        <section class="admin-overview-card ${syncError ? 'danger' : syncDisabled ? 'attention' : 'ok'}">
-          <span>Public sync</span>
-          <strong>${escapeHtml(syncText)}</strong>
-          <small>${syncError ? escapeHtml(syncError) : 'Publishing pushes the public-safe settings snapshot.'}</small>
-        </section>
-        <section class="admin-overview-card ok">
-          <span>Admin access</span>
-          <strong>${escapeHtml(authText)}</strong>
-          <small>${escapeHtml(sessionDetail)}</small>
-        </section>
-        <section class="admin-overview-card ${dataDurable ? 'ok' : settingsStorage ? 'attention' : 'muted'}">
-          <span>Data boundary</span>
-          <strong>${dataDurable ? 'Durable' : settingsStorage ? 'Local only' : 'Checking'}</strong>
-          <small>${escapeHtml(settingsStorage ? storageDetail : 'Admin data never syncs into public settings.')}</small>
-        </section>
-      </div>
-
-      <div class="admin-security-split">
-        <section class="admin-security-panel">
+      <div class="admin-release-grid">
+        <section class="admin-security-panel admin-release-panel admin-release-panel--availability">
           <div class="admin-panel-heading">
-            <h2>Main-site availability</h2>
-            <span>Visitor-facing mode</span>
+            <h2>Availability control</h2>
+            <span>${maintenance ? 'Maintenance staged' : 'Live staged'}</span>
           </div>
           <div class="admin-security-mode-row">
-            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-ghost' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live site</span></button>
-            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" id="security-open-maintenance">${ICON.close}<span>Stage maintenance mode</span></button>
+            <button type="button" class="admin-btn ${maintenance ? '' : 'admin-btn-primary'}" data-site-mode="live">${ICON.eye}<span>Restore live</span></button>
+            <button type="button" class="admin-btn ${maintenance ? 'admin-btn-primary' : 'admin-btn-danger'}" id="security-open-maintenance-inline">${ICON.close}<span>Maintenance draft</span></button>
           </div>
           <div class="admin-security-composer ${composerOpen ? 'is-open' : ''}" aria-hidden="${composerOpen ? 'false' : 'true'}">
             <div class="admin-security-composer-body">
               <div class="admin-security-composer-head">
                 <div>
                   <strong>Public maintenance page</strong>
-                  <span>Review the exact visitor-facing copy before staging maintenance.</span>
+                  <span>Review the exact visitor-facing title and message before publishing.</span>
                 </div>
                 <em>${maintenance ? 'Maintenance mode staged' : 'Draft not staged yet'}</em>
               </div>
               <div class="admin-field">
                 <label for="site-status-title">Maintenance title</label>
-                <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}">
+                <input class="admin-input" id="site-status-title" type="text" maxlength="120" value="${escapeHtml(status.title)}"${composerDisabled}>
               </div>
               <div class="admin-field">
                 <label for="site-status-message">Maintenance message</label>
-                <textarea class="admin-textarea" id="site-status-message" maxlength="500">${escapeHtml(status.message)}</textarea>
+                <textarea class="admin-textarea" id="site-status-message" maxlength="500"${composerDisabled}>${escapeHtml(status.message)}</textarea>
               </div>
               <div class="admin-security-template-grid" aria-label="Incident templates">
                 ${templateButtons}
               </div>
-              <div class="admin-security-note">This does not kill the backend. It publishes a public setting that makes the main site show a maintenance page until you restore live mode.</div>
+              <div class="admin-security-note">Public mode is a site setting. Backend auth, audit logs, analytics, and student sessions stay private.</div>
               <div class="admin-readiness-actions admin-security-actions">
-                <button type="button" class="admin-btn admin-btn-danger" id="security-stage-maintenance">${ICON.close}<span>${maintenance ? 'Update maintenance draft' : 'Stage maintenance draft'}</span></button>
-                <button type="button" class="admin-btn" id="security-preview">${ICON.eye}<span>Preview maintenance page</span></button>
-                <button type="button" class="admin-btn admin-btn-primary" id="security-publish">${ICON.upload}<span>Publish staged site status</span></button>
-                ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync">${ICON.refresh}<span>Retry public sync</span></button>` : ''}
+                <button type="button" class="admin-btn admin-btn-danger" id="security-stage-maintenance"${composerDisabled}>${ICON.close}<span>${maintenance ? 'Update maintenance' : 'Stage maintenance'}</span></button>
+                <button type="button" class="admin-btn admin-btn-primary" id="security-publish"${composerDisabled}>${ICON.upload}<span>Publish staged site status</span></button>
+                ${(syncError || syncDisabled) ? `<button type="button" class="admin-btn admin-btn-danger" id="security-sync"${composerDisabled}>${ICON.refresh}<span>Retry public sync</span></button>` : ''}
               </div>
             </div>
           </div>
         </section>
 
-        <section class="admin-security-panel">
+        <section class="admin-security-panel admin-release-panel admin-release-panel--impact">
           <div class="admin-panel-heading">
-            <h2>Publish impact</h2>
+            <h2>Protection checks</h2>
             <span>${escapeHtml(formatSecurityCheckedAt())}</span>
           </div>
-          <div class="admin-security-risk-issues">
-            <strong>Current findings</strong>
-            <ul>${riskIssues}</ul>
-          </div>
-          <div class="admin-security-gates">
-            ${releaseGates}
-          </div>
-          <div class="admin-security-action-grid">
-            <button type="button" class="admin-btn" data-security-go-tab="history">${ICON.backup}<span>History</span></button>
-            <button type="button" class="admin-btn" data-security-go-tab="safety">${ICON.privacy}<span>Privacy</span></button>
+          <div class="admin-security-impact-grid">
+            <div class="admin-security-risk-issues">
+              <strong>${model.status === 'ok' ? 'Stable right now' : 'Needs attention'}</strong>
+              <ul>${protectionFindings}</ul>
+            </div>
           </div>
         </section>
       </div>
 
-      <section class="admin-security-panel">
+      <section class="admin-security-panel admin-release-panel admin-release-panel--boundary">
         <div class="admin-panel-heading">
-          <h2>Security matrix</h2>
-          <span>Public vs private boundaries</span>
+          <h2>Protection map</h2>
+          <span>Public-safe boundary checks</span>
         </div>
-        <div class="admin-security-matrix">${securityMatrix}</div>
+        <div class="admin-attack-map">
+          ${boundaryCards.map(card => `
+            <div class="admin-attack-node ${card.status}">
+              <span>${escapeHtml(card.label)}</span>
+              <strong>${escapeHtml(card.value)}</strong>
+              <small>${escapeHtml(card.detail)}</small>
+            </div>`).join('')}
+        </div>
       </section>
 
-      <div class="admin-security-ops-grid admin-security-ops-grid--compact">
-        <section class="admin-security-panel">
+      <div class="admin-release-grid admin-release-grid--bottom">
+        <section class="admin-security-panel admin-release-panel admin-release-panel--timeline">
           <div class="admin-panel-heading">
             <h2>Evidence timeline</h2>
             <span>Latest audit and rollback</span>
           </div>
           <div class="admin-security-timeline">${timelineItems}</div>
-        </section>
-
-        <section class="admin-security-panel">
-          <div class="admin-panel-heading">
-            <h2>Response runbook</h2>
-            <span>${checklist.percent}% complete</span>
-          </div>
-          <div class="admin-security-progress">
-            <i style="width:${checklist.percent}%"></i>
-          </div>
-          <div class="admin-security-runbook">
-            ${renderSecurityChecklist()}
-          </div>
         </section>
       </div>
     `;
@@ -1777,6 +1958,11 @@
       renderActiveTab();
       requestAnimationFrame(() => document.getElementById('site-status-title')?.focus());
     });
+    host.querySelector('#security-open-maintenance-inline')?.addEventListener('click', () => {
+      state.securityComposerOpen = true;
+      renderActiveTab();
+      requestAnimationFrame(() => document.getElementById('site-status-title')?.focus());
+    });
     host.querySelector('#security-stage-maintenance')?.addEventListener('click', () => {
       if (!maintenance && !confirm('Show the maintenance page on the main site after publishing?')) return;
       state.securityComposerOpen = true;
@@ -1785,8 +1971,8 @@
     });
     host.querySelector('#site-status-title')?.addEventListener('input', e => updateSiteStatusDraft({ title: e.target.value }));
     host.querySelector('#site-status-message')?.addEventListener('input', e => updateSiteStatusDraft({ message: e.target.value }));
-    host.querySelector('#security-publish')?.addEventListener('click', () => publishDraft('security').catch(() => {}));
-    host.querySelector('#security-preview')?.addEventListener('click', openDraftPreview);
+    host.querySelector('#security-publish')?.addEventListener('click', () => publishDraft('security', { onlyKeys: ['siteStatus'] }).catch(() => {}));
+    host.querySelector('#security-preview')?.addEventListener('click', () => openDraftPreview('schedule'));
     host.querySelector('#security-sync')?.addEventListener('click', retryPublicSync);
     host.querySelector('#security-refresh')?.addEventListener('click', () => loadSecuritySnapshot(true).catch(e => toast(e.message, 'error', 5000)));
     host.querySelectorAll('[data-security-go-tab]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.securityGoTab)));
@@ -1797,26 +1983,10 @@
       updateSiteStatusDraft({ mode: 'maintenance', title: template.title, message: template.message }, true);
       toast(`${template.label} template staged. Preview before publishing.`, 'success', 3500);
     }));
-    host.querySelectorAll('[data-security-checklist]').forEach(input => {
-      input.addEventListener('change', () => {
-        toggleSecurityChecklist(input.dataset.securityChecklist, input.checked);
-        renderActiveTab();
-      });
-    });
     host.querySelector('#security-copy-summary')?.addEventListener('click', () => {
       copyText(summaryText)
         .then(() => toast('Audit packet copied.', 'success', 2200))
         .catch(e => toast('Copy failed: ' + e.message, 'error', 5000));
-    });
-    host.querySelector('#security-notes')?.addEventListener('input', e => saveSecurityNotes(e.target.value));
-    host.querySelector('#security-save-notes')?.addEventListener('click', () => {
-      saveSecurityNotes(host.querySelector('#security-notes')?.value || '');
-      toast('Security notes saved locally.', 'success', 2200);
-    });
-    host.querySelector('#security-clear-notes')?.addEventListener('click', () => {
-      saveSecurityNotes('');
-      renderActiveTab();
-      toast('Security notes cleared.', 'success', 2200);
     });
     return host;
   }
@@ -2081,14 +2251,25 @@
 
   function renderPrivacyParagraphsEditor() {
     const host = document.createElement('div');
+    host.className = 'admin-privacy-paragraphs';
     state.draft.gradeMelon = state.draft.gradeMelon || {};
     state.draft.gradeMelon.privacyParagraphs = state.draft.gradeMelon.privacyParagraphs || [];
     const arr = state.draft.gradeMelon.privacyParagraphs;
     function paint() {
       host.innerHTML = '';
+      if (!arr.length) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-compact-empty-state';
+        empty.innerHTML = `
+          <div>
+            <strong>No modal paragraphs yet</strong>
+            <span>Add concise student-facing copy explaining what GradeViewer links to and how to request support.</span>
+          </div>`;
+        host.appendChild(empty);
+      }
       arr.forEach((p, i) => {
         const row = document.createElement('div');
-        row.className = 'admin-list-item';
+        row.className = 'admin-list-item admin-list-item--compact';
         row.innerHTML = `
           <div class="admin-list-item-head">
             <span class="handle">Paragraph ${i+1}</span>
@@ -2098,7 +2279,7 @@
               <button class="admin-btn admin-btn-sm admin-btn-danger admin-btn-icon" title="Remove" aria-label="Remove paragraph ${i + 1}" data-act="del">${ICON.trash}</button>
             </div>
           </div>
-          <textarea class="admin-textarea" maxlength="4000">${escapeHtml(p)}</textarea>`;
+          <textarea class="admin-textarea admin-textarea--privacy" maxlength="4000" placeholder="Write one clear paragraph for the privacy modal.">${escapeHtml(p)}</textarea>`;
         row.querySelector('textarea').addEventListener('input', e => { arr[i] = e.target.value; markDirty(); pushPreview(); });
         row.querySelector('[data-act=up]').addEventListener('click', () => { arr.splice(i-1,0,arr.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
         row.querySelector('[data-act=down]').addEventListener('click', () => { arr.splice(i+1,0,arr.splice(i,1)[0]); markDirty(); paint(); pushPreview(); });
@@ -2108,7 +2289,7 @@
       const addBtn = document.createElement('button');
       addBtn.type = 'button'; addBtn.className = 'admin-btn admin-btn-sm';
       addBtn.innerHTML = ICON.plus + '<span>Add paragraph</span>';
-      addBtn.addEventListener('click', () => { arr.push(''); markDirty(); paint(); pushPreview(); });
+      addBtn.addEventListener('click', () => { arr.push(''); markDirty(); paint(); pushPreview(); host.querySelector('textarea:last-of-type')?.focus(); });
       host.appendChild(addBtn);
     }
     paint();
@@ -2599,237 +2780,65 @@
         </div>`;
     }
 
-    let stopJarvisGlobe = null;
-
-    function jarvisNoise(seed) {
-      const n = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-      return n - Math.floor(n);
-    }
-
-    function normalizeJarvisPoint(x, y, z) {
-      const len = Math.hypot(x, y, z) || 1;
-      return { x: x / len, y: y / len, z: z / len };
-    }
-
-    function makeJarvisGlobePoints(count = 168) {
-      const points = [];
-      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-      for (let i = 0; i < count; i++) {
-        const cluster = i % 17 === 0 ? 0.22 : i % 11 === 0 ? -0.16 : 0;
-        const zJitter = (jarvisNoise(i + 1.7) - 0.5) * 0.095 + cluster;
-        const thetaJitter = (jarvisNoise(i + 9.4) - 0.5) * 0.72;
-        const z = Math.max(-0.98, Math.min(0.98, 1 - (2 * (i + 0.5)) / count + zJitter));
-        const radius = Math.sqrt(1 - z * z);
-        const theta = i * goldenAngle + thetaJitter;
-        const raw = normalizeJarvisPoint(
-          Math.cos(theta) * radius + (jarvisNoise(i + 21.1) - 0.5) * 0.09,
-          z + (jarvisNoise(i + 33.8) - 0.5) * 0.07,
-          Math.sin(theta) * radius + (jarvisNoise(i + 47.6) - 0.5) * 0.09
-        );
-        points.push({
-          x: raw.x,
-          y: raw.y,
-          z: raw.z,
-          size: 0.62 + jarvisNoise(i + 61.2) * 1.24,
-          phase: jarvisNoise(i + 74.5),
-          drift: 0.35 + jarvisNoise(i + 88.9) * 0.65
-        });
-      }
-      return points;
-    }
-
-    function makeJarvisGlobeLinks(points) {
-      const links = [];
-      const seen = new Set();
-      points.forEach((point, i) => {
-        const nearest = [];
-        points.forEach((other, j) => {
-          if (i === j) return;
-          const dx = point.x - other.x;
-          const dy = point.y - other.y;
-          const dz = point.z - other.z;
-          const dist = dx * dx + dy * dy + dz * dz;
-          const cutoff = 0.13 + jarvisNoise(i * 17 + j * 3.1) * 0.15;
-          if (dist < cutoff) nearest.push({ j, dist });
-        });
-        const linkCount = 1 + Math.floor(jarvisNoise(i + 122.3) * 3);
-        nearest.sort((a, b) => a.dist - b.dist).slice(0, linkCount).forEach(({ j }) => {
-          const key = i < j ? `${i}:${j}` : `${j}:${i}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            links.push([i, j]);
-          }
-        });
-      });
-      return links;
-    }
-
-    function startJarvisGlobe(canvas) {
-      const ctx = canvas?.getContext?.('2d');
-      if (!ctx) return () => {};
-      const points = makeJarvisGlobePoints();
-      const links = makeJarvisGlobeLinks(points);
-      const signalLinks = links.length ? links : [[0, 1]];
-      const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      const signals = Array.from({ length: 34 }, (_, i) => ({
-        link: (i * 19) % signalLinks.length,
-        offset: (i * 0.137) % 1,
-        speed: 0.000055 + (i % 5) * 0.000012
-      }));
-      let frame = 0;
-      let stopped = false;
-      let startedAt = performance.now();
-
-      function resize(rect) {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const width = Math.max(1, Math.round(rect.width * dpr));
-        const height = Math.max(1, Math.round(rect.height * dpr));
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width;
-          canvas.height = height;
-        }
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-
-      function project(point, angle, tick, width, height, sphereRadius) {
-        const cosY = Math.cos(angle);
-        const sinY = Math.sin(angle);
-        const xRot = point.x * cosY + point.z * sinY;
-        const zRot = -point.x * sinY + point.z * cosY;
-        const tilt = -0.24;
-        const cosX = Math.cos(tilt);
-        const sinX = Math.sin(tilt);
-        const yRot = point.y * cosX - zRot * sinX;
-        const zTilt = point.y * sinX + zRot * cosX;
-        const perspective = 1.58 / (1.88 - zTilt * 0.48);
-        const depth = Math.max(0, Math.min(1, (zTilt + 1) / 2));
-        return {
-          x: width / 2 + xRot * sphereRadius * perspective,
-          y: height / 2 + yRot * sphereRadius * perspective,
-          depth,
-          size: (1.05 + depth * 3.25) * point.size * (0.88 + 0.18 * Math.sin(tick * 0.0018 * point.drift + point.phase * Math.PI * 2)),
-          alpha: 0.12 + depth * 0.82
-        };
-      }
-
-      function drawGlobe(now) {
-        if (stopped || !canvas.isConnected) return;
-        const rect = canvas.getBoundingClientRect();
-        if (rect.width < 2 || rect.height < 2) {
-          frame = requestAnimationFrame(drawGlobe);
-          return;
-        }
-        resize(rect);
-        const width = rect.width;
-        const height = rect.height;
-        const tick = now - startedAt;
-        const angle = prefersReduced ? -0.45 : tick * 0.00022;
-        const sphereRadius = Math.min(width, height) * 0.38;
-        const projected = points.map(point => project(point, angle, tick, width, height, sphereRadius));
-
-        ctx.clearRect(0, 0, width, height);
-        const glow = ctx.createRadialGradient(width / 2, height / 2, sphereRadius * 0.08, width / 2, height / 2, sphereRadius * 1.35);
-        glow.addColorStop(0, 'rgba(255,255,255,0.16)');
-        glow.addColorStop(0.42, 'rgba(255,255,255,0.045)');
-        glow.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(width / 2, height / 2, sphereRadius * 1.42, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 5; i++) {
-          const offset = (i - 2) * sphereRadius * (0.29 + jarvisNoise(i + 201) * 0.05);
-          ctx.globalAlpha = 0.08 - Math.abs(i - 2) * 0.01;
-          ctx.beginPath();
-          ctx.ellipse(
-            width / 2 + (jarvisNoise(i + 211) - 0.5) * sphereRadius * 0.06,
-            height / 2 + offset,
-            sphereRadius * Math.sqrt(Math.max(0.08, 1 - Math.pow((i - 2) * 0.27, 2))),
-            sphereRadius * (0.075 + jarvisNoise(i + 223) * 0.045),
-            (jarvisNoise(i + 235) - 0.5) * 0.16,
-            0,
-            Math.PI * 2
-          );
-          ctx.stroke();
-        }
-        for (let i = 0; i < 4; i++) {
-          ctx.globalAlpha = 0.065;
-          ctx.beginPath();
-          ctx.ellipse(width / 2, height / 2, sphereRadius * (0.18 + jarvisNoise(i + 251) * 0.11), sphereRadius, (Math.PI / 4) * i + angle * 0.28 + (jarvisNoise(i + 267) - 0.5) * 0.42, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-        ctx.restore();
-
-        links.forEach(([a, b]) => {
-          const p1 = projected[a];
-          const p2 = projected[b];
-          const depth = Math.min(p1.depth, p2.depth);
-          if (depth < 0.12) return;
-          ctx.strokeStyle = `rgba(255,255,255,${0.018 + depth * 0.13})`;
-          ctx.lineWidth = 0.7 + depth * 0.55;
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.stroke();
-        });
-
-        signals.forEach(signal => {
-          const link = signalLinks[signal.link];
-          if (!link) return;
-          const p1 = projected[link[0]];
-          const p2 = projected[link[1]];
-          const depth = Math.min(p1.depth, p2.depth);
-          if (depth < 0.25) return;
-          const t = prefersReduced ? signal.offset : (signal.offset + tick * signal.speed) % 1;
-          const x = p1.x + (p2.x - p1.x) * t;
-          const y = p1.y + (p2.y - p1.y) * t;
-          const pulse = Math.sin(t * Math.PI);
-          ctx.fillStyle = `rgba(255,255,255,${(0.2 + depth * 0.68) * pulse})`;
-          ctx.beginPath();
-          ctx.arc(x, y, 1.5 + depth * 2.2, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        projected
-          .map((point, i) => ({ ...point, i }))
-          .sort((a, b) => a.depth - b.depth)
-          .forEach(point => {
-            ctx.fillStyle = `rgba(245,245,245,${point.alpha})`;
-            ctx.shadowColor = `rgba(255,255,255,${0.05 + point.depth * 0.2})`;
-            ctx.shadowBlur = 7 + point.depth * 12;
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, point.size, 0, Math.PI * 2);
-            ctx.fill();
-          });
-        ctx.shadowBlur = 0;
-
-        if (!prefersReduced) frame = requestAnimationFrame(drawGlobe);
-      }
-
-      frame = requestAnimationFrame(drawGlobe);
-      return () => {
-        stopped = true;
-        if (frame) cancelAnimationFrame(frame);
-      };
-    }
-
     function paint() {
-      stopJarvisGlobe?.();
-      stopJarvisGlobe = null;
       const busy = !!state.jarvis.busy;
       const hasConversation = state.jarvis.messages.length > 1;
+      const changed = changedSections();
+      const publishIssues = collectPublishIssues();
+      const siteStatus = normalizedSiteStatus();
+      const snapshot = state.securitySnapshot || {};
+      const summary = state.opsSummary || {};
+      const publicSync = snapshot.publicSync || summary.publicSync || {};
+      const latestAudit = asArray(snapshot.auditLog?.entries || summary.audit?.events || summary.auditLog?.entries)[0] || null;
+      const promptOptions = [
+        ['Schedule fix', 'Make the schedule normal for today and explain what will change before publishing.'],
+        ['Announcement copy', 'Rewrite the public announcement copy so it is concise and student-friendly.'],
+        ['Privacy text', 'Draft a short privacy FAQ paragraph for GradeViewer and support requests.'],
+        ['Check draft', 'Review my current draft and tell me the safest next action.']
+      ];
       host.innerHTML = `
         <div class="admin-jarvis-shell ${busy ? 'is-busy' : ''}">
-          <div class="admin-jarvis-stage">
-            <div class="admin-jarvis-neural" aria-hidden="true">
-              <div class="admin-jarvis-neural-scene">
-                <canvas class="admin-jarvis-globe" width="760" height="760"></canvas>
+          <section class="admin-jarvis-card admin-jarvis-card--compose">
+            <div class="admin-panel-heading">
+              <div>
+                <h2>${busy ? 'Working on your draft' : 'Ask Jarvis'}</h2>
+                <span>Draft changes stay staged until you publish.</span>
               </div>
+              <b>${changed.length ? `${changed.length} staged` : 'clean draft'}</b>
             </div>
-            <h2>${busy ? 'Drafting change...' : 'Jarvis'}</h2>
+            ${pendingCard()}
+            <div class="admin-jarvis-suggestions" aria-label="Jarvis shortcuts">
+              ${promptOptions.map(([label, prompt]) => `<button type="button" data-jarvis-prompt="${escapeHtml(prompt)}"><span>${escapeHtml(label)}</span><small>${escapeHtml(prompt)}</small></button>`).join('')}
+            </div>
+            <form class="admin-jarvis-compose" id="jarvis-form">
+              <input type="file" id="jarvis-file-input" class="hidden" accept="image/*" multiple>
+              ${renderAttachmentChips(state.jarvis.attachments, true)}
+              <textarea id="jarvis-input" maxlength="3000" rows="3" placeholder="Tell Jarvis what to change, or attach a screenshot and describe what is wrong." ${busy ? 'disabled' : ''}></textarea>
+              <div class="admin-jarvis-compose-actions">
+                <button type="button" class="admin-btn" id="jarvis-add-file">${ICON.plus}<span>Attach image</span></button>
+                <button type="submit" class="admin-btn admin-btn-primary" id="jarvis-send" ${busy ? 'disabled' : ''}>${busy ? 'Working...' : 'Ask Jarvis'}</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="admin-jarvis-card admin-jarvis-card--context">
+            <div class="admin-panel-heading">
+              <h2>Live context</h2>
+              <span>${escapeHtml(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}</span>
+            </div>
+            <div class="admin-jarvis-context-grid">
+              <div><span>Public site</span><strong>${siteStatus.mode === 'maintenance' ? 'Maintenance' : 'Live'}</strong><small>${siteStatus.mode === 'maintenance' ? escapeHtml(siteStatus.title) : 'Normal visitor mode.'}</small></div>
+              <div><span>Public sync</span><strong>${publicSync.configured === false ? 'Needs setup' : publicSync.ready === false ? 'Check sync' : 'Ready'}</strong><small>${escapeHtml(publicSync.message || publicSync.reason || 'Public settings status is available to Jarvis.')}</small></div>
+              <div><span>Publish gate</span><strong>${publishIssues.blocking.length ? `${publishIssues.blocking.length} blockers` : publishIssues.warnings.length ? `${publishIssues.warnings.length} warnings` : 'Clear'}</strong><small>${escapeHtml(publishIssues.blocking[0] || publishIssues.warnings[0] || 'No publish issues found.')}</small></div>
+              <div><span>Last evidence</span><strong>${escapeHtml(latestAudit?.action || 'No event')}</strong><small>${escapeHtml(latestAudit?.actor?.email || latestAudit?.actor?.name || latestAudit?.email || 'Audit history appears here.')}</small></div>
+            </div>
+          </section>
+
+          <section class="admin-jarvis-card admin-jarvis-card--thread">
+            <div class="admin-panel-heading">
+              <h2>Conversation</h2>
+              <span>${hasConversation ? `${state.jarvis.messages.length} messages` : 'ready'}</span>
+            </div>
             <div class="admin-jarvis-messages ${hasConversation ? 'has-conversation' : ''}" id="jarvis-messages">
               ${state.jarvis.messages.map(m => `
                 <div class="admin-jarvis-message ${m.role === 'user' ? 'user' : 'assistant'}">
@@ -2838,31 +2847,23 @@
                   ${renderAttachmentChips(m.attachments, false)}
                 </div>`).join('')}
             </div>
-          </div>
-          <div class="admin-jarvis-dock">
-            ${pendingCard()}
-            <form class="admin-jarvis-compose" id="jarvis-form">
-              <input type="file" id="jarvis-file-input" class="hidden" accept="image/*" multiple>
-              ${renderAttachmentChips(state.jarvis.attachments, true)}
-              <div class="admin-jarvis-composer-row">
-                <button type="button" class="admin-jarvis-icon-btn" id="jarvis-add-file" title="Add images" aria-label="Add images">${ICON.plus}</button>
-                <textarea id="jarvis-input" maxlength="3000" rows="1" placeholder="Describe the site change..." ${busy ? 'disabled' : ''}></textarea>
-                <button type="button" class="admin-jarvis-tools-btn" aria-label="Add image context"><span>${ICON.sparkle}</span><strong>G</strong></button>
-                <button type="submit" class="admin-jarvis-send-btn" id="jarvis-send" aria-label="Send" ${busy ? 'disabled' : ''}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m6 11 6-6 6 6"/></svg>
-                </button>
-              </div>
-            </form>
-          </div>
+          </section>
         </div>`;
 
       const messages = host.querySelector('#jarvis-messages');
       messages.scrollTop = messages.scrollHeight;
       host.querySelector('#jarvis-form').addEventListener('submit', onSubmit);
-      host.querySelector('.admin-jarvis-tools-btn').addEventListener('click', () => host.querySelector('#jarvis-file-input').click());
       host.querySelector('#jarvis-add-file').addEventListener('click', () => host.querySelector('#jarvis-file-input').click());
       host.querySelector('#jarvis-file-input').addEventListener('change', onFilesSelected);
-      stopJarvisGlobe = startJarvisGlobe(host.querySelector('.admin-jarvis-globe'));
+      host.querySelectorAll('[data-jarvis-prompt]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const input = host.querySelector('#jarvis-input');
+          if (!input || busy) return;
+          input.value = btn.dataset.jarvisPrompt || '';
+          input.focus();
+          input.dispatchEvent(new Event('input'));
+        });
+      });
       host.querySelectorAll('[data-remove-jarvis-attachment]').forEach(btn => {
         btn.addEventListener('click', () => {
           state.jarvis.attachments.splice(Number(btn.dataset.removeJarvisAttachment), 1);
@@ -2878,9 +2879,9 @@
       });
       input?.addEventListener('input', () => {
         input.style.height = 'auto';
-        input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+        input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
       });
-      host.querySelector('[data-jarvis-act="preview"]')?.addEventListener('click', openDraftPreview);
+      host.querySelector('[data-jarvis-act="preview"]')?.addEventListener('click', () => openDraftPreview(null, { fromActiveTab: true }));
       host.querySelector('[data-jarvis-act="done"]')?.addEventListener('click', async () => {
         const btn = host.querySelector('[data-jarvis-act="done"]');
         btn.disabled = true;
@@ -2999,23 +3000,26 @@
       const storageNote = storage ? `<div class="admin-privacy-note" style="margin-bottom:14px">Backup storage: ${escapeHtml(storage.type)}${storage.durable ? ` · ${escapeHtml(storage.repo || '')}/${escapeHtml(storage.path || '')}` : ' · local development only'}</div>` : '';
       if (!j.backups?.length) {
         host.innerHTML = storageNote + '<div class="admin-field-help">No backups yet. A backup is created automatically before each publish.</div>';
+        refreshWorkspaceLayoutSoon();
         return;
       }
       host.innerHTML = `
         ${storageNote}
-        <table class="admin-audit-table">
-          <thead><tr><th>When</th><th>Source</th><th>Actor</th><th>Changed</th><th></th></tr></thead>
-          <tbody>
-            ${j.backups.map(b => `
-              <tr data-backup-id="${escapeHtml(b.id)}">
-                <td class="muted">${new Date(b.ts).toLocaleString()}</td>
-                <td class="action">${escapeHtml(b.source || b.action || 'manual')}</td>
-                <td class="muted">${escapeHtml(b.actor?.email || b.actor?.name || '—')}</td>
-                <td class="muted">${escapeHtml((b.sections || b.patchKeys || []).join(', ') || b.message || '—')}</td>
-                <td><button type="button" class="admin-btn admin-btn-sm admin-btn-ghost" data-act="restore">Restore</button></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>`;
+        <div class="admin-table-scroll">
+          <table class="admin-audit-table">
+            <thead><tr><th>When</th><th>Source</th><th>Actor</th><th>Changed</th><th></th></tr></thead>
+            <tbody>
+              ${j.backups.map(b => `
+                <tr data-backup-id="${escapeHtml(b.id)}">
+                  <td class="muted">${backupTimestamp(b) ? new Date(backupTimestamp(b)).toLocaleString() : 'No timestamp'}</td>
+                  <td class="action">${escapeHtml(b.source || b.action || 'manual')}</td>
+                  <td class="muted admin-audit-actor">${escapeHtml(b.actor?.email || b.actor?.name || '—')}</td>
+                  <td class="muted admin-audit-detail">${escapeHtml((b.sections || b.patchKeys || []).join(', ') || b.message || '—')}</td>
+                  <td><button type="button" class="admin-btn admin-btn-sm admin-btn-ghost" data-act="restore">Restore</button></td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
       host.querySelectorAll('[data-act="restore"]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = btn.closest('[data-backup-id]').dataset.backupId;
@@ -3037,8 +3041,10 @@
           }
         });
       });
+      refreshWorkspaceLayoutSoon();
     }).catch(e => {
       host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      refreshWorkspaceLayoutSoon();
     });
     return host;
   }
@@ -3046,11 +3052,16 @@
   function renderAuditLog() {
     const host = document.createElement('div');
     host.innerHTML = '<div class="admin-field-help">Loading…</div>';
-    api('/admin/audit-log?limit=200').then(j => {
+    api('/admin/audit-log?limit=80').then(j => {
       const storage = j.storage;
       const storageNote = storage ? `<div class="admin-privacy-note" style="margin-bottom:14px">Audit storage: ${escapeHtml(storage.type)}${storage.durable ? ` · ${escapeHtml(storage.repo || '')}/${escapeHtml(storage.path || '')}` : ' · local development only'}</div>` : '';
       const entries = Array.isArray(j.entries) ? j.entries : [];
-      if (!entries.length) { host.innerHTML = storageNote + '<div class="admin-field-help">No events yet.</div>'; return; }
+      const visibleLimit = 60;
+      if (!entries.length) {
+        host.innerHTML = storageNote + '<div class="admin-field-help">No events yet.</div>';
+        refreshWorkspaceLayoutSoon();
+        return;
+      }
       const detailFor = (entry) => [entry.sections?.join(','), entry.patchKeys?.join(','), entry.section, entry.file, entry.type, entry.rowCount && `${entry.rowCount} rows`, entry.imageCount && `${entry.imageCount} images`, entry.message].filter(Boolean).join(' · ') || '—';
       const actorFor = (entry) => entry.actor?.email || entry.email || entry.actor?.name || '—';
       const actions = [...new Set(entries.map(entry => entry.action).filter(Boolean))].sort();
@@ -3091,21 +3102,26 @@
       }
       function paintAuditTable() {
         const rows = filteredEntries();
-        resultCount.textContent = `${rows.length} of ${entries.length} events shown`;
+        const visibleRows = rows.slice(0, visibleLimit);
+        const clipped = rows.length > visibleRows.length ? ` · showing first ${visibleRows.length}` : '';
+        resultCount.textContent = `${rows.length} matching ${entries.length} loaded${clipped}`;
         tableHost.innerHTML = `
-          <table class="admin-audit-table">
-            <thead><tr><th>When</th><th>Actor</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
-            <tbody>
-              ${rows.map(entry => `
-                <tr>
-                  <td class="muted">${new Date(entry.ts || entry.timestamp || entry.time || Date.now()).toLocaleString()}</td>
-                  <td class="muted">${escapeHtml(actorFor(entry))}</td>
-                  <td class="muted">${escapeHtml(entry.ip || '—')}</td>
-                  <td class="action">${escapeHtml(entry.action || 'event')}</td>
-                  <td class="muted">${escapeHtml(detailFor(entry))}</td>
-                </tr>`).join('') || '<tr><td colspan="5" class="muted">No matching audit events.</td></tr>'}
-            </tbody>
-          </table>`;
+          <div class="admin-table-scroll">
+            <table class="admin-audit-table admin-audit-table--events">
+              <thead><tr><th>When</th><th>Actor</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
+              <tbody>
+                ${visibleRows.map(entry => `
+                  <tr>
+                    <td class="muted">${new Date(entry.ts || entry.timestamp || entry.time || Date.now()).toLocaleString()}</td>
+                    <td class="muted admin-audit-actor">${escapeHtml(actorFor(entry))}</td>
+                    <td class="muted">${escapeHtml(entry.ip || '—')}</td>
+                    <td class="action">${escapeHtml(entry.action || 'event')}</td>
+                    <td class="muted admin-audit-detail">${escapeHtml(detailFor(entry))}</td>
+                  </tr>`).join('') || '<tr><td colspan="5" class="muted">No matching audit events.</td></tr>'}
+              </tbody>
+            </table>
+          </div>`;
+        refreshWorkspaceLayoutSoon();
       }
       function csvCell(value) {
         return `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -3128,7 +3144,10 @@
           .catch(e => toast('Copy failed: ' + e.message, 'error', 5000));
       });
       paintAuditTable();
-    }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`; });
+    }).catch(e => {
+      host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      refreshWorkspaceLayoutSoon();
+    });
     return host;
   }
 
@@ -3219,6 +3238,18 @@
           <td>${formatDuration(t.durationSeconds)}</td>
         </tr>`;
       }).join('');
+      const gaRows = (ga.pages || []).map(p => `<tr>
+        <td class="action">${escapeHtml(p.path)}</td>
+        <td>${formatNumber(p.pageviews)}</td>
+        <td>${formatNumber(p.activeUsers)}</td>
+        <td>${formatDuration(p.averageSessionDuration)}</td>
+      </tr>`).join('');
+      const gaTable = ga.configured && !ga.error ? `
+        <h2>Google Analytics pages</h2>
+        <table class="admin-audit-table">
+          <thead><tr><th>Path</th><th>Views</th><th>Users</th><th>Avg session</th></tr></thead>
+          <tbody>${gaRows || '<tr><td colspan="4" class="muted">No GA page data yet.</td></tr>'}</tbody>
+        </table>` : ga.error ? `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(ga.error)}</div>` : '';
 
       host.innerHTML = `
         <div class="admin-stat-grid">
@@ -3248,27 +3279,92 @@
             <div class="admin-rank-list">${pageBars || '<div class="admin-field-help">No page data yet.</div>'}</div>
           </section>
         </div>
-        ${ga.configured && !ga.error ? `<h2 style="margin-top:22px">Google Analytics pages</h2>
-        <table class="admin-audit-table">
-          <thead><tr><th>Path</th><th>Views</th><th>Users</th><th>Avg session</th></tr></thead>
-          <tbody>${(ga.pages || []).map(p => `<tr>
-            <td class="action">${escapeHtml(p.path)}</td>
-            <td>${formatNumber(p.pageviews)}</td>
-            <td>${formatNumber(p.activeUsers)}</td>
-            <td>${formatDuration(p.averageSessionDuration)}</td>
-          </tr>`).join('') || '<tr><td colspan="4" class="muted">No GA page data yet.</td></tr>'}</tbody>
-        </table>` : ga.error ? `<div class="admin-field-help" style="color:var(--danger);margin-top:12px">${escapeHtml(ga.error)}</div>` : ''}
-        <h2 style="margin-top:22px">First-party pages</h2>
-        <table class="admin-audit-table">
-          <thead><tr><th>Page</th><th>Views</th><th>Total time</th></tr></thead>
-          <tbody>${pageRows || '<tr><td colspan="3" class="muted">No page data yet.</td></tr>'}</tbody>
-        </table>
-        <h2 style="margin-top:22px">Recent days</h2>
-        <table class="admin-audit-table">
-          <thead><tr><th>Date</th><th>Views</th><th>Total time</th></tr></thead>
-          <tbody>${dayRows || '<tr><td colspan="3" class="muted">No daily data yet.</td></tr>'}</tbody>
-        </table>`;
-    }).catch(e => { host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`; });
+        <details class="admin-analytics-details">
+          <summary>Raw analytics tables</summary>
+          <div class="admin-analytics-details-body">
+            ${gaTable}
+            <h2>First-party pages</h2>
+            <table class="admin-audit-table">
+              <thead><tr><th>Page</th><th>Views</th><th>Total time</th></tr></thead>
+              <tbody>${pageRows || '<tr><td colspan="3" class="muted">No page data yet.</td></tr>'}</tbody>
+            </table>
+            <h2>Recent days</h2>
+            <table class="admin-audit-table">
+              <thead><tr><th>Date</th><th>Views</th><th>Total time</th></tr></thead>
+              <tbody>${dayRows || '<tr><td colspan="3" class="muted">No daily data yet.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </details>`;
+      refreshWorkspaceLayoutSoon();
+    }).catch(e => {
+      host.innerHTML = `<div class="admin-field-help" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      refreshWorkspaceLayoutSoon();
+    });
+    return host;
+  }
+
+  function workspacePreviewPage(tabId) {
+    if (tabId === 'jarvis' || tabId === 'history') return null;
+    if (tabId === 'announcements') return 'announcements';
+    if (tabId === 'advanced') return 'grades';
+    if (tabId === 'safety') return 'privacy';
+    return 'schedule';
+  }
+
+  function tabWorkspaceSummary(tab) {
+    const fieldCount = tab.groups.reduce((count, group) => count + (group.fields?.length || 0), 0);
+    const toolCount = tab.groups.filter(group => group.custom).length;
+    const dirtyCount = tabDirtyCount(tab);
+    const actionMap = {
+      bellSchedules: ['Schedule control', 'Change today, import a screenshot, or edit reusable bell templates.'],
+      announcements: ['Content pipeline', 'Edit public cards with preview and publish checks nearby.'],
+      appearance: ['Public shell', 'Tune the front page, navigation, imagery, and footer without hunting through raw JSON.'],
+      safety: ['Privacy desk', 'Manage public privacy copy, analytics visibility, and student-facing disclosure.'],
+      history: ['Evidence vault', 'Read audit events, backup points, and rollback context in one surface.'],
+      advanced: ['Integration bay', 'Control iframe URLs, display sizing, footer routing, and low-frequency app settings.'],
+      jarvis: ['Assistant desk', 'Draft admin changes here; public preview appears only after a schedule, site, privacy, or announcement change is staged.'],
+      site: ['Site controls', 'Review public links, launch state, and shared site behavior.']
+    };
+    const fallback = [tab.title || tab.label, tab.sub || 'Edit this section with live publish context.'];
+    const [title, detail] = actionMap[tab.id] || fallback;
+    return { title, detail, fieldCount, toolCount, dirtyCount };
+  }
+
+  function renderWorkspaceBanner(tab) {
+    const model = tabWorkspaceSummary(tab);
+    const changed = changedSections();
+    const previewPage = workspacePreviewPage(tab.id);
+    const host = document.createElement('section');
+    host.className = 'admin-workspace-banner';
+    host.innerHTML = `
+      <div class="admin-workspace-banner-copy">
+        <div class="admin-command-eyebrow">
+          <span>${escapeHtml(model.title)}</span>
+          <b>${model.dirtyCount ? `${model.dirtyCount} changed` : 'No draft changes'}</b>
+        </div>
+        <h2>${escapeHtml(tab.title || tab.label)}</h2>
+        <p>${escapeHtml(model.detail)}</p>
+      </div>
+      <div class="admin-workspace-banner-stats" aria-label="${escapeHtml(tab.label)} workspace summary">
+        <div><strong>${model.fieldCount}</strong><span>fields</span></div>
+        <div><strong>${model.toolCount}</strong><span>tools</span></div>
+        <div><strong>${changed.length}</strong><span>staged</span></div>
+      </div>
+      <div class="admin-workspace-banner-actions">
+        ${previewPage ? `<button type="button" class="admin-btn admin-btn-primary" data-workspace-preview>${ICON.eye}<span>Preview</span></button>` : ''}
+        <button type="button" class="admin-btn" data-workspace-command>${ICON.search}<span>Command</span></button>
+        <button type="button" class="admin-btn" data-workspace-refresh>${ICON.refresh}<span>Refresh</span></button>
+      </div>`;
+    host.querySelector('[data-workspace-preview]')?.addEventListener('click', () => openDraftPreview(previewPage));
+    host.querySelector('[data-workspace-command]')?.addEventListener('click', () => openCommandPalette());
+    host.querySelector('[data-workspace-refresh]')?.addEventListener('click', () => {
+      loadOpsSummary(true)
+        .then(() => {
+          toast('Workspace refreshed.', 'success', 1800);
+          renderActiveTab();
+        })
+        .catch(e => toast(e.message, 'error', 5000));
+    });
     return host;
   }
 
@@ -3283,13 +3379,28 @@
     $('#tab-sub').textContent   = tab.sub;
     const panels = $('#panels');
     panels.innerHTML = '';
-    const wideTabs = new Set(['overview', 'security', 'bellSchedules', 'announcements', 'appearance', 'safety', 'history', 'advanced']);
+    const wideTabs = new Set(['overview', 'security', 'jarvis', 'bellSchedules', 'announcements', 'appearance', 'safety', 'history', 'advanced']);
     panels.className = [
       'admin-panels',
       `admin-panels--${tab.id}`,
       wideTabs.has(tab.id) ? 'admin-panels--wide' : '',
       tab.id === 'appearance' ? 'admin-panels--appearance' : ''
     ].filter(Boolean).join(' ');
+    const workspace = document.createElement('div');
+    workspace.className = [
+      'admin-workspace',
+      `admin-workspace--${tab.id}`,
+      'admin-workspace--no-rail',
+      wideTabs.has(tab.id) ? 'admin-workspace--wide' : ''
+    ].filter(Boolean).join(' ');
+    const workspaceMain = document.createElement('div');
+    workspaceMain.className = 'admin-workspace-main';
+    workspace.appendChild(workspaceMain);
+    panels.appendChild(workspace);
+
+    if (!['overview', 'security'].includes(tab.id)) {
+      workspaceMain.appendChild(renderWorkspaceBanner(tab));
+    }
 
     const q = state.search.trim().toLowerCase();
     const matches = (label) => !q || (label || '').toLowerCase().includes(q);
@@ -3301,7 +3412,8 @@
       card.className = 'admin-card';
       if (group.custom === 'jarvisAssistant') card.classList.add('admin-card--jarvis');
       if (group.custom) card.classList.add(`admin-card--${group.custom}`);
-      if (tab.id === 'appearance') card.classList.add(`admin-appearance-card-${group.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+      if (group.title) card.classList.add(`admin-card--group-${classSlug(group.title)}`);
+      if (tab.id === 'appearance' && group.title) card.classList.add(`admin-appearance-card-${classSlug(group.title)}`);
       card.innerHTML = group.title ? `<h2>${escapeHtml(group.title)}</h2>` : '';
 
       if (group.custom === 'overviewDashboard')         { card.classList.add('admin-card--flush'); card.appendChild(renderOverviewDashboard()); anyVisible = true; }
@@ -3329,14 +3441,15 @@
         anyVisible = true;
         for (const f of visible) card.appendChild(renderField(f));
       }
-      panels.appendChild(card);
+      workspaceMain.appendChild(card);
     }
     if (!anyVisible && q) {
-      panels.innerHTML = `<div class="admin-card"><div class="admin-field-help">No fields match "${escapeHtml(q)}" on this tab. Other tabs may have matches.</div></div>`;
+      workspaceMain.innerHTML = `<div class="admin-card"><div class="admin-field-help">No fields match "${escapeHtml(q)}" on this tab. Other tabs may have matches.</div></div>`;
     }
 
     refreshDirtyMarkers();
     pushPreview();
+    scheduleWorkspaceMasonry(workspaceMain);
   }
 
   // ── Dirty / publish ────────────────────────────────────────────────────
@@ -3362,6 +3475,74 @@
   }
   function markDirty() { refreshDirtyMarkers(); }
 
+  function isAcceptableUrl(value, allowRelative = true) {
+    const raw = String(value || '').trim();
+    if (!raw) return true;
+    try {
+      const url = new URL(raw, location.origin);
+      if (!allowRelative && !/^https?:\/\//i.test(raw)) return false;
+      return ['http:', 'https:'].includes(url.protocol);
+    } catch {
+      return false;
+    }
+  }
+
+  function collectPublishIssues() {
+    const blocking = [];
+    const warnings = [];
+    const navItems = asArray(state.draft?.nav?.items);
+    navItems.forEach((item, index) => {
+      const label = String(item?.label || '').trim();
+      const href = String(item?.href || '').trim();
+      if (!label) blocking.push(`Navigation link ${index + 1} needs a label.`);
+      if (!href || href === '#') blocking.push(`Navigation link ${index + 1} needs a real URL or page path.`);
+      else if (!isAcceptableUrl(href, true)) blocking.push(`Navigation link ${index + 1} has an invalid URL.`);
+    });
+
+    const feedbackUrl = state.draft?.footer?.feedbackUrl;
+    if (feedbackUrl && !isAcceptableUrl(feedbackUrl, false)) blocking.push('Feedback URL must be a full http or https URL.');
+    const logoLink = state.draft?.branding?.logoLink;
+    if (logoLink && !isAcceptableUrl(logoLink, true)) blocking.push('Logo click-through URL is invalid.');
+    const prodIframe = String(state.draft?.grades?.iframeUrlProd || '').trim();
+    if (prodIframe && !isHttpsUrl(prodIframe)) blocking.push('GradeViewer production URL must use HTTPS.');
+
+    const override = state.draft?.scheduleOverride;
+    if (override && !override.date) blocking.push('Active schedule override needs an applies-on date.');
+    const schedules = state.draft?.bellSchedules && typeof state.draft.bellSchedules === 'object' ? state.draft.bellSchedules : {};
+    for (const [name, map] of Object.entries(schedules)) {
+      const rows = Object.entries(map || {}).map(([start, value]) => ({
+        start: Number(start),
+        end: Number(asArray(value)[0]),
+        name: String(asArray(value)[1] || '')
+      })).sort((a, b) => a.start - b.start);
+      rows.forEach((row, index) => {
+        if (!Number.isFinite(row.start) || !Number.isFinite(row.end)) blocking.push(`${name} row ${index + 1} has an invalid time.`);
+        if (row.end <= row.start) blocking.push(`${name} row ${index + 1} ends before it starts.`);
+        if (!row.name.trim()) warnings.push(`${name} row ${index + 1} has no period name.`);
+        const previous = rows[index - 1];
+        if (previous && row.start < previous.end) blocking.push(`${name} row ${index + 1} overlaps the previous period.`);
+      });
+    }
+
+    const paragraphs = asArray(state.draft?.gradeMelon?.privacyParagraphs).map(p => String(p || '').trim()).filter(Boolean);
+    if (!paragraphs.length) warnings.push('Privacy modal has no explanatory paragraph.');
+    if (normalizedSiteStatus().mode === 'maintenance') warnings.push('Publishing now will show the maintenance page to public visitors.');
+    return { blocking, warnings };
+  }
+
+  function confirmPublishReview() {
+    const issues = collectPublishIssues();
+    if (issues.blocking.length) {
+      alert(`Fix before publishing:\n\n${issues.blocking.slice(0, 8).join('\n')}`);
+      toast('Publish blocked by validation.', 'error', 4200);
+      return false;
+    }
+    if (issues.warnings.length) {
+      return confirm(`Publish with these warnings?\n\n${issues.warnings.slice(0, 8).join('\n')}`);
+    }
+    return true;
+  }
+
   $('#discard-btn').addEventListener('click', () => {
     state.draft = deepClone(state.settings);
     renderActiveTab();
@@ -3372,13 +3553,9 @@
     const btn = $('#publish-btn');
     btn.disabled = true; btn.textContent = 'Publishing...';
     try {
-      const patch = {};
-      const keys = new Set([...Object.keys(state.settings), ...Object.keys(state.draft)]);
-      for (const k of keys) {
-        if (k === 'updatedAt') continue;
-        if (!eq(state.settings[k], state.draft[k])) patch[k] = state.draft[k];
-      }
+      const patch = buildSettingsPatch(opts.onlyKeys || null);
       if (!Object.keys(patch).length) { toast('Nothing to publish'); return; }
+      if (!confirmPublishReview()) return;
       const json = await api('/site-settings', { method: 'PUT', body: JSON.stringify({ patch, source }) });
       state.settings = json.settings;
       state.draft = deepClone(json.settings);
@@ -3435,15 +3612,130 @@
     }
   }
 
+  function commandEntries() {
+    const entries = [];
+    for (const tab of SCHEMA) {
+      entries.push({ tab: tab.id, type: 'Tab', title: tab.label, detail: tab.sub || tab.title || tab.label, query: '' });
+      for (const group of tab.groups || []) {
+        const title = group.title || (group.custom ? group.custom.replace(/([A-Z])/g, ' $1').trim() : '');
+        if (title) entries.push({ tab: tab.id, type: 'Panel', title, detail: `${tab.label} panel`, query: title, targetClass: group.custom ? `admin-card--${group.custom}` : `admin-card--group-${classSlug(group.title)}` });
+        for (const field of group.fields || []) {
+          entries.push({ tab: tab.id, type: 'Field', title: field.label, detail: `${tab.label} · ${field.path}`, query: field.label, fieldPath: field.path });
+        }
+      }
+    }
+    return entries;
+  }
+
+  function ensureCommandPalette() {
+    let palette = $('#admin-command-palette');
+    if (palette) return palette;
+    palette = document.createElement('div');
+    palette.id = 'admin-command-palette';
+    palette.className = 'admin-command-palette';
+    palette.setAttribute('aria-hidden', 'true');
+    palette.innerHTML = `
+      <div class="admin-command-dialog" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="admin-command-search">
+          ${ICON.search}
+          <input id="admin-command-input" type="search" autocomplete="off" placeholder="Jump to a tab, panel, or field">
+        </div>
+        <div id="admin-command-results" class="admin-command-results"></div>
+      </div>`;
+    palette.addEventListener('click', event => {
+      if (event.target === palette) closeCommandPalette();
+    });
+    document.body.appendChild(palette);
+    return palette;
+  }
+
+  function closeCommandPalette() {
+    const palette = $('#admin-command-palette');
+    if (!palette) return;
+    palette.classList.remove('open');
+    palette.setAttribute('aria-hidden', 'true');
+  }
+
+  function openCommandPalette(query = '') {
+    const palette = ensureCommandPalette();
+    const input = $('#admin-command-input', palette);
+    palette.classList.add('open');
+    palette.setAttribute('aria-hidden', 'false');
+    input.value = query;
+    paintCommandPalette();
+    requestAnimationFrame(() => input.focus());
+  }
+
+  function runCommandEntry(index) {
+    const palette = ensureCommandPalette();
+    const row = $$('[data-command-index]', palette)[index] || $('[data-command-index]', palette);
+    if (!row) return;
+    const entry = commandEntries()[Number(row.dataset.commandIndex)];
+    if (!entry) return;
+    state.search = '';
+    const searchInput = $('#search-input');
+    if (searchInput) searchInput.value = '';
+    goTab(entry.tab);
+    closeCommandPalette();
+    requestAnimationFrame(() => {
+      const target = entry.fieldPath
+        ? document.getElementById(fieldElementId(entry.fieldPath))?.closest('.admin-field')
+        : entry.targetClass
+          ? document.querySelector(`.${entry.targetClass}`)
+          : null;
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (entry.fieldPath) document.getElementById(fieldElementId(entry.fieldPath))?.focus({ preventScroll: true });
+    });
+  }
+
+  function paintCommandPalette() {
+    const palette = ensureCommandPalette();
+    const input = $('#admin-command-input', palette);
+    const results = $('#admin-command-results', palette);
+    const query = String(input.value || '').trim().toLowerCase();
+    const entries = commandEntries();
+    const scored = entries
+      .map((entry, index) => ({ entry, index, text: `${entry.type} ${entry.title} ${entry.detail}`.toLowerCase() }))
+      .filter(row => !query || row.text.includes(query))
+      .slice(0, 12);
+    results.innerHTML = scored.map((row, position) => `
+      <button type="button" class="admin-command-row ${position === 0 ? 'active' : ''}" data-command-index="${row.index}">
+        <span>${escapeHtml(row.entry.type)}</span>
+        <strong>${escapeHtml(row.entry.title)}</strong>
+        <small>${escapeHtml(row.entry.detail)}</small>
+      </button>`).join('') || '<div class="admin-command-empty">No matching admin command.</div>';
+    $$('[data-command-index]', results).forEach((btn, position) => {
+      btn.addEventListener('click', () => runCommandEntry(position));
+    });
+  }
+
   $('#sidebar-collapse-btn')?.addEventListener('click', toggleDesktopSidebar);
+  $('#theme-toggle-btn')?.addEventListener('click', toggleThemePreference);
   $('#mobile-sidebar-toggle')?.addEventListener('click', toggleMobileSidebar);
   $('#sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
   window.addEventListener('resize', () => {
     if (!isMobileSidebarMode()) closeMobileSidebar();
     syncSidebarState();
+    scheduleWorkspaceMasonry();
   });
   window.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeMobileSidebar();
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+      return;
+    }
+    if (e.key === 'Escape') {
+      closeCommandPalette();
+      closeMobileSidebar();
+    }
+    const palette = $('#admin-command-palette');
+    if (palette?.classList.contains('open') && e.key === 'Enter') {
+      e.preventDefault();
+      runCommandEntry(0);
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target?.id === 'admin-command-input') paintCommandPalette();
   });
 
   // ── Search ─────────────────────────────────────────────────────────────
@@ -3478,7 +3770,12 @@
     }
   }
   function previewPagePath() {
-    return 'index.html';
+    return ({
+      schedule: 'index.html',
+      announcements: 'announcements.html',
+      grades: 'gradeviewer.html',
+      privacy: 'privacy.html'
+    })[state.previewPage] || 'index.html';
   }
   function buildPreviewUrl() {
     const ts = Date.now();
@@ -3489,6 +3786,7 @@
   }
   function refreshPreview() {
     _previewReady = false;
+    $('#preview-host')?.classList.toggle('preview-mobile', state.previewSize === 'mobile');
     $('#preview-frame').src = buildPreviewUrl();
     paintPreviewBar();
   }
@@ -3508,16 +3806,37 @@
     $('#preview-mode-pill').className = 'mode-pill' + (state.previewMode === 'draft' ? ' draft' : '');
     $('#preview-mode-pill').textContent = state.previewMode === 'draft' ? 'Showing draft (un-published)' : 'Showing published version';
     $$('#preview-mode-seg button').forEach(b => b.classList.toggle('active', b.dataset.mode === state.previewMode));
+    $$('#preview-page-seg button').forEach(b => b.classList.toggle('active', b.dataset.previewPage === state.previewPage));
+    $$('#preview-size-seg button').forEach(b => b.classList.toggle('active', b.dataset.previewSize === state.previewSize));
   }
-  function openDraftPreview() {
+  function previewPageForActiveTab() {
+    if (state.activeTab === 'announcements') return 'announcements';
+    if (state.activeTab === 'advanced') return 'grades';
+    if (state.activeTab === 'safety') return 'privacy';
+    return 'schedule';
+  }
+  function openDraftPreview(page, opts = {}) {
     $('#preview-host').classList.add('open');
     state.previewMode = 'draft';
+    if (page) state.previewPage = page;
+    else if (opts.fromActiveTab) state.previewPage = previewPageForActiveTab();
+    try { localStorage.setItem(PREVIEW_PAGE_KEY, state.previewPage); } catch {}
     refreshPreview();
   }
-  $('#open-preview-btn').addEventListener('click', openDraftPreview);
+  $('#open-preview-btn').addEventListener('click', () => openDraftPreview());
   $('#preview-close-btn').addEventListener('click', () => { $('#preview-host').classList.remove('open'); });
   $('#preview-refresh-btn').addEventListener('click', refreshPreview);
   $$('#preview-mode-seg button').forEach(b => b.addEventListener('click', () => { state.previewMode = b.dataset.mode; refreshPreview(); }));
+  $$('#preview-page-seg button').forEach(b => b.addEventListener('click', () => {
+    state.previewPage = b.dataset.previewPage || 'schedule';
+    try { localStorage.setItem(PREVIEW_PAGE_KEY, state.previewPage); } catch {}
+    refreshPreview();
+  }));
+  $$('#preview-size-seg button').forEach(b => b.addEventListener('click', () => {
+    state.previewSize = b.dataset.previewSize === 'mobile' ? 'mobile' : 'desktop';
+    try { localStorage.setItem(PREVIEW_SIZE_KEY, state.previewSize); } catch {}
+    refreshPreview();
+  }));
 
   // Iframe signals readiness; we then immediately push the draft.
   window.addEventListener('message', (e) => {
@@ -3530,6 +3849,7 @@
   });
 
   // ── Init ───────────────────────────────────────────────────────────────
+  syncThemePreference();
   restoreBearerSession();
   if (isLocal || isBackendHostedAdmin || state.token) bootApp(); else showLogin();
   if (!isLocal) loadAuthConfig();
