@@ -23,6 +23,10 @@
   const CACHE_TTL_MS = 60 * 1000;
   const SETTINGS_FETCH_TIMEOUT_MS = 4500;
   const BACKEND_RETRY_MAX_MS = 60000;
+  const TRUSTED_PREVIEW_PARENT_ORIGINS = new Set([
+    'https://phs-grades-backend.onrender.com',
+    'https://poolesville.web.app'
+  ]);
   let backendRetryAt = 0;
   let backendBackoffMs = 0;
   const isPreviewIframe = (() => {
@@ -72,6 +76,33 @@
       return '#' + raw.slice(1).split('').map(ch => ch + ch).join('').toUpperCase();
     }
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw) ? raw.toUpperCase() : null;
+  }
+  function isLoopbackHostname(hostname) {
+    return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(hostname);
+  }
+  function isAllowedPreviewParentOrigin(origin) {
+    try {
+      const url = new URL(origin);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+      if (url.origin === location.origin) return true;
+      if (TRUSTED_PREVIEW_PARENT_ORIGINS.has(url.origin)) return true;
+      return isLoopbackHostname(url.hostname);
+    } catch {
+      return false;
+    }
+  }
+  function previewParentOrigin() {
+    try {
+      const ancestor = window.location.ancestorOrigins?.[0];
+      if (ancestor && isAllowedPreviewParentOrigin(ancestor)) return ancestor;
+    } catch {}
+    try {
+      if (document.referrer) {
+        const origin = new URL(document.referrer).origin;
+        if (isAllowedPreviewParentOrigin(origin)) return origin;
+      }
+    } catch {}
+    return null;
   }
   function cleanStatusText(value, fallback, max) {
     const text = String(value || '').replace(/\s+/g, ' ').trim();
@@ -306,6 +337,7 @@
     if (!e.data || e.data.type !== 'phs:preview-settings') return;
     if (!isPreviewIframe) return; // never accept overrides on the live site
     if (e.source !== window.parent) return;
+    if (!isAllowedPreviewParentOrigin(e.origin)) return;
     const s = e.data.settings;
     if (s && typeof s === 'object') {
       window.__SITE_SETTINGS__ = s;
@@ -315,7 +347,8 @@
 
   // Tell parent we're ready to receive (admin side waits for this signal).
   if (isPreviewIframe && window.parent !== window) {
-    window.parent.postMessage({ type: 'phs:preview-ready' }, '*');
+    const parentOrigin = previewParentOrigin();
+    if (parentOrigin) window.parent.postMessage({ type: 'phs:preview-ready' }, parentOrigin);
   }
 
   // Admin shortcut: Ctrl+Shift+A on any public page opens the admin tab.

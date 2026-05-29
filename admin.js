@@ -3756,18 +3756,27 @@
   // Mode 'draft' → load page with ?_preview, then postMessage draft into it.
   // Mode 'live'  → load page without ?_preview so it fetches the published version.
   let _previewReady = false;
+  const TRUSTED_PUBLIC_PREVIEW_HOSTS = new Set(['poolesville.web.app']);
+  function isLoopbackHostname(hostname) {
+    return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(hostname);
+  }
+  function isAllowedPublicPreviewUrl(url) {
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    return TRUSTED_PUBLIC_PREVIEW_HOSTS.has(url.hostname) || (isLocal && isLoopbackHostname(url.hostname));
+  }
   function publicPreviewBase() {
-    const configured = state.authConfig?.publicSiteUrl || 'https://poolesville.web.app';
-    try {
-      const url = new URL(configured);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('bad protocol');
-      url.pathname = url.pathname.replace(/\/?$/, '/');
-      url.search = '';
-      url.hash = '';
-      return url;
-    } catch {
-      return new URL('https://poolesville.web.app/');
+    const candidates = [state.authConfig?.publicSiteUrl, isLocal ? location.origin : '', 'https://poolesville.web.app'];
+    for (const candidate of candidates) {
+      try {
+        const url = new URL(candidate);
+        if (!isAllowedPublicPreviewUrl(url)) continue;
+        url.pathname = url.pathname.replace(/\/?$/, '/');
+        url.search = '';
+        url.hash = '';
+        return url;
+      } catch {}
     }
+    return new URL('https://poolesville.web.app/');
   }
   function previewPagePath() {
     return ({
@@ -3790,17 +3799,23 @@
     $('#preview-frame').src = buildPreviewUrl();
     paintPreviewBar();
   }
-  function pushPreview() {
+  function pushPreview(options = {}) {
     if (!$('#preview-host').classList.contains('open')) return;
     if (state.previewMode !== 'draft') return;
-    if (!_previewReady) return;
+    if (options.requireReady !== false && !_previewReady) return;
+    const targetOrigin = previewOrigin();
+    if (!targetOrigin) return;
     try {
-      $('#preview-frame').contentWindow.postMessage({ type: 'phs:preview-settings', settings: state.draft }, previewOrigin());
+      $('#preview-frame').contentWindow.postMessage({ type: 'phs:preview-settings', settings: state.draft }, targetOrigin);
     } catch {}
   }
   function previewOrigin() {
-    try { return new URL($('#preview-frame').src, location.href).origin; }
-    catch { return location.origin; }
+    try {
+      const url = new URL($('#preview-frame').src, location.href);
+      return isAllowedPublicPreviewUrl(url) ? url.origin : null;
+    } catch {
+      return null;
+    }
   }
   function paintPreviewBar() {
     $('#preview-mode-pill').className = 'mode-pill' + (state.previewMode === 'draft' ? ' draft' : '');
@@ -3840,12 +3855,17 @@
 
   // Iframe signals readiness; we then immediately push the draft.
   window.addEventListener('message', (e) => {
+    const targetOrigin = previewOrigin();
+    if (!targetOrigin) return;
     if (e.source !== $('#preview-frame')?.contentWindow) return;
-    if (e.origin !== previewOrigin()) return;
+    if (e.origin !== targetOrigin) return;
     if (e.data?.type === 'phs:preview-ready') {
       _previewReady = true;
       pushPreview();
     }
+  });
+  $('#preview-frame')?.addEventListener('load', () => {
+    if (state.previewMode === 'draft') setTimeout(() => pushPreview({ requireReady: false }), 100);
   });
 
   // ── Init ───────────────────────────────────────────────────────────────
