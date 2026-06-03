@@ -1189,8 +1189,13 @@ function _analyticsDeviceType() {
   return 'desktop';
 }
 
+function _analyticsEndpoint() {
+  return _isLocalhost() ? '/analytics/event' : `${_BACKEND_URL}/analytics/event`;
+}
+
 function _sendAnalyticsEvent(payload) {
   if (new URLSearchParams(location.search).has('_preview')) return;
+  const endpoint = _analyticsEndpoint();
   const body = JSON.stringify({
     page: _analyticsPageName(),
     device: _analyticsDeviceType(),
@@ -1198,12 +1203,12 @@ function _sendAnalyticsEvent(payload) {
   });
   try {
     if (navigator.sendBeacon) {
-      const ok = navigator.sendBeacon('/analytics/event', new Blob([body], { type: 'application/json' }));
+      const ok = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
       if (ok) return;
     }
   } catch {}
   try {
-    fetch('/analytics/event', {
+    fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
