@@ -1,7 +1,5 @@
 temp_zip_extract/
-.claude/
 .agents/
-.codex-tmp/
 .obsidian/
 .superpowers/
 *.zip
@@ -21,5 +19,4 @@ lunch-food-taxonomy-backup.md
 backups/
 .supply-chain-risk-auditor/
 .hallmark/
-.codex-*
 .release-*
