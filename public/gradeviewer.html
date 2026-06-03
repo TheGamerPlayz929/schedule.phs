@@ -154,7 +154,7 @@
 
   <main class="hero hero--compact">
     <div class="hero-title-wrapper fade-up" style="--stagger: 1">
-      <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.gradesPageTitle">Grades</h1>
+      <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.gradesPageTitle" data-studio-key="gradesTitle" data-text-style="gradesTitle" data-studio-label="Grades page title" data-studio-paths="hero.gradesPageTitle,appearance.textStyles.targets.gradesTitle">Grades</h1>
     </div>
   </main>
 
@@ -162,6 +162,9 @@
     <div class="grades-scaler" id="grades-scaler">
       <iframe
         id="grades-frame"
+        data-studio-key="gradesFrame"
+        data-studio-label="GradeViewer embed"
+        data-studio-paths="grades.iframeUrlLocal,grades.iframeUrlProd,gradeMelon.embedUrl"
         src="about:blank"
         scrolling="yes"
         allowtransparency="true"

@@ -27,6 +27,7 @@
   "hero": {
     "schedulePageEyebrow": "We're in",
     "schedulePageStatusFallback": "Loading...",
+    "noSchoolStatusText": "No School",
     "announcementsPageTitle": "Announcements",
     "gradesPageTitle": "Grades"
   },
@@ -65,14 +66,18 @@
     "periodCardPadding": 16,
     "periodCardRadius": 12,
     "footerSize": 12,
-    "footerColor": "#a7abbf"
+    "footerColor": "#a7abbf",
+    "textStyles": {
+      "version": 1,
+      "targets": {}
+    }
   },
   "announcements": {
     "items": [
       {
-        "title": "Certificate",
+        "title": "Website Link",
         "bullets": [
-          "Certificate of Authenticity: The new website link is the one you are currently on."
+          "Use poolesville.web.app if available! MCPS approval pending for chromebooks. "
         ]
       },
       {
@@ -80,23 +85,38 @@
         "bullets": [
           "Hello everyone!",
           "This website was designed in response to the inconveniences students face with modern applications.",
-          "Working on importing GradeViewer™ for more ease of access."
+          "GradeViewer™ has been embedded. "
         ]
       }
     ]
   },
-  "bellSchedules": {},
+  "privacy": {
+    "faqTitle": "Privacy & Safety FAQ",
+    "faqBody": "Your StudentVue credentials are sent directly from your browser to your school district's servers. They are never stored or logged on this site."
+  },
+  "bellSchedules": {
+    "_dateOverrides": {
+      "2026-06-03": "Advisory"
+    }
+  },
+  "scheduleRules": [],
   "gradeMelon": {
     "privacyButtonLabel": "Privacy & Safety FAQ",
     "privacyTitle": "Privacy & Safety FAQ",
     "privacyDoneLabel": "Done",
-    "privacyParagraphs": []
+    "privacyParagraphs": [
+      "GradeViewer pages may open embedded school tools; this site shows only the information you choose to view and does not sell personal data. For support or removal requests, use the contact emails shown in the footer."
+    ]
   },
   "siteStatus": {
     "mode": "live",
     "title": "Site paused for maintenance",
     "message": "Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon."
   },
-  "scheduleOverride": null,
-  "updatedAt": 1779365969567
+  "scheduleOverride": {
+    "type": "Advisory",
+    "date": "2026-06-03",
+    "timestamp": 1780491581177
+  },
+  "updatedAt": 1780491583766
 }

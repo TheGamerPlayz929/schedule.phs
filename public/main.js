@@ -16,12 +16,20 @@ let _overrideInterval = null;
 
 /* --- Admin time override (localhost only) --- */
 let _timeOffsetSeconds = 0; // added to real time
+let _heroSettings = {}; // populated from site-settings:applied, used for editable status text
 let _devScheduleType = null;
 
 /* --- Schedule override (set by admin panel, synced from backend) --- */
 let _scheduleOverride = null; // { type: string, timestamp: number, date: string } | null
 let _clockTimerId = null;
 let _clockTickMs = 0;
+const renderState = {
+  lastHm: '',
+  lastS: '',
+  lastPeriodCount: -1,
+  lastSignedTitle: '',
+  lastSignedEyebrow: ''
+};
 
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
@@ -71,6 +79,7 @@ const _BACKEND_URL = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(loc
   ? location.origin
   : 'https://phs-grades-backend.onrender.com';
 const _IS_ADMIN_PREVIEW = new URLSearchParams(location.search).has('_preview');
+const _IS_STUDIO_PREVIEW = new URLSearchParams(location.search).has('_studio');
 
 function _isScheduleEntry(entry) {
   return Array.isArray(entry)
@@ -90,7 +99,7 @@ let _siteViewScroll = { announcements: 0, schedule: 0, grades: 0 };
 let _gradesFrame = null;
 let _gradesScaler = null;
 let _gradesFrameUrlLocked = false;
-let _gradesFrameApplyToken = 0;
+let _gradesFrameApplyGeneration = 0;
 let _gradesFrameSizeRaf = 0;
 let _gradesFrameBridgeReady = false;
 let _gradesIsFullscreen = false;
@@ -110,6 +119,7 @@ let _weatherPayload = null;
 let _weatherLoading = false;
 let _weatherVisible = false;
 let _weatherRetryAt = 0;
+let _lunchWeatherInterval = null;
 let _overrideFailureCount = 0;
 let _overrideRetryAt = 0;
 const _periodEntryCache = new WeakMap();
@@ -174,8 +184,18 @@ function _dateToISODate(d) {
   return `${y}-${m}-${day}`;
 }
 
+function _currentScheduleDate() {
+  const previewISO = window.__PHS_PREVIEW_DATE__;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(previewISO || ''))) {
+    const [y, m, d] = String(previewISO).split('-').map(Number);
+    const now = new Date();
+    return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+  }
+  return new Date();
+}
+
 function _todayISODate() {
-  return _dateToISODate(new Date());
+  return _dateToISODate(_currentScheduleDate());
 }
 
 function _timestampToISODate(timestamp) {
@@ -195,6 +215,19 @@ function _normalizeScheduleOverride(override) {
   return _overrideAppliesToday(override) ? override : null;
 }
 
+function _plannedScheduleOverrides() {
+  const map = window.__SITE_SETTINGS__?.bellSchedules?._dateOverrides
+    || window.__SITE_SETTINGS__?.scheduleOverride?.dateOverrides
+    || {};
+  return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+}
+
+function _plannedOverrideForDate(date) {
+  const iso = _dateToISODate(date);
+  const type = _plannedScheduleOverrides()[iso];
+  return type ? { type, date: iso, planned: true } : null;
+}
+
 function _writeStoredScheduleOverride(override) {
   try {
     localStorage.setItem('phs_schedule_override', JSON.stringify({ ...override, fetchedAt: Date.now() }));
@@ -202,7 +235,7 @@ function _writeStoredScheduleOverride(override) {
 }
 
 function _readSettingsScheduleOverride() {
-  return _normalizeScheduleOverride(window.__SITE_SETTINGS__?.scheduleOverride || null);
+  return _normalizeScheduleOverride(window.__SITE_SETTINGS__?.scheduleOverride || null) || _plannedOverrideForDate(_currentScheduleDate());
 }
 
 function _readStoredScheduleOverride() {
@@ -265,9 +298,41 @@ function _startOfDay(date) {
 }
 
 function _getScheduleDataForDate(date) {
+  const baseEntry = _defaultScheduleDataForDate(date);
+  const resolved = window.PhsScheduleResolver?.resolveScheduleType
+    ? window.PhsScheduleResolver.resolveScheduleType(date, window.__SITE_SETTINGS__ || {}, baseEntry?.[0] || '')
+    : { type: _plannedOverrideForDate(date)?.type || baseEntry?.[0] || '', source: _plannedOverrideForDate(date) ? 'manual' : 'default' };
+  if (resolved?.type && resolved.source !== 'default') {
+    const template = window.__SITE_SETTINGS__?.bellSchedules?.[resolved.type];
+    if (template && typeof template === 'object' && !Array.isArray(template) && Object.keys(template).length) {
+      return [resolved.type, template];
+    }
+    if (_isNonInstructionalSchedule(resolved.type)) return [resolved.type, {}];
+    const matching = Object.values(data || {}).find(entry => Array.isArray(entry) && entry[0] === resolved.type);
+    if (matching) return matching;
+    return [resolved.type, baseEntry?.[1] || {}];
+  }
+  return baseEntry;
+}
+
+function _defaultScheduleDataForDate(date) {
   const key = _scheduleKeyForDate(date);
   if (key in data) return data[key];
   return _isWeekendDate(date) ? ['No School', {}] : data.base;
+}
+
+function _escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
+function _renderScheduleDifferenceBanner(date) {
+  document.getElementById('schedule-difference-banner')?.remove();
 }
 
 function _getPeriodEntries(periods) {
@@ -347,27 +412,27 @@ function _setTimerSurfaceVisible(visible) {
 }
 
 function _clearCountdownDisplay() {
-  if (_hmEl) _hmEl.textContent = '';
-  if (_sEl) _sEl.textContent = '';
-  _lastHm = '';
-  _lastS = '';
+  if (domRefs.hmEl) domRefs.hmEl.textContent = '';
+  if (domRefs.sEl) domRefs.sEl.textContent = '';
+  renderState.lastHm = '';
+  renderState.lastS = '';
 }
 
 function _prepareCountdownDisplay() {
-  if (_hmEl) {
-    Array.from(_hmEl.childNodes)
+  if (domRefs.hmEl) {
+    Array.from(domRefs.hmEl.childNodes)
       .filter(n => n.nodeType === Node.TEXT_NODE)
       .forEach(n => n.remove());
-    if (!_hmEl.querySelector('.cd-min-label')) {
+    if (!domRefs.hmEl.querySelector('.cd-min-label')) {
       const label = document.createElement('span');
       label.className = 'cd-min-label';
       label.textContent = 'm';
-      _hmEl.appendChild(label);
+      domRefs.hmEl.appendChild(label);
     }
   }
-  if (_sEl) _sEl.textContent = '';
-  _lastHm = '';
-  _lastS = '';
+  if (domRefs.sEl) domRefs.sEl.textContent = '';
+  renderState.lastHm = '';
+  renderState.lastS = '';
 }
 
 function _readScheduleDataCache() {
@@ -848,9 +913,14 @@ function _initLunchWeather() {
   _weatherHours = document.getElementById('lunch-weather-hours');
   _weatherMeta = document.getElementById('lunch-weather-meta');
   _syncLunchWeatherVisibility();
-  setInterval(() => {
+  if (_lunchWeatherInterval) clearInterval(_lunchWeatherInterval);
+  _lunchWeatherInterval = setInterval(() => {
     if (document.visibilityState === 'visible') _loadLunchWeather();
   }, LUNCH_WEATHER_CACHE_TTL_MS);
+  window.addEventListener('pagehide', () => {
+    if (_lunchWeatherInterval) clearInterval(_lunchWeatherInterval);
+    _lunchWeatherInterval = null;
+  }, { once: true });
 }
 
 function _updateLunchWeatherMode() {
@@ -922,6 +992,7 @@ function _navHrefKind(href) {
   if (!href) return '';
   try {
     const url = new URL(href, location.href);
+    if (url.origin !== location.origin) return '';
     const path = url.pathname;
     if (/\/announcements\.html?$/i.test(path)) return 'announcements';
     if (/\/(?:gradeviewer|grademelon)(?:\.html?)?\/?$/i.test(path)) return 'grades';
@@ -935,6 +1006,8 @@ function _navHrefKind(href) {
 }
 
 function _viewFromLocation() {
+  const requested = (new URLSearchParams(location.search).get('_view') || location.hash.replace(/^#/, '') || '').toLowerCase();
+  if (requested === 'announcements' || requested === 'grades' || requested === 'schedule') return requested;
   const kind = _navHrefKind(location.pathname);
   return kind === 'announcements' || kind === 'grades' ? kind : 'schedule';
 }
@@ -1050,25 +1123,42 @@ function _escapeHtml(value) {
   }[char]));
 }
 
+function _setStyledText(el, target, text) {
+  if (!el) return;
+  if (window.PhsTextStyle?.setText) window.PhsTextStyle.setText(el, target, text);
+  else el.textContent = String(text ?? '');
+}
+
+function _hasTextStyleRuns(target) {
+  return Boolean(window.PhsTextStyle?.hasLetterStyles?.(target));
+}
+
 function _renderAnnouncements(settings) {
   const list = document.getElementById('announcements-list');
   if (!list) return;
   const configured = settings?.announcements?.items;
-  const items = Array.isArray(configured) && configured.length
+  const sourceItems = Array.isArray(configured) && configured.length
     ? configured
     : FALLBACK_ANNOUNCEMENTS.announcements.items;
+  const today = _todayISODate();
+  const items = sourceItems.map((item, index) => ({ item, index })).filter(({ item }) => {
+    const showFrom = String(item.showFrom || '').trim();
+    const expiresOn = String(item.expiresOn || '').trim();
+    return (!showFrom || today >= showFrom) && (!expiresOn || today <= expiresOn);
+  });
   if (!items.length) {
     list.innerHTML = '<div class="announcements-empty">No announcements yet.</div>';
     return;
   }
-  list.innerHTML = items.map(item => {
+  list.innerHTML = items.map(({ item, index }) => {
     const bulletItems = Array.isArray(item.bullets) ? item.bullets : [];
-    const bullets = bulletItems.map(bullet => `<li>${_escapeHtml(bullet)}</li>`).join('');
-    return `<div class="announcement-card">
-      <div class="announcement-title">${_escapeHtml(item.title || '')}</div>
+    const bullets = bulletItems.map((bullet, bulletIndex) => `<li data-studio-key="announcementBullet" data-text-style="announcementBullet" data-studio-label="Announcement ${index + 1} bullet ${bulletIndex + 1}" data-studio-paths="announcements.items,appearance.textStyles.targets.announcementBullet" data-studio-text-path="announcements.items.${index}.bullets.${bulletIndex}">${_escapeHtml(bullet)}</li>`).join('');
+    return `<div class="announcement-card" data-studio-key="announcementCard" data-studio-label="Announcement ${index + 1} card" data-studio-paths="announcements.items">
+      <div class="announcement-title" data-studio-key="announcementTitle" data-text-style="announcementTitle" data-studio-label="Announcement ${index + 1} title" data-studio-paths="announcements.items,appearance.textStyles.targets.announcementTitle" data-studio-text-path="announcements.items.${index}.title">${_escapeHtml(item.title || '')}</div>
       <div class="announcement-content"><ul>${bullets}</ul></div>
     </div>`;
   }).join('');
+  window.PhsTextStyle?.applyAll?.(list);
 }
 
 function _initAnnouncementsView() {
@@ -1083,6 +1173,61 @@ function _initAnnouncementsView() {
   }, 2500);
 }
 
+function _analyticsPageName() {
+  const path = location.pathname.toLowerCase();
+  const hash = location.hash.toLowerCase();
+  if (path.includes('announcement') || hash.includes('announcement')) return 'announcements';
+  if (path.includes('grade') || hash.includes('grade')) return 'grades';
+  if (path.includes('privacy') || hash.includes('privacy')) return 'privacy';
+  return 'schedule';
+}
+
+function _analyticsDeviceType() {
+  const width = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+  if (width < 760) return 'mobile';
+  if (width < 1100) return 'tablet';
+  return 'desktop';
+}
+
+function _sendAnalyticsEvent(payload) {
+  if (new URLSearchParams(location.search).has('_preview')) return;
+  const body = JSON.stringify({
+    page: _analyticsPageName(),
+    device: _analyticsDeviceType(),
+    ...payload
+  });
+  try {
+    if (navigator.sendBeacon) {
+      const ok = navigator.sendBeacon('/analytics/event', new Blob([body], { type: 'application/json' }));
+      if (ok) return;
+    }
+  } catch {}
+  try {
+    fetch('/analytics/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+}
+
+function _initFirstPartyAnalytics() {
+  if (new URLSearchParams(location.search).has('_preview')) return;
+  const start = Date.now();
+  let sentDuration = false;
+  _sendAnalyticsEvent({ type: 'view' });
+  const sendDuration = () => {
+    if (sentDuration) return;
+    sentDuration = true;
+    _sendAnalyticsEvent({ type: 'duration', durationSeconds: Math.max(1, Math.round((Date.now() - start) / 1000)) });
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') sendDuration();
+  });
+  window.addEventListener('pagehide', sendDuration);
+}
+
 function _ensureGradesFrame() {
   _gradesFrame = _gradesFrame || document.getElementById('grades-frame');
   _gradesScaler = _gradesScaler || document.getElementById('grades-scaler');
@@ -1094,13 +1239,13 @@ function _ensureGradesFrame() {
 
 async function _applyGradesFrameUrl(settings) {
   if (_gradesFrameUrlLocked || !_gradesFrame) return;
-  const token = ++_gradesFrameApplyToken;
+  const applyGeneration = ++_gradesFrameApplyGeneration;
   const localUrl = settings?.grades?.iframeUrlLocal || (_isLocalhost() ? GRADEVIEWER_DEFAULT_LOCAL_URL : '');
   const prodUrl = _withGradeViewerEmbedVersion(settings?.grades?.iframeUrlProd || GRADEVIEWER_DEFAULT_PROD_URL);
   let url = _safeFrameUrl(_isLocalhost() ? localUrl : prodUrl);
   if (_isLocalhost() && (!localUrl || !(await _localGradeMelonAvailable()))) url = prodUrl;
   url = _safeFrameUrl(url);
-  if (token !== _gradesFrameApplyToken || _gradesFrameUrlLocked) return;
+  if (applyGeneration !== _gradesFrameApplyGeneration || _gradesFrameUrlLocked) return;
   if (url && !_urlsEqual(_gradesFrame.src, url)) {
     _gradesFrame.src = url;
     _gradesFrameUrlLocked = true;
@@ -1264,6 +1409,9 @@ function _setAdminStatus(text) {
 
 function _initAdminPanel() {
   if (!_isLocalhost()) return;
+  // In Theme Studio preview we KEEP the dev clock — it's how you simulate a school
+  // day / time so the ring, periods, and in-session states actually appear to style.
+  // It's docked bottom-right + dimmed via .phs-studio-preview CSS so it stays out of the way.
   if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && !location.pathname.endsWith('/')) return;
 
   const panel = document.createElement('div');
@@ -1325,6 +1473,7 @@ function _initAdminPanel() {
   adminCollapse.addEventListener('click', () => setAdminCollapsed(!collapsed));
   window.addEventListener('resize', collapseAdminOnCompactViewport);
   collapseAdminOnCompactViewport();
+  if (_IS_STUDIO_PREVIEW) setAdminCollapsed(true);
 
   const ampmBtn = document.getElementById('admin-ampm');
   ampmBtn.addEventListener('click', () => {
@@ -1333,9 +1482,9 @@ function _initAdminPanel() {
   });
 
   document.getElementById('admin-apply').addEventListener('click', () => {
-    let h = parseInt(document.getElementById('admin-h').value) || 12;
-    const m = parseInt(document.getElementById('admin-m').value) || 0;
-    const s = parseInt(document.getElementById('admin-s').value) || 0;
+    let h = parseInt(document.getElementById('admin-h').value, 10) || 12;
+    const m = parseInt(document.getElementById('admin-m').value, 10) || 0;
+    const s = parseInt(document.getElementById('admin-s').value, 10) || 0;
     const isPM = ampmBtn.textContent === 'PM';
     if (isPM && h !== 12) h += 12;
     if (!isPM && h === 12) h = 0;
@@ -1344,7 +1493,7 @@ function _initAdminPanel() {
     const realSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     _timeOffsetSeconds = targetSec - realSec;
     const pad = (n) => String(n).padStart(2, '0');
-    const dispH = parseInt(document.getElementById('admin-h').value) || 12;
+    const dispH = parseInt(document.getElementById('admin-h').value, 10) || 12;
     document.getElementById('admin-status').textContent = `Set → ${dispH}:${pad(m)}:${pad(s)} ${ampmBtn.textContent}`;
     updateAll();
     _loadLunchWeather(true);
@@ -1374,15 +1523,24 @@ function _initAdminPanel() {
 }
 
 /* --- Cache DOM refs --- */
-let _hmEl, _sEl, _heroTitle, _heroEyebrow;
-let _signatureTitle, _signatureEyebrow;
-let _ringFill, _statusPill, _statusLabel, _schedTitle, _schedDate, _periodList;
-let _lastHm = '', _lastS = '', _lastPeriodCount = -1;
-let _lastSignedTitle = '', _lastSignedEyebrow = '';
-let _signatureFontPromise = null;
-let _signatureLibraryPromise = null;
-let _signatureId = 0;
-let _signatureRequestId = 0;
+const domRefs = {
+  hmEl: null,
+  sEl: null,
+  heroTitle: null,
+  heroEyebrow: null,
+  signatureTitle: null,
+  signatureEyebrow: null,
+  ringFill: null,
+  statusPill: null,
+  statusLabel: null,
+  schedTitle: null,
+  schedDate: null,
+  periodList: null
+};
+let _handwritingFontPromise = null;
+let _handwritingLibraryPromise = null;
+let _heroScriptDrawId = 0;
+let _heroScriptRequestId = 0;
 const HOMEPAGE_INTRO_COPY = 'poolesville.web';
 const HOMEPAGE_INTRO_SEEN_KEY = 'phs:homepage-intro-seen:v1';
 let _homepageIntroMotionReady = false;
@@ -1512,21 +1670,21 @@ function _renderScheduleDataUnavailable(error) {
   document.body.classList.remove('schedule-no-school-state', 'schedule-ended-state');
   _setTimerSurfaceVisible(false);
   _clearCountdownDisplay();
-  if (_heroEyebrow) setHeroLine('eyebrow', '', false);
-  if (_heroTitle) setHeroLine('title', 'Schedule unavailable', true, { fontSize: 96, revealStroke: 40 });
-  if (_statusPill && _statusLabel) {
-    _statusPill.style.display = 'inline-flex';
-    _statusPill.dataset.status = 'off';
-    _statusLabel.textContent = 'Refresh to retry';
+  if (domRefs.heroEyebrow) setHeroLine('eyebrow', '', false);
+  if (domRefs.heroTitle) setHeroLine('title', 'Schedule unavailable', true, { fontSize: 96, revealStroke: 40 });
+  if (domRefs.statusPill && domRefs.statusLabel) {
+    domRefs.statusPill.style.display = 'inline-flex';
+    domRefs.statusPill.dataset.status = 'off';
+    _setStyledText(domRefs.statusLabel, 'statusLabel', 'Refresh to retry');
   }
-  if (_schedTitle) _schedTitle.textContent = 'Schedule unavailable';
-  if (_schedDate) _schedDate.textContent = '';
-  if (_periodList) {
-    _periodList.innerHTML = '';
+  _setStyledText(domRefs.schedTitle, 'scheduleTitle', 'Schedule unavailable');
+  _setStyledText(domRefs.schedDate, 'scheduleDate', '');
+  if (domRefs.periodList) {
+    domRefs.periodList.innerHTML = '';
     const li = document.createElement('li');
     li.className = 'period-card period-card--empty';
     li.textContent = 'Could not load bell schedule data';
-    _periodList.appendChild(li);
+    domRefs.periodList.appendChild(li);
   }
 }
 
@@ -1562,22 +1720,22 @@ function _initHomepageIntro() {
 }
 
 function getSignatureFont() {
-  if (_signatureFontPromise) return _signatureFontPromise;
+  if (_handwritingFontPromise) return _handwritingFontPromise;
 
-  _signatureFontPromise = loadSignatureLibrary().then((opentypeApi) => new Promise((resolve, reject) => {
+  _handwritingFontPromise = loadSignatureLibrary().then((opentypeApi) => new Promise((resolve, reject) => {
     opentypeApi.load(SIGNATURE_FONT_URL, (err, font) => {
       if (err || !font) reject(err || new Error('Signature font did not load'));
       else resolve(font);
     });
   }));
-  return _signatureFontPromise;
+  return _handwritingFontPromise;
 }
 
 function loadSignatureLibrary() {
   if (window.opentype) return Promise.resolve(window.opentype);
-  if (_signatureLibraryPromise) return _signatureLibraryPromise;
+  if (_handwritingLibraryPromise) return _handwritingLibraryPromise;
 
-  _signatureLibraryPromise = new Promise((resolve, reject) => {
+  _handwritingLibraryPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = OPENTYPE_SCRIPT_URL;
     script.async = true;
@@ -1585,7 +1743,7 @@ function loadSignatureLibrary() {
     script.onerror = () => reject(new Error('opentype.js failed to load'));
     document.head.appendChild(script);
   });
-  return _signatureLibraryPromise;
+  return _handwritingLibraryPromise;
 }
 
 function smootherStep(t) {
@@ -1597,10 +1755,10 @@ function updateHeroSignatureLayout() {
   const wrapper = document.querySelector('.hero-title-wrapper');
   if (!wrapper) return;
 
-  const pendingEyebrow = Boolean(_signatureEyebrow?.dataset.pendingSignatureText);
-  const pendingTitle = Boolean(_signatureTitle?.dataset.pendingSignatureText);
-  const visibleEyebrow = Boolean(_signatureEyebrow?.classList.contains('is-visible'));
-  const visibleTitle = Boolean(_signatureTitle?.classList.contains('is-visible'));
+  const pendingEyebrow = Boolean(domRefs.signatureEyebrow?.dataset.pendingHeroScriptText);
+  const pendingTitle = Boolean(domRefs.signatureTitle?.dataset.pendingHeroScriptText);
+  const visibleEyebrow = Boolean(domRefs.signatureEyebrow?.classList.contains('is-visible'));
+  const visibleTitle = Boolean(domRefs.signatureTitle?.classList.contains('is-visible'));
   const layoutCount = Number(visibleEyebrow || pendingEyebrow) + Number(visibleTitle || pendingTitle);
   const visibleCount = Number(visibleEyebrow) + Number(visibleTitle);
 
@@ -1612,46 +1770,58 @@ function updateHeroSignatureLayout() {
 
 function setHeroLine(line, text, visible, options = {}) {
   const isEyebrow = line === 'eyebrow';
-  const fallback = isEyebrow ? _heroEyebrow : _heroTitle;
-  const stage = isEyebrow ? _signatureEyebrow : _signatureTitle;
+  const fallback = isEyebrow ? domRefs.heroEyebrow : domRefs.heroTitle;
+  const stage = isEyebrow ? domRefs.signatureEyebrow : domRefs.signatureTitle;
+  const styleTarget = isEyebrow ? 'heroEyebrow' : 'heroTitle';
+  const hasLetterStyles = _IS_STUDIO_PREVIEW || _hasTextStyleRuns(styleTarget);
 
   if (!fallback) return;
 
-  fallback.textContent = text;
+  _setStyledText(fallback, styleTarget, text);
   fallback.style.display = visible ? 'block' : 'none';
-  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible));
+  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible && !hasLetterStyles));
 
   if (!stage) return;
   if (!visible) {
-    delete stage.dataset.pendingSignatureText;
-    delete stage.dataset.signatureRequestId;
+    delete stage.dataset.pendingHeroScriptText;
+    delete stage.dataset.heroScriptRequestId;
     stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
     fallback.classList.remove('signature-fallback-hidden');
-    if (isEyebrow) _lastSignedEyebrow = '';
-    else _lastSignedTitle = '';
+    if (isEyebrow) renderState.lastSignedEyebrow = '';
+    else renderState.lastSignedTitle = '';
     updateHeroSignatureLayout();
     return;
   }
 
-  const currentText = isEyebrow ? _lastSignedEyebrow : _lastSignedTitle;
-  if (currentText === text && (stage.classList.contains('is-visible') || stage.dataset.pendingSignatureText === text)) return;
+  if (hasLetterStyles) {
+    delete stage.dataset.pendingHeroScriptText;
+    delete stage.dataset.heroScriptRequestId;
+    stage.classList.remove('is-visible', 'is-complete');
+    stage.innerHTML = '';
+    fallback.classList.remove('signature-fallback-hidden');
+    updateHeroSignatureLayout();
+    return;
+  }
 
-  if (isEyebrow) _lastSignedEyebrow = text;
-  else _lastSignedTitle = text;
+  const currentText = isEyebrow ? renderState.lastSignedEyebrow : renderState.lastSignedTitle;
+  if (currentText === text && (stage.classList.contains('is-visible') || stage.dataset.pendingHeroScriptText === text)) return;
 
-  const requestId = String(++_signatureRequestId);
-  stage.dataset.pendingSignatureText = text;
-  stage.dataset.signatureRequestId = requestId;
+  if (isEyebrow) renderState.lastSignedEyebrow = text;
+  else renderState.lastSignedTitle = text;
+
+  const requestId = String(++_heroScriptRequestId);
+  stage.dataset.pendingHeroScriptText = text;
+  stage.dataset.heroScriptRequestId = requestId;
   stage.classList.remove('is-visible', 'is-complete');
   stage.innerHTML = '';
   updateHeroSignatureLayout();
 
   signHeroText(stage, text, options, requestId).catch((error) => {
     console.warn('Signature renderer fallback:', error);
-    if (stage.dataset.signatureRequestId !== requestId) return;
-    delete stage.dataset.signatureRequestId;
-    delete stage.dataset.pendingSignatureText;
+    if (stage.dataset.heroScriptRequestId !== requestId) return;
+    delete stage.dataset.heroScriptRequestId;
+    delete stage.dataset.pendingHeroScriptText;
     stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
     fallback.classList.remove('signature-fallback-hidden');
@@ -1663,10 +1833,10 @@ async function signHeroText(target, text, options = {}, requestId = '') {
   const phrase = String(text || '').trim();
   if (!target || !phrase) return;
 
-  target.dataset.pendingSignatureText = phrase;
+  target.dataset.pendingHeroScriptText = phrase;
   const font = await getSignatureFont();
-  if (target.dataset.pendingSignatureText !== phrase) return;
-  if (requestId && target.dataset.signatureRequestId !== requestId) return;
+  if (target.dataset.pendingHeroScriptText !== phrase) return;
+  if (requestId && target.dataset.heroScriptRequestId !== requestId) return;
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fontSize = options.fontSize || 128;
@@ -1688,14 +1858,16 @@ async function signHeroText(target, text, options = {}, requestId = '') {
 
   if (!glyphPaths.length) return;
 
-  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
-  glyphPaths.forEach((path) => {
+  const bounds = glyphPaths.reduce((acc, path) => {
     const box = path.getBoundingBox();
-    x1 = Math.min(x1, box.x1);
-    y1 = Math.min(y1, box.y1);
-    x2 = Math.max(x2, box.x2);
-    y2 = Math.max(y2, box.y2);
-  });
+    return {
+      x1: Math.min(acc.x1, box.x1),
+      y1: Math.min(acc.y1, box.y1),
+      x2: Math.max(acc.x2, box.x2),
+      y2: Math.max(acc.y2, box.y2)
+    };
+  }, { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity });
+  const { x1, y1, x2, y2 } = bounds;
 
   const padX = fontSize * 0.28;
   const padTop = fontSize * 0.72;
@@ -1706,15 +1878,15 @@ async function signHeroText(target, text, options = {}, requestId = '') {
   const viewH = (y2 - y1) + padTop + padBottom;
   const viewBox = `${viewX} ${viewY} ${viewW} ${viewH}`;
   const ns = 'http://www.w3.org/2000/svg';
-  const runId = ++_signatureId;
+  const runId = ++_heroScriptDrawId;
   const maskId = `signature-mask-${runId}`;
   const gradId = `signature-brush-${runId}`;
 
-  if (requestId && target.dataset.signatureRequestId !== requestId) return;
+  if (requestId && target.dataset.heroScriptRequestId !== requestId) return;
   if (target._signatureRaf) cancelAnimationFrame(target._signatureRaf);
   target.innerHTML = '';
-  target.dataset.signatureText = phrase;
-  delete target.dataset.pendingSignatureText;
+  target.dataset.heroScriptText = phrase;
+  delete target.dataset.pendingHeroScriptText;
   target.classList.remove('is-complete');
   target.classList.add('is-visible');
   updateHeroSignatureLayout();
@@ -1792,7 +1964,7 @@ async function signHeroText(target, text, options = {}, requestId = '') {
   svg.appendChild(defs);
   svg.appendChild(fillGroup);
   svg.appendChild(glintGroup);
-  if (requestId && target.dataset.signatureRequestId !== requestId) return;
+  if (requestId && target.dataset.heroScriptRequestId !== requestId) return;
   target.appendChild(svg);
 
   const glintWidth = viewW * 0.08;
@@ -1812,7 +1984,7 @@ async function signHeroText(target, text, options = {}, requestId = '') {
   const totalDuration = Math.min(1750, Math.max(950, viewW * 1.18));
 
   if (reduceMotion) {
-    if (requestId && target.dataset.signatureRequestId !== requestId) return;
+    if (requestId && target.dataset.heroScriptRequestId !== requestId) return;
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
     target.classList.add('is-complete');
@@ -1822,7 +1994,7 @@ async function signHeroText(target, text, options = {}, requestId = '') {
 
   const startTime = performance.now();
   const animate = (now) => {
-    if (requestId && target.dataset.signatureRequestId !== requestId) return;
+    if (requestId && target.dataset.heroScriptRequestId !== requestId) return;
     const elapsed = now - startTime;
     const progress = smootherStep(elapsed / totalDuration);
     const brushReach = Math.max(0, (viewW + brushWidth) * progress);
@@ -1844,8 +2016,8 @@ async function signHeroText(target, text, options = {}, requestId = '') {
 
   target._signatureRaf = requestAnimationFrame(animate);
   setTimeout(() => {
-    if (target.dataset.signatureText !== phrase) return;
-    if (requestId && target.dataset.signatureRequestId !== requestId) return;
+    if (target.dataset.heroScriptText !== phrase) return;
+    if (requestId && target.dataset.heroScriptRequestId !== requestId) return;
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
     target.classList.add('is-complete');
@@ -1855,21 +2027,21 @@ async function signHeroText(target, text, options = {}, requestId = '') {
 
 async function main() {
   try {
-    _hmEl = document.getElementById('cd-hm');
-    _sEl = document.getElementById('cd-s');
-    _heroTitle = document.getElementById('hero-title');
-    _heroEyebrow = document.querySelector('.hero-eyebrow');
-    _signatureTitle = document.getElementById('signature-title');
-    _signatureEyebrow = document.getElementById('signature-eyebrow');
-    _ringFill = document.getElementById('ring-fill');
-    _statusPill = document.getElementById('status-pill');
-    _statusLabel = document.getElementById('status-label');
-    _schedTitle = document.getElementById('schedule-title');
-    _schedDate = document.getElementById('schedule-date');
-    _periodList = document.getElementById('period-list');
+    domRefs.hmEl = document.getElementById('cd-hm');
+    domRefs.sEl = document.getElementById('cd-s');
+    domRefs.heroTitle = document.getElementById('hero-title');
+    domRefs.heroEyebrow = document.querySelector('.hero-eyebrow');
+    domRefs.signatureTitle = document.getElementById('signature-title');
+    domRefs.signatureEyebrow = document.getElementById('signature-eyebrow');
+    domRefs.ringFill = document.getElementById('ring-fill');
+    domRefs.statusPill = document.getElementById('status-pill');
+    domRefs.statusLabel = document.getElementById('status-label');
+    domRefs.schedTitle = document.getElementById('schedule-title');
+    domRefs.schedDate = document.getElementById('schedule-date');
+    domRefs.periodList = document.getElementById('period-list');
     _initAnnouncementsView();
 
-    const isSchedulePage = Boolean(_hmEl && _sEl && _ringFill && _schedTitle && _periodList);
+    const isSchedulePage = Boolean(domRefs.hmEl && domRefs.sEl && domRefs.ringFill && domRefs.schedTitle && domRefs.periodList);
     if (!isSchedulePage) return;
 
     _initKeepAliveTabs();
@@ -1879,8 +2051,6 @@ async function main() {
     const cachedData = _readScheduleDataCache();
     if (cachedData) {
       data = cachedData;
-      _updateAllOrDeferForHomepageIntro();
-      _markHomepageIntroDataReady();
     }
 
     try {
@@ -1901,6 +2071,10 @@ async function main() {
         return;
       }
       console.warn('Using cached schedule data:', fetchError);
+    }
+
+    if (window.PhsSettingsReady && typeof window.PhsSettingsReady.then === 'function') {
+      try { await window.PhsSettingsReady; } catch {}
     }
 
     _initAdminPanel();
@@ -1937,7 +2111,7 @@ const proccessTime = function (time) {
 
 function calculateGoal() {
   if (!data) return;
-  const date = new Date();
+  const date = _currentScheduleDate();
   let val = _clockSeconds(date);
 
   let arr = _getScheduleDataForDate(date);
@@ -2025,7 +2199,7 @@ function updateAll() {
   calculateGoal();
   _updateLunchWeatherMode();
 
-  const date = new Date();
+  const date = _currentScheduleDate();
   let val = _clockSeconds(date);
   let timeleft = Math.max(0, goal - val);
 
@@ -2048,17 +2222,17 @@ function updateAll() {
   _setTimerSurfaceVisible(!isTimerInactive);
 
   /* --- Countdown --- */
-  if (_hmEl && !isTimerInactive) {
+  if (domRefs.hmEl && !isTimerInactive) {
     const u = (t) => `<span class="cd-min-label">${t}</span>`;
     const hm = h > 0
       ? `${h}${u('h')}${m > 0 ? (m < 10 ? '&nbsp;' : '') + m + u('m') : ''}`
       : `${m}${u('m')}`;
-    if (hm !== _lastHm) { _hmEl.innerHTML = hm; _lastHm = hm; }
+    if (hm !== renderState.lastHm) { domRefs.hmEl.innerHTML = hm; renderState.lastHm = hm; }
 
     const ss = String(s).padStart(2, '0');
-    if (ss !== _lastS && _sEl) {
-      _sEl.innerHTML = `${ss}<span class="cd-sec-label" style="margin-left:3px">s</span>`;
-      _lastS = ss;
+    if (ss !== renderState.lastS && domRefs.sEl) {
+      domRefs.sEl.innerHTML = `${ss}<span class="cd-sec-label" style="margin-left:3px">s</span>`;
+      renderState.lastS = ss;
     }
   }
 
@@ -2071,63 +2245,64 @@ function updateAll() {
   }
 
   /* --- Hero text & Status --- */
-  if (_heroTitle && _heroEyebrow && _statusPill && _statusLabel) {
+  if (domRefs.heroTitle && domRefs.heroEyebrow && domRefs.statusPill && domRefs.statusLabel) {
     if (noSchool) {
       setHeroLine('eyebrow', '', false);
       setHeroLine('title', 'No School', true, { fontSize: 178, revealStroke: 78 });
 
-      _statusPill.style.display = "inline-flex";
-      _statusPill.dataset.status = "off";
-      _statusLabel.textContent = "Enjoy your day";
+      domRefs.statusPill.style.display = "inline-flex";
+      domRefs.statusPill.dataset.status = "off";
+      _setStyledText(domRefs.statusLabel, 'statusLabel', _heroSettings.noSchoolStatusText || "Enjoy your day");
     } else if (dayIsOver) {
       setHeroLine('eyebrow', '', false);
       setHeroLine('title', 'School Day Ended', true, { fontSize: 178, revealStroke: 78 });
 
-      _statusPill.style.display = "inline-flex";
-      _statusPill.dataset.status = "off";
-      _statusLabel.textContent = _getNextSchoolDayLabel(date);
+      domRefs.statusPill.style.display = "inline-flex";
+      domRefs.statusPill.dataset.status = "off";
+      _setStyledText(domRefs.statusLabel, 'statusLabel', _getNextSchoolDayLabel(date));
     } else if (isBeforeSchool) {
       setHeroLine('eyebrow', 'Starts in', true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', '', false);
-      _statusPill.style.display = "none";
+      domRefs.statusPill.style.display = "none";
     } else {
       setHeroLine('eyebrow', isTransition ? "Passing" : "Currently in", true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', period, true, { fontSize: 142, revealStroke: 62 });
 
-      _statusPill.style.display = "inline-flex";
+      domRefs.statusPill.style.display = "inline-flex";
       if (isTransition) {
-        _statusPill.dataset.status = "passing";
-        _statusLabel.textContent = "Next period soon";
+        domRefs.statusPill.dataset.status = "passing";
+        _setStyledText(domRefs.statusLabel, 'statusLabel', "Next period soon");
       } else if (timeleft <= 60 && timeleft > 0) {
-        _statusPill.dataset.status = "urgent";
-        _statusLabel.textContent = "Ending Soon";
+        domRefs.statusPill.dataset.status = "urgent";
+        _setStyledText(domRefs.statusLabel, 'statusLabel', "Ending Soon");
       } else {
-        _statusPill.dataset.status = "live";
-        _statusLabel.textContent = "In Session";
+        domRefs.statusPill.dataset.status = "live";
+        _setStyledText(domRefs.statusLabel, 'statusLabel', "In Session");
       }
     }
   }
 
   /* --- Ring --- */
-  if (_ringFill && periodEndTime > periodStartTime) {
+  if (domRefs.ringFill && periodEndTime > periodStartTime) {
     const elapsed = val - periodStartTime;
     const total = periodEndTime - periodStartTime;
     const pctRemaining = Math.min(1, Math.max(0, 1 - elapsed / total));
     const arcLen = pctRemaining * 100;
-    _ringFill.style.strokeDasharray = `${arcLen} 100`;
-    _ringFill.style.strokeDashoffset = '0';
-  } else if (_ringFill) {
-    _ringFill.style.strokeDasharray = '0 100';
-    _ringFill.style.strokeDashoffset = '0';
+    domRefs.ringFill.style.strokeDasharray = `${arcLen} 100`;
+    domRefs.ringFill.style.strokeDashoffset = '0';
+  } else if (domRefs.ringFill) {
+    domRefs.ringFill.style.strokeDasharray = '0 100';
+    domRefs.ringFill.style.strokeDashoffset = '0';
   }
 
   /* --- Schedule header --- */
-  if (_schedTitle) _schedTitle.textContent = scheduleType;
-  if (_schedDate) {
+  _setStyledText(domRefs.schedTitle, 'scheduleTitle', scheduleType);
+  if (domRefs.schedDate) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
-    _schedDate.textContent = `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    _setStyledText(domRefs.schedDate, 'scheduleDate', `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`);
   }
+  _renderScheduleDifferenceBanner(date);
 
   /* --- Period list --- */
   renderPeriodList(val);
@@ -2135,27 +2310,27 @@ function updateAll() {
 }
 
 function renderPeriodList(currentSeconds) {
-  if (!_periodList) return;
+  if (!domRefs.periodList) return;
   if (myArray.length === 0) {
     const emptyLabel = _isNonInstructionalSchedule(scheduleType)
       ? 'No bell schedule today'
       : 'No remaining bell schedule';
-    if (_lastPeriodCount !== 0 || _periodList.dataset.emptyLabel !== emptyLabel) {
-      _periodList.innerHTML = '';
+    if (renderState.lastPeriodCount !== 0 || domRefs.periodList.dataset.emptyLabel !== emptyLabel) {
+      domRefs.periodList.innerHTML = '';
       const li = document.createElement('li');
       li.className = 'period-card period-card--empty';
       li.textContent = emptyLabel;
-      _periodList.appendChild(li);
-      _periodList.dataset.emptyLabel = emptyLabel;
-      _lastPeriodCount = 0;
+      domRefs.periodList.appendChild(li);
+      domRefs.periodList.dataset.emptyLabel = emptyLabel;
+      renderState.lastPeriodCount = 0;
     }
     return;
   }
-  delete _periodList.dataset.emptyLabel;
+  delete domRefs.periodList.dataset.emptyLabel;
 
-  if (_periodList.children.length === myArray.length && myArray.length === _lastPeriodCount) {
+  if (domRefs.periodList.children.length === myArray.length && myArray.length === renderState.lastPeriodCount) {
     for (let i = 0; i < myArray.length; i++) {
-      const li = _periodList.children[i];
+      const li = domRefs.periodList.children[i];
       const p = myArray[i];
       const stateClass = getStateClass(p, currentSeconds);
 
@@ -2163,11 +2338,17 @@ function renderPeriodList(currentSeconds) {
       if (li.className !== expectedClass.trim()) {
         li.className = expectedClass.trim();
       }
+      li.dataset.studioKey = 'periodCard';
+      li.dataset.studioLabel = p.name;
+      li.dataset.studioPaths = 'appearance.periodCardPadding,appearance.periodCardRadius';
+      _setStyledText(li.querySelector('.period-time'), 'periodTime', p.timeStr);
+      _setStyledText(li.querySelector('.period-name'), 'periodName', p.name);
+      _setStyledText(li.querySelector('.period-meta'), 'periodMeta', `${Math.round((p.endSec - p.startSec) / 60)} min`);
     }
     return;
   }
 
-  _periodList.innerHTML = '';
+  domRefs.periodList.innerHTML = '';
   for (let i = 0; i < myArray.length; i++) {
     const p = myArray[i];
     const stateClass = getStateClass(p, currentSeconds);
@@ -2175,24 +2356,39 @@ function renderPeriodList(currentSeconds) {
 
     const li = document.createElement('li');
     li.className = 'period-card ' + stateClass;
+    li.dataset.studioKey = 'periodCard';
+    li.dataset.studioLabel = p.name;
+    li.dataset.studioPaths = 'appearance.periodCardPadding,appearance.periodCardRadius';
 
     const time = document.createElement('div');
     time.className = 'period-time';
-    time.textContent = p.timeStr;
+    time.dataset.studioKey = 'periodTime';
+    time.dataset.textStyle = 'periodTime';
+    time.dataset.studioLabel = 'Period time';
+    time.dataset.studioPaths = 'appearance.periodTimeSize,appearance.textStyles.targets.periodTime';
+    _setStyledText(time, 'periodTime', p.timeStr);
 
     const name = document.createElement('div');
     name.className = 'period-name';
-    name.textContent = p.name;
+    name.dataset.studioKey = 'periodName';
+    name.dataset.textStyle = 'periodName';
+    name.dataset.studioLabel = 'Period name';
+    name.dataset.studioPaths = 'appearance.periodNameSize,appearance.textStyles.targets.periodName';
+    _setStyledText(name, 'periodName', p.name);
 
     const meta = document.createElement('div');
     meta.className = 'period-meta';
-    meta.textContent = `${durationMin} min`;
+    meta.dataset.studioKey = 'periodMeta';
+    meta.dataset.textStyle = 'periodMeta';
+    meta.dataset.studioLabel = 'Period duration';
+    meta.dataset.studioPaths = 'appearance.periodDurationSize,appearance.textStyles.targets.periodMeta';
+    _setStyledText(meta, 'periodMeta', `${durationMin} min`);
 
     li.append(time, name, meta);
 
-    _periodList.appendChild(li);
+    domRefs.periodList.appendChild(li);
   }
-  _lastPeriodCount = myArray.length;
+  renderState.lastPeriodCount = myArray.length;
 }
 
 function getStateClass(period, currentSeconds) {
@@ -2202,6 +2398,7 @@ function getStateClass(period, currentSeconds) {
 }
 
 document.addEventListener('site-settings:applied', e => {
+  _heroSettings = e.detail?.hero || {};
   _applySettingsScheduleOverride(e.detail);
   _applyGradesFrameUrl(e.detail);
   _applyViewTitle(document.querySelector('[data-site-view]') ? _siteView : _viewFromLocation());
@@ -2210,6 +2407,7 @@ document.addEventListener('site-settings:applied', e => {
 });
 
 _initHomepageIntro();
+_initFirstPartyAnalytics();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', main, { once: true });
 } else {

@@ -4,6 +4,10 @@
   const OLD_KEYS = ['phs:appearance:v1', 'phs:appearance:v2'];
   const defaults = { accent: '#A8AAA8', colors: ['#A8AAA8', '#131414', '#ECECE8'], hue: 40, planeX: 1, planeY: 33, intensity: 48, textScale: 1, reduceGlow: false };
   const MAX_COLORS = 5;
+  const isAdminPreview = (() => {
+    try { return new URLSearchParams(location.search).has('_preview') && window.parent !== window; }
+    catch { return false; }
+  })();
 
   function hexToRgb(hex) {
     const clean = String(hex || '').replace('#', '').trim();
@@ -235,7 +239,7 @@
     enhanceAppearanceSlider(scale);
     let current = read();
     let activeSlot = slotForAccent(current);
-    let stopsLayoutSignature = '';
+    let stopsLayoutStamp = '';
     let frame = 0;
 
     function normalizeCurrent(syncPicker) {
@@ -254,12 +258,12 @@
     }
     function renderStops() {
       strip.style.background = gradient(current.colors);
-      const signature = `${activeSlot}|${current.colors.length}`;
-      if (signature !== stopsLayoutSignature || strip.children.length !== current.colors.length) {
-        stopsLayoutSignature = signature;
+      const layoutStamp = `${activeSlot}|${current.colors.length}`;
+      if (layoutStamp !== stopsLayoutStamp || strip.children.length !== current.colors.length) {
+        stopsLayoutStamp = layoutStamp;
         strip.innerHTML = current.colors.map((stop, index) => {
-          const raw = current.colors.length === 1 ? 0 : (index / (current.colors.length - 1)) * 100;
-          const left = `calc(${raw}% + ${30 - raw * 0.6}px)`;
+          const percent = current.colors.length === 1 ? 0 : (index / (current.colors.length - 1)) * 100;
+          const left = `calc(${percent}% + ${30 - percent * 0.6}px)`;
           return `<button type="button" class="theme-stop ${index === activeSlot ? 'active' : ''}" data-theme-slot="${index}" style="left:${left};--stop-color:${stop}" aria-label="Color stop ${index + 1}"></button>`;
         }).join('');
         return;
@@ -430,14 +434,16 @@
     paint();
   }
 
-  apply(read());
-  // Re-apply after admin settings load so admin's theme doesn't overwrite the user's choice.
-  document.addEventListener('site-settings:applied', () => apply(read()));
-  window.addEventListener('storage', (e) => {
-    if (e.key !== KEY) return;
+  if (!isAdminPreview) {
     apply(read());
-    document.dispatchEvent(new CustomEvent('phs:appearance-storage-sync'));
-  });
+    // Re-apply after admin settings load so admin's theme doesn't overwrite the user's choice.
+    document.addEventListener('site-settings:applied', () => apply(read()));
+    window.addEventListener('storage', (e) => {
+      if (e.key !== KEY) return;
+      apply(read());
+      document.dispatchEvent(new CustomEvent('phs:appearance-storage-sync'));
+    });
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
   else mount();
 })();

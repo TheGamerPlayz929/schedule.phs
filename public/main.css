@@ -1283,6 +1283,23 @@ body.site-view-schedule:not(.schedule-terminal-state) #admin-panel {
   bottom: auto;
 }
 
+.phs-studio-preview #admin-panel,
+html.phs-studio-preview body.site-view-schedule:not(.schedule-terminal-state) #admin-panel,
+.phs-studio-preview.site-view-schedule:not(.schedule-terminal-state) #admin-panel {
+  top: auto;
+  right: 14px;
+  bottom: 14px;
+  min-width: 188px;
+  transform: scale(.82);
+  transform-origin: bottom right;
+  opacity: .78;
+}
+
+.phs-studio-preview #admin-panel:hover,
+.phs-studio-preview #admin-panel:focus-within {
+  opacity: 1;
+}
+
 body:not(.site-view-schedule) #admin-panel {
   opacity: 0;
   pointer-events: none;

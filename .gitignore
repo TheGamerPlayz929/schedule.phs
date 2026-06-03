@@ -1,6 +1,9 @@
 temp_zip_extract/
 .claude/
 .agents/
+.codex-tmp/
+.obsidian/
+.superpowers/
 *.zip
 node_modules/
 __pycache__/
@@ -10,3 +13,13 @@ __pycache__/
 OneDrive/
 data/
 local-grass/
+output/
+test-results/
+AGENTS.md
+lunch-food-taxonomy-backup.md
+.DS_Store
+backups/
+.supply-chain-risk-auditor/
+.hallmark/
+.codex-*
+.release-*

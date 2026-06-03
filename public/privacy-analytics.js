@@ -44,7 +44,7 @@
     if (!visibleSince) return;
     const seconds = Math.round((Date.now() - visibleSince) / 1000);
     visibleSince = document.visibilityState === 'visible' ? Date.now() : 0;
-    if (seconds >= 3) post({ type: 'duration', seconds }, beacon);
+    if (seconds >= 3) post({ type: 'duration', durationSeconds: seconds }, beacon);
   }
 
   post({ type: 'pageview' });

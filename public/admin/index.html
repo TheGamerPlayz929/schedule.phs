@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin · PHS Schedule</title>
   <meta name="robots" content="noindex,nofollow">
-  <link rel="icon" href="favicon.ico">
-  <link rel="stylesheet" href="admin.css">
+  <link rel="icon" href="/admin/favicon.ico">
+  <link rel="stylesheet" href="admin.css?v=20260603c">
 </head>
 <body>
 
@@ -32,7 +32,7 @@
   <button id="sidebar-backdrop" class="admin-sidebar-backdrop" type="button" aria-label="Close navigation"></button>
   <aside id="admin-sidebar" class="admin-sidebar">
     <div class="admin-sidebar-brand">
-      <img src="phs-logo.png" alt="" class="admin-sidebar-brand-img">
+      <img src="/admin/phs-logo.png" alt="" class="admin-sidebar-brand-img">
       <span class="admin-sidebar-brand-text">PHS Admin</span>
       <button id="sidebar-collapse-btn" class="admin-sidebar-collapse-btn" type="button" aria-label="Collapse navigation" aria-expanded="true" aria-controls="admin-sidebar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -69,9 +69,12 @@
         <div class="sub" id="tab-sub">Identity & visual basics for the public site.</div>
       </div>
       <div class="admin-header-tools">
+        <button id="style-toggle-btn" class="admin-btn admin-btn-ghost admin-style-toggle" type="button" aria-pressed="false" title="Switch interface style"><span class="admin-style-dot" aria-hidden="true"></span><span>Classic</span></button>
         <button id="theme-toggle-btn" class="admin-btn admin-btn-ghost admin-theme-toggle" type="button" aria-pressed="false">Dark</button>
         <div class="admin-actions">
           <span id="dirty-pill" class="admin-dirty-pill">Unsaved changes</span>
+          <span id="save-status-pill" class="admin-save-status" aria-live="polite"></span>
+          <button id="save-draft-btn" class="admin-btn admin-btn-ghost" disabled>Save draft</button>
           <button id="discard-btn" class="admin-btn admin-btn-ghost" disabled>Discard</button>
           <button id="publish-btn" class="admin-btn admin-btn-primary" disabled>Publish</button>
         </div>
@@ -102,6 +105,12 @@
       </div>
       <span class="mode-pill draft" id="preview-mode-pill">Showing draft (un-published)</span>
     </div>
+    <div class="admin-preview-time-machine" id="preview-time-machine" aria-label="Time Machine preview">
+      <span>Time Machine</span>
+      <input id="preview-date-range" type="range" min="-30" max="120" value="0" aria-label="Preview date offset">
+      <input id="preview-date-input" type="date" aria-label="Preview date">
+      <button id="preview-date-today-btn" class="admin-btn admin-btn-sm admin-btn-ghost" type="button">Today</button>
+    </div>
     <div class="row-gap-8">
       <button id="preview-refresh-btn" class="admin-btn admin-btn-sm" type="button">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0115-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15 6.7L3 16M3 21v-5h5"/></svg>
@@ -118,6 +127,7 @@
 <div class="admin-toast-host" id="toast-host" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="admin.js"></script>
+<script src="/schedule-resolver.js"></script>
+  <script src="admin.js?v=20260603d"></script>
 </body>
 </html>

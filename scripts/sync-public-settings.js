@@ -18,8 +18,12 @@ const PUBLIC_KEYS = [
   'theme',
   'appearance',
   'announcements',
+  'privacy',
+  'themePresets',
   'bellSchedules',
+  'scheduleRules',
   'gradeMelon',
+  'siteStatus',
   'scheduleOverride',
   'updatedAt'
 ];
@@ -27,12 +31,19 @@ const PUBLIC_KEYS = [
 const PRIVATE_KEYS = new Set([
   'actor',
   'audit',
-  'auditLog',
+  'auditlog',
+  'authorization',
+  'cookie',
+  'cookies',
   'email',
   'ip',
   'ips',
   'login',
+  'password',
   'passwordHash',
+  'passwordhash',
+  'secret',
+  'secrets',
   'session',
   'sessions',
   'token',
@@ -50,7 +61,8 @@ function assertNoPrivateKeys(value, trail = []) {
     return;
   }
   for (const [key, child] of Object.entries(value)) {
-    if (PRIVATE_KEYS.has(key)) {
+    const isThemePresetTokenBundle = trail[0] === 'themePresets' && trail.length === 2 && key === 'tokens';
+    if (!isThemePresetTokenBundle && PRIVATE_KEYS.has(String(key).toLowerCase())) {
       throw new Error(`Refusing to publish private settings key: ${trail.concat(key).join('.')}`);
     }
     assertNoPrivateKeys(child, trail.concat(key));

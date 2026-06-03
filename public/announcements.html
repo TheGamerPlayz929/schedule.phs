@@ -143,7 +143,7 @@
 
   <main class="hero hero--compact">
     <div class="hero-title-wrapper fade-up" style="--stagger: 1">
-      <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle">Announcements</h1>
+      <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle" data-studio-key="announcementTitle" data-text-style="announcementTitle" data-studio-label="Announcement page title" data-studio-paths="hero.announcementsPageTitle,appearance.textStyles.targets.announcementTitle">Announcements</h1>
     </div>
   </main>
 
@@ -189,18 +189,25 @@
     const list = document.getElementById('announcements-list');
     if (!list) return;
     const configured = settings?.announcements?.items;
-    const items = Array.isArray(configured) && configured.length
+    const sourceItems = Array.isArray(configured) && configured.length
       ? configured
       : FALLBACK_ANNOUNCEMENTS.announcements.items;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const items = sourceItems.map((item, index) => ({ item, index })).filter(({ item: a }) => {
+      const showFrom = String(a.showFrom || '').trim();
+      const expiresOn = String(a.expiresOn || '').trim();
+      return (!showFrom || today >= showFrom) && (!expiresOn || today <= expiresOn);
+    });
     if (!items.length) {
       list.innerHTML = '<div class="announcements-empty">No announcements yet.</div>';
       return;
     }
-    list.innerHTML = items.map(a => {
+    list.innerHTML = items.map(({ item: a, index }) => {
       const bulletItems = Array.isArray(a.bullets) ? a.bullets : [];
-      const bullets = bulletItems.map(b => `<li>${escapeHtml(b)}</li>`).join('');
-      return `<div class="announcement-card">
-        <div class="announcement-title">${escapeHtml(a.title || '')}</div>
+      const bullets = bulletItems.map((b, bulletIndex) => `<li data-studio-key="announcementBullet" data-text-style="announcementBullet" data-studio-label="Announcement ${index + 1} bullet ${bulletIndex + 1}" data-studio-paths="announcements.items,appearance.textStyles.targets.announcementBullet" data-studio-text-path="announcements.items.${index}.bullets.${bulletIndex}">${escapeHtml(b)}</li>`).join('');
+      return `<div class="announcement-card" data-studio-key="announcementCard" data-studio-label="Announcement ${index + 1} card" data-studio-paths="announcements.items">
+        <div class="announcement-title" data-studio-key="announcementTitle" data-text-style="announcementTitle" data-studio-label="Announcement ${index + 1} title" data-studio-paths="announcements.items,appearance.textStyles.targets.announcementTitle" data-studio-text-path="announcements.items.${index}.title">${escapeHtml(a.title || '')}</div>
         <div class="announcement-content"><ul>${bullets}</ul></div>
       </div>`;
     }).join('');

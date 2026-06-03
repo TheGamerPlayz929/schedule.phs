@@ -42,9 +42,14 @@
       const a = document.createElement('a');
       a.href = href;
       a.className = 'nav-btn' + (pageMatches(it.href, page) ? ' active' : '');
+      a.dataset.studioKey = pageMatches(it.href, page) ? 'navLinkActive' : 'navLink';
+      a.dataset.textStyle = pageMatches(it.href, page) ? 'navLinkActive' : 'navLink';
+      a.dataset.studioLabel = `${it.label || 'Navigation'} link`;
+      a.dataset.studioPaths = 'nav.items,appearance.textStyles.targets.navLink,appearance.textStyles.targets.navLinkActive';
       a.textContent = it.label;
       wrap.appendChild(a);
     }
+    window.PhsTextStyle?.applyAll?.(wrap);
   }
 
   function tryRender() {

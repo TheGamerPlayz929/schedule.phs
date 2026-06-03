@@ -9,10 +9,12 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260521-publicsettings3';
-  const CACHE_KEY = 'phs:site-settings:v5';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v5';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260603-sync1';
+  const CACHE_KEY = 'phs:site-settings:v6';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v6';
   const OLD_CACHE_KEYS = [
+    'phs:site-settings:v5',
+    'phs:site-settings:last-good:v5',
     'phs:site-settings:v4',
     'phs:site-settings:last-good:v4',
     'phs:site-settings:v2',
@@ -33,6 +35,40 @@
     try { return new URLSearchParams(location.search).has('_preview') && window.parent !== window; }
     catch { return false; }
   })();
+  const isStudioPreview = (() => {
+    try { return isPreviewIframe && new URLSearchParams(location.search).has('_studio'); }
+    catch { return false; }
+  })();
+  const TEXT_STYLE_PROPS = new Set([
+    'color',
+    'backgroundColor',
+    'fontWeight',
+    'fontStyle',
+    'textDecoration',
+    'letterSpacing',
+    'textTransform',
+    'textShadow'
+  ]);
+  const TEXT_STYLE_TARGETS = new Set([
+    'navLink',
+    'navLinkActive',
+    'heroEyebrow',
+    'heroTitle',
+    'statusLabel',
+    'scheduleTitle',
+    'scheduleDate',
+    'periodTime',
+    'periodName',
+    'periodMeta',
+    'announcementTitle',
+    'announcementBullet',
+    'gradesTitle',
+    'footerContact',
+    'footerLink',
+    'maintenanceTitle',
+    'maintenanceMessage'
+  ]);
+  let activeStudioKey = '';
 
   function readCache() {
     try {
@@ -44,9 +80,9 @@
     } catch { return { settings: null, stale: false }; }
   }
   function writeCache(s) {
-    const payload = JSON.stringify({ ts: Date.now(), settings: s });
-    try { sessionStorage.setItem(CACHE_KEY, payload); } catch {}
-    try { localStorage.setItem(LAST_GOOD_KEY, payload); } catch {}
+    const cacheRecord = JSON.stringify({ ts: Date.now(), settings: s });
+    try { sessionStorage.setItem(CACHE_KEY, cacheRecord); } catch {}
+    try { localStorage.setItem(LAST_GOOD_KEY, cacheRecord); } catch {}
   }
   function clearOldCaches() {
     for (const key of OLD_CACHE_KEYS) {
@@ -55,7 +91,7 @@
     }
   }
   function pickPath(obj, dotted) {
-    return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+    return dotted.split('.').reduce((o, k) => (o === null || o === undefined ? o : o[k]), obj);
   }
   function safeUrl(value, options = {}) {
     const raw = String(value || '').trim();
@@ -108,6 +144,161 @@
     const text = String(value || '').replace(/\s+/g, ' ').trim();
     return (text || fallback).slice(0, max);
   }
+  function normalizeStyleTarget(target) {
+    const key = String(target || '').trim();
+    return TEXT_STYLE_TARGETS.has(key) ? key : '';
+  }
+  function safeCssLength(value, fallback = '') {
+    const raw = String(value || '').trim();
+    return /^-?\d+(\.\d+)?(px|em|rem|%)$/i.test(raw) ? raw : fallback;
+  }
+  function safeTextStyle(input = {}) {
+    const style = {};
+    if (!input || typeof input !== 'object') return style;
+    const color = safeHex(input.color);
+    const backgroundColor = safeHex(input.backgroundColor);
+    if (color) style.color = color;
+    if (backgroundColor) style.backgroundColor = backgroundColor;
+    const weight = Number(input.fontWeight);
+    if (Number.isFinite(weight)) style.fontWeight = String(Math.min(900, Math.max(100, Math.round(weight / 100) * 100)));
+    if (input.fontStyle === 'italic' || input.fontStyle === 'normal') style.fontStyle = input.fontStyle;
+    if (['none', 'underline', 'line-through'].includes(input.textDecoration)) style.textDecoration = input.textDecoration;
+    const letterSpacing = safeCssLength(input.letterSpacing);
+    if (letterSpacing) style.letterSpacing = letterSpacing;
+    if (['none', 'uppercase', 'lowercase', 'capitalize'].includes(input.textTransform)) style.textTransform = input.textTransform;
+    if (typeof input.textShadow === 'string' && input.textShadow.length < 120) style.textShadow = input.textShadow;
+    return style;
+  }
+  function textStyleFor(target) {
+    const key = normalizeStyleTarget(target);
+    if (!key) return { base: {}, letters: [] };
+    const targetStyle = window.__SITE_SETTINGS__?.appearance?.textStyles?.targets?.[key] || {};
+    const base = safeTextStyle(targetStyle.base || {});
+    const letters = Array.isArray(targetStyle.letters)
+      ? targetStyle.letters
+        .map(run => ({
+          start: Math.max(0, Math.floor(Number(run.start) || 0)),
+          end: Math.max(0, Math.floor(Number(run.end) || 0)),
+          style: safeTextStyle(run.style || {})
+        }))
+        .filter(run => run.end > run.start && Object.keys(run.style).some(prop => TEXT_STYLE_PROPS.has(prop)))
+      : [];
+    return { base, letters };
+  }
+  function applyInlineTextStyle(el, style) {
+    if (!el || !style) return;
+    for (const prop of TEXT_STYLE_PROPS) {
+      if (Object.prototype.hasOwnProperty.call(style, prop)) el.style[prop] = style[prop];
+    }
+  }
+  function renderStyledText(el, target, text) {
+    if (!el) return;
+    const key = normalizeStyleTarget(target || el.getAttribute('data-text-style'));
+    const value = String(text ?? '');
+    if (!key) {
+      el.textContent = value;
+      return;
+    }
+    const { base, letters } = textStyleFor(key);
+    applyInlineTextStyle(el, base);
+    if (!letters.length || !value) {
+      el.textContent = value;
+      return;
+    }
+    const chars = Array.from(value);
+    const nodes = chars.map((char, index) => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      const run = letters.slice().reverse().find(item => index >= item.start && index < item.end);
+      if (run) applyInlineTextStyle(span, run.style);
+      return span;
+    });
+    el.replaceChildren(...nodes);
+  }
+  function applyTextStyles(settings, root = document) {
+    if (!settings || typeof settings !== 'object') return;
+    root.querySelectorAll('[data-text-style]').forEach(el => {
+      renderStyledText(el, el.getAttribute('data-text-style'), el.textContent || '');
+    });
+  }
+  function studioSelectableFor(node) {
+    if (!node || node.nodeType !== 1) return null;
+    return node.closest('[data-studio-key], [data-text-style]');
+  }
+  function describeStudioSelection(el) {
+    const key = el.getAttribute('data-studio-key') || el.getAttribute('data-text-style') || '';
+    const styleTarget = el.getAttribute('data-text-style') || '';
+    const label = el.getAttribute('data-studio-label') || el.getAttribute('aria-label') || el.textContent || key;
+    const textPath = el.getAttribute('data-studio-text-path') || el.getAttribute('data-bind') || '';
+    const paths = String(el.getAttribute('data-studio-paths') || '')
+      .split(',')
+      .map(path => path.trim())
+      .filter(Boolean);
+    const rect = el.getBoundingClientRect();
+    return {
+      type: 'phs:studio-select',
+      key,
+      styleTarget,
+      label: cleanStatusText(label, key || 'Selection', 80),
+      text: cleanStatusText(el.textContent || '', '', 240),
+      textPath,
+      paths,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    };
+  }
+  function setStudioSelection(el, options = {}) {
+    const target = studioSelectableFor(el);
+    if (!target) return;
+    document.querySelectorAll('.phs-studio-selected').forEach(node => node.classList.remove('phs-studio-selected'));
+    target.classList.add('phs-studio-selected');
+    activeStudioKey = target.getAttribute('data-studio-key') || target.getAttribute('data-text-style') || '';
+    // Only scroll when the element is actually off-screen — 'nearest' won't yank
+    // elements that are already visible (fixes the "jumps up when I select the nav" bug).
+    if (options.scroll === true) target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    if (options.notify === false) return;
+    const parentOrigin = previewParentOrigin();
+    if (parentOrigin) window.parent.postMessage(describeStudioSelection(target), parentOrigin);
+  }
+  function installStudioPreview() {
+    if (!isStudioPreview) return;
+    document.documentElement.classList.add('phs-studio-preview');
+    const style = document.createElement('style');
+    style.textContent = `
+      .phs-studio-preview [data-studio-key],
+      .phs-studio-preview [data-text-style]{cursor:crosshair}
+      .phs-studio-preview .phs-studio-selected{outline:2px solid rgba(236,236,232,.88);outline-offset:4px;box-shadow:0 0 0 7px rgba(168,170,168,.16)}
+      .phs-studio-preview .phs-studio-selected *{pointer-events:none}
+      .phs-studio-preview .phs-studio-flash{animation:phsStudioFlash 1s cubic-bezier(.16,1,.3,1)}
+      @keyframes phsStudioFlash{0%{box-shadow:0 0 0 0 rgba(168,170,168,.55),0 0 0 0 rgba(168,170,168,.35)}60%{box-shadow:0 0 0 10px rgba(168,170,168,.18),0 0 28px 6px rgba(168,170,168,.28)}100%{box-shadow:0 0 0 7px rgba(168,170,168,.16)}}
+    `;
+    document.head.appendChild(style);
+    document.addEventListener('click', event => {
+      const target = studioSelectableFor(event.target);
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setStudioSelection(target);
+    }, true);
+    window.addEventListener('message', event => {
+      if (event.source !== window.parent || !isAllowedPreviewParentOrigin(event.origin)) return;
+      if (event.data?.type === 'phs:studio-select-key') {
+        const key = String(event.data.key || '');
+        const target = document.querySelector(`[data-studio-key="${CSS.escape(key)}"], [data-text-style="${CSS.escape(key)}"]`);
+        if (target) setStudioSelection(target, { notify: false });
+      }
+      if (event.data?.type === 'phs:studio-reveal') {
+        const key = String(event.data.key || '');
+        const target = document.querySelector(`[data-studio-key="${CSS.escape(key)}"], [data-text-style="${CSS.escape(key)}"]`);
+        if (target) {
+          setStudioSelection(target, { notify: false, scroll: true });
+          target.classList.remove('phs-studio-flash');
+          void target.offsetWidth; // restart animation
+          target.classList.add('phs-studio-flash');
+          setTimeout(() => target.classList.remove('phs-studio-flash'), 1000);
+        }
+      }
+    });
+  }
   function ensureMaintenancePanel() {
     let panel = document.getElementById('site-maintenance');
     if (panel) return panel;
@@ -133,9 +324,15 @@
 
     const title = document.createElement('h1');
     title.id = 'site-maintenance-title';
+    title.setAttribute('data-studio-key', 'maintenanceTitle');
+    title.setAttribute('data-text-style', 'maintenanceTitle');
+    title.setAttribute('data-studio-paths', 'siteStatus.title,appearance.textStyles.targets.maintenanceTitle');
 
     const message = document.createElement('p');
     message.id = 'site-maintenance-message';
+    message.setAttribute('data-studio-key', 'maintenanceMessage');
+    message.setAttribute('data-text-style', 'maintenanceMessage');
+    message.setAttribute('data-studio-paths', 'siteStatus.message,appearance.textStyles.targets.maintenanceMessage');
 
     const note = document.createElement('span');
     note.className = 'site-maintenance__note';
@@ -164,8 +361,8 @@
     if (logo && logoSrc) logo.setAttribute('src', logoSrc);
     if (logo) logo.setAttribute('alt', cleanStatusText(branding.logoAlt, 'Poolesville Schedule logo', 120));
     if (mark && logoLink) mark.setAttribute('href', logoLink);
-    document.getElementById('site-maintenance-title').textContent = cleanStatusText(status.title, 'Site paused for maintenance', 120);
-    document.getElementById('site-maintenance-message').textContent = cleanStatusText(status.message, 'Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon.', 500);
+    renderStyledText(document.getElementById('site-maintenance-title'), 'maintenanceTitle', cleanStatusText(status.title, 'Site paused for maintenance', 120));
+    renderStyledText(document.getElementById('site-maintenance-message'), 'maintenanceMessage', cleanStatusText(status.message, 'Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon.', 500));
     const note = panel.querySelector('.site-maintenance__note');
     if (note) note.textContent = cleanStatusText(settings?.branding?.siteTitle, 'Poolesville Schedule', 80);
   }
@@ -177,7 +374,7 @@
     document.querySelectorAll('[data-bind]').forEach(el => {
       const key = el.getAttribute('data-bind');
       const val = pickPath(settings, key);
-      if (val == null) return;
+      if (val === null || val === undefined) return;
       const mode = el.getAttribute('data-bind-attr');
       if (mode === 'href')   { const safe = safeUrl(val, { allowMailto: true }); if (safe) el.setAttribute('href', safe); return; }
       if (mode === 'src')    { const safe = safeUrl(val); if (safe) el.setAttribute('src', safe); return; }
@@ -240,7 +437,12 @@
       if (safe) fav.setAttribute('href', safe);
     }
 
+    applyTextStyles(settings);
     document.dispatchEvent(new CustomEvent('site-settings:applied', { detail: settings }));
+    if (activeStudioKey) {
+      const selected = document.querySelector(`[data-studio-key="${CSS.escape(activeStudioKey)}"], [data-text-style="${CSS.escape(activeStudioKey)}"]`);
+      if (selected) setStudioSelection(selected, { notify: false, scroll: false });
+    }
     document.documentElement.classList.remove('settings-loading');
   }
 
@@ -284,7 +486,7 @@
   async function fetchAndApply() {
     if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
     try {
-      const publicSettings = await fetchJson(PUBLIC_SETTINGS_URL);
+      const publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
       writeCache(publicSettings);
       applyBindings(publicSettings);
     } catch (err) {
@@ -315,35 +517,45 @@
 
   clearOldCaches();
 
-  // Apply cached public settings immediately; stale v2/v3 caches are deliberately ignored.
+  // Do not paint cached settings first: schedule overrides are date-sensitive,
+  // so stale cache can visibly flip "No School" to the real planned day later.
   const cached = readCache();
-  if (cached.settings && !isPreviewIframe) applyBindings(cached.settings);
 
-  fetchAndApply();
+  window.PhsSettingsReady = fetchAndApply().then(settings => {
+    if (!settings && cached.settings && !cached.stale && !isPreviewIframe) {
+      applyBindings(cached.settings);
+      return cached.settings;
+    }
+    return settings;
+  });
 
   // Auto-refresh while visible so admin changes propagate without burning work in background tabs.
   if (!isPreviewIframe) {
-    setInterval(() => {
+    const refreshTimer = setInterval(() => {
       if (document.visibilityState === 'visible') fetchAndApply();
     }, CACHE_TTL_MS);
+    window.addEventListener('pagehide', () => clearInterval(refreshTimer), { once: true });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') fetchAndApply();
     });
   }
 
   // Preview: parent admin tab posts draft settings.
-  // Message shape: { type: 'phs:preview-settings', settings: {...} }
+  // Message shape: { type: 'phs:preview-settings', settings: {...}, previewDate?: 'YYYY-MM-DD' }
   window.addEventListener('message', (e) => {
     if (!e.data || e.data.type !== 'phs:preview-settings') return;
     if (!isPreviewIframe) return; // never accept overrides on the live site
     if (e.source !== window.parent) return;
     if (!isAllowedPreviewParentOrigin(e.origin)) return;
     const s = e.data.settings;
+    window.__PHS_PREVIEW_DATE__ = /^\d{4}-\d{2}-\d{2}$/.test(String(e.data.previewDate || '')) ? String(e.data.previewDate) : '';
     if (s && typeof s === 'object') {
       window.__SITE_SETTINGS__ = s;
       applyBindings(s);
     }
   });
+
+  installStudioPreview();
 
   // Tell parent we're ready to receive (admin side waits for this signal).
   if (isPreviewIframe && window.parent !== window) {
@@ -364,5 +576,10 @@
     apply: applyBindings,
     backend: BACKEND,
     isPreview: isPreviewIframe
+  };
+  window.PhsTextStyle = {
+    applyAll: (root = document) => applyTextStyles(window.__SITE_SETTINGS__, root),
+    setText: renderStyledText,
+    hasLetterStyles: target => textStyleFor(target).letters.length > 0
   };
 })();

@@ -15,7 +15,7 @@ By doing this, we hope to help students with the most challenging classes. Of co
 ## Pages
 - `announcements.html` — school announcements
 - `index.html` — bell schedule
-- `grademelon.html` — grades page with embedded GradeMelon
+- `gradeviewer.html` — grades page with embedded GradeViewer
 
 ## What's Inside
 
@@ -49,4 +49,3 @@ The embedded grade viewer is a separate Next.js app deployed to Firebase. Change
 - All-purple color palette (lavender → light purple → deep violet → darkest violet)
 - Boxy segments with rounded cap only on topmost bar via custom Chart.js plugin
 - Axis/legend text updated to white for dark theme
-

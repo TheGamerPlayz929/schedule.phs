@@ -7,7 +7,7 @@
   <meta name="google-site-verification" content="8Zxv2gF9pWq9mWpM6Uhl2qUUUKUzTzohabLAoEfYpxg" />
 
   <title data-bind="branding.siteTitle">PHS Schedule</title>
-  <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="PHS Schedule">
+  <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Beautiful Shader Experiences - PHS Schedule">
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
   <script>
     try {
@@ -42,13 +42,13 @@
 
 <div class="app-shell">
   <!-- Navigation -->
-  <nav class="glass-nav fade-up" style="--stagger: 0">
-    <div class="brand-icon">
+  <nav class="glass-nav fade-up" style="--stagger: 0" data-studio-key="nav" data-studio-label="Navigation" data-studio-paths="nav.items,branding.logoSrc,branding.logoLink">
+    <div class="brand-icon" data-studio-key="logo" data-studio-label="Logo" data-studio-paths="branding.logoSrc,branding.logoAlt,branding.logoLink">
       <a data-bind="branding.logoLink" data-bind-attr="href" href="https://www.montgomeryschoolsmd.org/schools/poolesvillehs/" target="_blank" rel="noopener noreferrer">
         <img data-bind="branding.logoSrc" data-bind-attr="src" src="phs-logo-96.png" width="48" height="40" decoding="async" fetchpriority="low" alt="PHS Logo" style="height: 40px; width: auto;">
       </a>
     </div>
-    <div class="nav-links" id="nav-links" data-page="schedule">
+    <div class="nav-links" id="nav-links" data-page="schedule" data-studio-key="navLinks" data-studio-label="Navigation links" data-studio-paths="nav.items,appearance.textStyles.targets.navLink,appearance.textStyles.targets.navLinkActive">
       <!-- rendered from settings -->
     </div>
     <div class="nav-actions">
@@ -110,20 +110,20 @@
 
   <!-- Hero Section -->
   <main class="hero" data-site-view="schedule">
-    <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off">
+    <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off" data-studio-key="statusPill" data-studio-label="Status pill" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">
       <span class="status-dot"></span>
-      <span id="status-label" data-bind="hero.schedulePageStatusFallback">Loading...</span>
+      <span id="status-label" data-bind="hero.schedulePageStatusFallback" data-text-style="statusLabel" data-studio-key="statusLabel" data-studio-label="Status label" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">Loading...</span>
     </div>
 
-    <div class="hero-title-wrapper fade-up" style="--stagger: 2">
-      <h2 class="hero-eyebrow" id="hero-eyebrow" data-bind="hero.schedulePageEyebrow">Currently in</h2>
+    <div class="hero-title-wrapper fade-up" style="--stagger: 2" data-studio-key="heroText" data-studio-label="Hero text" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">
+      <h2 class="hero-eyebrow" id="hero-eyebrow" data-bind="hero.schedulePageEyebrow" data-text-style="heroEyebrow" data-studio-key="heroEyebrow" data-studio-label="Hero eyebrow" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.textStyles.targets.heroEyebrow">Currently in</h2>
       <div class="signature-stage signature-stage--eyebrow" id="signature-eyebrow" aria-hidden="true"></div>
-      <h1 class="hero-title" id="hero-title">—</h1>
+      <h1 class="hero-title" id="hero-title" data-text-style="heroTitle" data-studio-key="heroTitle" data-studio-label="Hero title" data-studio-paths="appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">—</h1>
       <div class="signature-stage signature-stage--title" id="signature-title" aria-hidden="true"></div>
     </div>
 
     <!-- Glass Countdown Panel -->
-    <div class="ring-wrap fade-up" style="--stagger: 3">
+    <div class="ring-wrap fade-up" style="--stagger: 3" data-studio-key="countdownRing" data-studio-label="Countdown ring" data-studio-paths="appearance.countdownSize,theme.accent">
       <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
         <defs>
           <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -177,10 +177,10 @@
   </main>
 
   <!-- Schedule Section -->
-  <section class="schedule-section fade-up" data-site-view="schedule" style="--stagger: 4">
+  <section class="schedule-section fade-up" data-site-view="schedule" style="--stagger: 4" data-studio-key="scheduleSection" data-studio-label="Schedule section" data-studio-paths="appearance.periodCardPadding,appearance.periodCardRadius">
     <div class="schedule-header">
-      <h3 id="schedule-title">Normal Schedule</h3>
-      <span class="date" id="schedule-date"></span>
+      <h3 id="schedule-title" data-text-style="scheduleTitle" data-studio-key="scheduleTitle" data-studio-label="Schedule title" data-studio-paths="appearance.scheduleTitleSize,appearance.textStyles.targets.scheduleTitle">Loading schedule</h3>
+      <span class="date" id="schedule-date" data-text-style="scheduleDate" data-studio-key="scheduleDate" data-studio-label="Schedule date" data-studio-paths="appearance.textStyles.targets.scheduleDate"></span>
     </div>
     <ol class="period-list" id="period-list">
       <!-- JS renders period-card elements here -->
@@ -190,11 +190,11 @@
   <section class="announcements-view fade-up" id="announcements-view" data-site-view="announcements" hidden aria-hidden="true" style="--stagger: 4">
     <div class="hero hero--compact announcements-hero">
       <div class="hero-title-wrapper">
-        <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle">Announcements</h1>
+        <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle" data-text-style="announcementTitle" data-studio-key="announcementTitle" data-studio-label="Announcements title" data-studio-paths="hero.announcementsPageTitle,appearance.textStyles.targets.announcementTitle">Announcements</h1>
       </div>
     </div>
-    <section class="schedule-section announcements-section">
-      <div class="announcements-list" id="announcements-list">
+    <section class="schedule-section announcements-section" data-studio-key="announcementsSection" data-studio-label="Announcements section" data-studio-paths="announcements.items">
+      <div class="announcements-list" id="announcements-list" data-studio-key="announcementsList" data-studio-label="Announcement list" data-studio-paths="announcements.items">
         <div class="announcements-empty">Loading...</div>
       </div>
     </section>
@@ -203,10 +203,10 @@
   <section class="grades-view fade-up" id="grades-view" data-site-view="grades" hidden aria-hidden="true" style="--stagger: 4">
     <div class="hero hero--compact grades-hero">
       <div class="hero-title-wrapper">
-        <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.gradesPageTitle">Grades</h1>
+        <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.gradesPageTitle" data-text-style="gradesTitle" data-studio-key="gradesTitle" data-studio-label="Grades title" data-studio-paths="hero.gradesPageTitle,appearance.textStyles.targets.gradesTitle">Grades</h1>
       </div>
     </div>
-    <section class="grades-wrap" id="grades-wrap">
+    <section class="grades-wrap" id="grades-wrap" data-studio-key="gradesFrame" data-studio-label="Grades embed" data-studio-paths="grades.iframeUrlLocal,grades.iframeUrlProd">
       <div class="grades-scaler" id="grades-scaler">
         <iframe
           id="grades-frame"
@@ -223,17 +223,18 @@
 
   <footer class="app-footer fade-up" style="--stagger: 5">
     <div class="footer-links">
-      <span class="footer-contact">For all inquiries, support, or removal requests, please contact us at <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:jayalternateuser@gmail.com">jayalternateuser@gmail.com</a></span>
-      <a href="privacy.html">Privacy &amp; Safety</a>
+      <span class="footer-contact" data-studio-key="footerContact" data-studio-label="Footer contact" data-studio-paths="appearance.footerSize,appearance.footerColor,footer.supportEmail">For all inquiries, support, or removal requests, please contact us at <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:jayalternateuser@gmail.com">jayalternateuser@gmail.com</a></span>
+      <a href="privacy.html" data-text-style="footerLink" data-studio-key="footerLink" data-studio-label="Footer privacy link" data-studio-paths="appearance.footerSize,appearance.footerColor,appearance.textStyles.targets.footerLink">Privacy &amp; Safety</a>
     </div>
   </footer>
 </div>
 
-<script defer src="settings-loader.js?v=20260524-perf1"></script>
+<script defer src="settings-loader.js?v=20260603-sync1"></script>
 <script defer src="nav-renderer.js?v=20260524-desktopfix2"></script>
 <script defer src="privacy-analytics.js?v=20260524-desktopfix2"></script>
 <script defer src="google-analytics.js?v=20260506-island1"></script>
 <script defer src="appearance-settings.js?v=20260524-desktopfix1"></script>
-<script defer src="main.js?v=20260525-faq1"></script>
+<script defer src="schedule-resolver.js?v=20260529-rules1"></script>
+<script defer src="main.js?v=20260603a"></script>
 </body>
 </html>
