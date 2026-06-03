@@ -946,6 +946,7 @@ function _timeoutSignal(ms) {
 }
 
 async function _localGradeMelonAvailable() {
+  if (!_isLocalhost() || !['8080', '8096'].includes(location.port)) return false;
   try {
     const res = await fetch('/local-grade-melon-status', { cache: 'no-store', signal: _timeoutSignal(1500) });
     const json = await res.json();
@@ -1195,6 +1196,7 @@ function _analyticsEndpoint() {
 
 function _sendAnalyticsEvent(payload) {
   if (new URLSearchParams(location.search).has('_preview')) return;
+  if (_isLocalhost()) return;
   const endpoint = _analyticsEndpoint();
   const body = JSON.stringify({
     page: _analyticsPageName(),

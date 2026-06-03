@@ -528,7 +528,7 @@
     } catch (e) {
       const target = new URL(BACKEND).host;
       if (path.includes('/admin/ai/')) {
-        throw new Error(`Could not reach the backend at ${target}. Make sure the backend is running and GEMINI_API_KEY is set there.`);
+        throw new Error(`Could not reach the backend at ${target}. Make sure the backend AI service is configured.`);
       }
       throw new Error(`Could not reach the backend at ${target}.`);
     }

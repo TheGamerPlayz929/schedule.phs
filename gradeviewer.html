@@ -177,7 +177,7 @@
 
   <footer class="app-footer fade-up" style="--stagger: 3">
     <div class="footer-links">
-      <span class="footer-contact">For all inquiries, support, or removal requests, please contact us at <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:jayalternateuser@gmail.com">jayalternateuser@gmail.com</a></span>
+      <span class="footer-contact">For support or removal requests, use the feedback form.</span>
       <a href="privacy.html">Privacy &amp; Safety</a>
     </div>
   </footer>
@@ -193,6 +193,7 @@
   const frame  = document.getElementById('grades-frame');
 
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
+  const canProbeLocalBackend = isLocal && ['8080', '8096'].includes(location.port);
 
   function timeoutSignal(ms) {
     if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
@@ -203,6 +204,7 @@
     return c.signal;
   }
   async function localGradeMelonAvailable() {
+    if (!canProbeLocalBackend) return false;
     try {
       const res = await fetch('/local-grade-melon-status', { cache: 'no-store', signal: timeoutSignal(1500) });
       const json = await res.json();
