@@ -742,6 +742,15 @@
     if (retry) retry.classList.toggle('hidden', !opts.retry);
   }
 
+  function breakGlassRequested() {
+    try {
+      const params = new URLSearchParams(location.search);
+      return params.has('breakglass') || params.has('break-glass');
+    } catch {
+      return false;
+    }
+  }
+
   async function loadAuthConfig() {
     $('#login-error').textContent = '';
     setLoginStatus('Connecting to admin backend...', { retry: false });
@@ -753,7 +762,52 @@
       setLoginStatus('Admin backend is offline or still waking up. Try again in a few seconds.', { retry: true });
       return;
     }
+    configureBreakGlassLogin();
     configureGoogleLogin();
+  }
+
+  function configureBreakGlassLogin() {
+    const form = $('#break-glass-login-wrap');
+    if (!form || !breakGlassRequested()) return;
+    form.classList.remove('hidden');
+    if (form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', handleBreakGlassLogin);
+  }
+
+  async function handleBreakGlassLogin(event) {
+    event.preventDefault();
+    const err = $('#login-error');
+    const input = $('#break-glass-token');
+    const token = String(input?.value || '').trim();
+    if (!token) {
+      if (err) err.textContent = 'Paste the temporary access token.';
+      input?.focus();
+      return;
+    }
+    if (err) err.textContent = '';
+    setLoginStatus('Checking temporary access...', { retry: false });
+    try {
+      const res = await fetch(BACKEND + '/admin/break-glass-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ token })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json.error || (res.status === 404 ? 'Temporary access is not enabled.' : 'Temporary access failed.'));
+      }
+      state.token = json.token || null;
+      if (state.token) localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, state.token);
+      else localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+      if (input) input.value = '';
+      setLoginStatus('Opening admin session...', { retry: false });
+      const who = await waitForAdminSession();
+      await bootApp(who);
+    } catch (ex) {
+      showLogin(ex.message || 'Temporary access failed.');
+    }
   }
 
   function configureGoogleLogin() {
