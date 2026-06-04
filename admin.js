@@ -268,6 +268,13 @@
     'siteStatus',
     'scheduleOverride'
   ];
+  const LOCAL_ONLY_SETTINGS_KEYS = new Set(['themePresets', 'automations']);
+  const BACKEND_SETTINGS_KEYS = PUBLIC_SETTINGS_KEYS.filter(key => !LOCAL_ONLY_SETTINGS_KEYS.has(key));
+  const sanitizeSettingsKeys = keys => {
+    if (!keys) return BACKEND_SETTINGS_KEYS;
+    const incoming = keys instanceof Set ? [...keys] : Array.from(keys || []);
+    return incoming.filter(key => BACKEND_SETTINGS_KEYS.includes(key));
+  };
 
   // ── Helpers ────────────────────────────────────────────────────────────
   const $  = (sel, root = document) => root.querySelector(sel);
@@ -957,7 +964,7 @@
   }
 
   function hasClientDraftChanges() {
-    return Boolean(state.settings && state.draft && !settingsEq(state.settings, state.draft));
+    return Boolean(state.settings && state.draft && !settingsEq(publicSettingsView(state.settings), publicSettingsView(state.draft)));
   }
 
   function hasUnpublishedDraftChanges() {
@@ -966,7 +973,7 @@
 
   function publicSettingsView(settings) {
     const out = {};
-    for (const key of PUBLIC_SETTINGS_KEYS) {
+    for (const key of BACKEND_SETTINGS_KEYS) {
       if (settings?.[key] !== undefined) out[key] = settings[key];
     }
     return out;
@@ -974,7 +981,7 @@
 
   function changedSections(base = state.defaults, next = state.draft) {
     if (!base || !next) return [];
-    return PUBLIC_SETTINGS_KEYS
+    return BACKEND_SETTINGS_KEYS
       .filter(k => !eq(base[k], next[k]))
       .map(sectionLabelForKey)
       .filter((label, idx, arr) => arr.indexOf(label) === idx);
@@ -986,13 +993,14 @@
   }
 
   function buildDiscardDraftPatch() {
-    const next = deepClone(state.settings || state.draft || {});
-    for (const key of PUBLIC_SETTINGS_KEYS) {
-      if (state.defaults?.[key] === undefined) delete next[key];
-      else next[key] = deepClone(state.defaults[key]);
+    const patch = {};
+    for (const key of BACKEND_SETTINGS_KEYS) {
+      if (state.defaults?.[key] === undefined) continue;
+      if (!eq(state.settings?.[key], state.defaults[key]) || !eq(state.draft?.[key], state.defaults[key])) {
+        patch[key] = deepClone(state.defaults[key]);
+      }
     }
-    delete next.updatedAt;
-    return next;
+    return patch;
   }
 
   function buildPatchFromBase(base, allowedKeys = null) {
@@ -1002,18 +1010,19 @@
     for (const k of keys) {
       if (k === 'updatedAt') continue;
       if (allow && !allow.has(k)) continue;
+      if (!BACKEND_SETTINGS_KEYS.includes(k)) continue;
+      if (state.draft?.[k] === undefined) continue;
       if (!eq(base?.[k], state.draft?.[k])) patch[k] = state.draft[k];
     }
     return patch;
   }
 
   function buildSettingsPatch(allowedKeys = null) {
-    return buildPatchFromBase(state.settings, allowedKeys);
+    return buildPatchFromBase(state.settings, sanitizeSettingsKeys(allowedKeys));
   }
 
   function buildPublishPatch(allowedKeys = null) {
-    const publicKeys = allowedKeys ? PUBLIC_SETTINGS_KEYS.filter(key => allowedKeys.has?.(key) || allowedKeys.includes?.(key)) : PUBLIC_SETTINGS_KEYS;
-    return buildPatchFromBase(state.defaults, publicKeys);
+    return buildPatchFromBase(state.defaults, sanitizeSettingsKeys(allowedKeys));
   }
 
   function fieldElementId(path) {

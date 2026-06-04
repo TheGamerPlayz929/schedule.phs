@@ -2,8 +2,14 @@
 (function () {
   'use strict';
 
+  function isDateLike(input) {
+    return Object.prototype.toString.call(input) === '[object Date]'
+      && typeof input.getTime === 'function'
+      && !Number.isNaN(input.getTime());
+  }
+
   function toISODate(input) {
-    if (input instanceof Date && !Number.isNaN(input.getTime())) {
+    if (isDateLike(input)) {
       const y = input.getFullYear();
       const m = String(input.getMonth() + 1).padStart(2, '0');
       const d = String(input.getDate()).padStart(2, '0');
@@ -14,7 +20,7 @@
   }
 
   function localDate(input) {
-    if (input instanceof Date && !Number.isNaN(input.getTime())) {
+    if (isDateLike(input)) {
       return new Date(input.getFullYear(), input.getMonth(), input.getDate());
     }
     const iso = toISODate(input);
