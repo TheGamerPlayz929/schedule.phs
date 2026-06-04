@@ -9,7 +9,7 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260603-sync1';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260603-sync2';
   const CACHE_KEY = 'phs:site-settings:v6';
   const LAST_GOOD_KEY = 'phs:site-settings:last-good:v6';
   const OLD_CACHE_KEYS = [
@@ -458,19 +458,25 @@
       .finally(() => clearTimeout(timeout));
   }
 
-  function chooseBackendSettings(backendSettings) {
-    if (!backendSettings || typeof backendSettings !== 'object') return null;
-    const current = window.__SITE_SETTINGS__;
-    if (!current) return backendSettings;
+  function settingsFreshness(settings) {
+    const updatedAt = Number(settings?.updatedAt || 0);
+    const overrideAt = Number(settings?.scheduleOverride?.timestamp || 0);
+    return Math.max(
+      Number.isFinite(updatedAt) ? updatedAt : 0,
+      Number.isFinite(overrideAt) ? overrideAt : 0
+    );
+  }
 
-    const currentUpdated = Number(current.updatedAt || 0);
-    const backendUpdated = Number(backendSettings.updatedAt || 0);
-    if (!currentUpdated || !backendUpdated || backendUpdated >= currentUpdated) return backendSettings;
+  function chooseFreshSettings(publicSettings, backendSettings) {
+    const hasPublic = publicSettings && typeof publicSettings === 'object';
+    const hasBackend = backendSettings && typeof backendSettings === 'object';
+    if (!hasPublic) return hasBackend ? backendSettings : null;
+    if (!hasBackend) return publicSettings;
 
-    if (backendSettings.scheduleOverride) {
-      return { ...current, scheduleOverride: backendSettings.scheduleOverride };
-    }
-    return null;
+    const publicFreshness = settingsFreshness(publicSettings);
+    const backendFreshness = settingsFreshness(backendSettings);
+    if (publicFreshness && backendFreshness && publicFreshness > backendFreshness) return publicSettings;
+    return backendSettings;
   }
 
   function noteBackendSuccess() {
@@ -485,27 +491,28 @@
 
   async function fetchAndApply() {
     if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
+    let publicSettings = null;
+    let backendSettings = null;
     try {
-      const publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
-      writeCache(publicSettings);
-      applyBindings(publicSettings);
+      publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
     } catch (err) {
       console.warn('[settings] public fetch failed:', err);
     }
 
     if (!isLocal && Date.now() >= backendRetryAt) {
       try {
-        const backendSettings = await fetchJson(BACKEND + '/site-settings', { noStore: true });
+        backendSettings = await fetchJson(BACKEND + '/site-settings', { noStore: true });
         noteBackendSuccess();
-        const nextSettings = chooseBackendSettings(backendSettings);
-        if (nextSettings) {
-          writeCache(nextSettings);
-          applyBindings(nextSettings);
-        }
       } catch (err) {
         noteBackendFailure();
         console.warn('[settings] backend fetch failed:', err);
       }
+    }
+
+    const nextSettings = chooseFreshSettings(publicSettings, backendSettings);
+    if (nextSettings) {
+      writeCache(nextSettings);
+      applyBindings(nextSettings);
     }
 
     if (!window.__SITE_SETTINGS__) {

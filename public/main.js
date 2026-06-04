@@ -147,7 +147,7 @@ async function _pollScheduleOverride() {
       cache: 'no-store'
     });
     const json = await res.json();
-    _scheduleOverride = _normalizeScheduleOverride(json.override || null) || settingsOverride;
+    _scheduleOverride = _chooseFreshScheduleOverride(json.override || null, settingsOverride);
     if (_scheduleOverride) {
       _writeStoredScheduleOverride(_scheduleOverride);
     } else {
@@ -213,6 +213,27 @@ function _overrideAppliesToday(override) {
 
 function _normalizeScheduleOverride(override) {
   return _overrideAppliesToday(override) ? override : null;
+}
+
+function _overrideTimestamp(override) {
+  const value = Number(override?.timestamp || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function _chooseFreshScheduleOverride(apiOverride, settingsOverride) {
+  const api = _normalizeScheduleOverride(apiOverride || null);
+  const settings = _normalizeScheduleOverride(settingsOverride || null);
+  if (!api) return settings;
+  if (!settings) return api;
+
+  const apiTimestamp = _overrideTimestamp(api);
+  const settingsTimestamp = _overrideTimestamp(settings);
+  if (apiTimestamp && settingsTimestamp) {
+    return apiTimestamp >= settingsTimestamp ? api : settings;
+  }
+  if (settingsTimestamp && !apiTimestamp) return settings;
+  if (apiTimestamp && !settingsTimestamp) return api;
+  return settings;
 }
 
 function _plannedScheduleOverrides() {
