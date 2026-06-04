@@ -46,7 +46,6 @@ const LUNCH_WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
 const LUNCH_WEATHER_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 const LUNCH_WEATHER_FETCH_TIMEOUT_MS = 6500;
 const LUNCH_WEATHER_RETRY_COOLDOWN_MS = 60 * 1000;
-const LUNCH_WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=39.1459&longitude=-77.4169&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&minutely_15=precipitation,precipitation_probability,weather_code&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&forecast_days=2';
 const LUNCH_WEATHER_FALLBACK_START_SEC = 10 * 3600 + 20 * 60;
 const LUNCH_WEATHER_FALLBACK_END_SEC = 12 * 3600;
 const LUNCH_WEATHER_FORECAST_END_SEC = 14 * 3600 + 30 * 60;
@@ -527,14 +526,16 @@ function _writeLunchWeatherCache(api) {
 }
 
 function _lunchWeatherFetchUrls() {
-  const urls = [LUNCH_WEATHER_URL];
+  const urls = [];
   if (!_isLocalhost() && location.protocol !== 'file:') urls.push(`${_BACKEND_URL}/weather/lunch`);
   return [...new Set(urls)];
 }
 
 async function _fetchLunchWeatherApi() {
   let lastError = null;
-  for (const url of _lunchWeatherFetchUrls()) {
+  const urls = _lunchWeatherFetchUrls();
+  if (!urls.length) throw new Error('Weather fetch unavailable in static preview');
+  for (const url of urls) {
     try {
       const res = await fetch(url, { cache: 'no-store', signal: _timeoutSignal(LUNCH_WEATHER_FETCH_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
