@@ -20,6 +20,12 @@
   const PREVIEW_PAGE_KEY = 'phs:admin-preview-page:v2';
   const PREVIEW_SIZE_KEY = 'phs:admin-preview-size:v2';
   const TODAY_VARIANT_KEY = 'phs:admin-today-variant:v1';
+  function publicSiteAssetUrl(fileName) {
+    const name = String(fileName || '').replace(/^\/+/, '');
+    const path = location.pathname || '/';
+    if (/\/admin\/(?:index\.html)?$/i.test(path)) return new URL(`../${name}`, location.href).href;
+    return new URL(name, location.href).href;
+  }
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
     token: null,
@@ -1483,8 +1489,8 @@
   function loadScheduleData(force = false) {
     if (state.scheduleDataLoading) return state.scheduleDataLoading;
     if (state.scheduleData && !force) return Promise.resolve(state.scheduleData);
-    const url = new URL('/data.json', location.origin);
-    state.scheduleDataLoading = fetch(url.href, { cache: 'no-store' })
+    const url = publicSiteAssetUrl('data.json');
+    state.scheduleDataLoading = fetch(url, { cache: 'no-store' })
       .then(res => {
         if (!res.ok) throw new Error(`Schedule data HTTP ${res.status}`);
         return res.json();
