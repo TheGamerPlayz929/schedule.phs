@@ -37,7 +37,8 @@ const OVERRIDE_FETCH_TIMEOUT_MS = 5000;
 const OVERRIDE_POLL_INTERVAL_MS = 5000;
 const OVERRIDE_FAILURE_BACKOFF_MAX_MS = 60000;
 const OVERRIDE_CACHE_FALLBACK_TTL_MS = 24 * 60 * 60 * 1000;
-const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v1';
+const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v2';
+const OLD_SCHEDULE_DATA_CACHE_KEYS = ['phs:schedule-data:v1'];
 const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const SCHEDULE_DATA_FETCH_TIMEOUT_MS = 5000;
 const LUNCH_WEATHER_CACHE_KEY = 'phs:lunch-weather:v7';
@@ -466,6 +467,13 @@ function _readScheduleDataCache() {
     return _isScheduleDataShape(parsed.data) ? parsed.data : null;
   } catch {
     return null;
+  }
+}
+
+function _clearOldScheduleDataCaches() {
+  for (const key of OLD_SCHEDULE_DATA_CACHE_KEYS) {
+    try { sessionStorage.removeItem(key); } catch {}
+    try { localStorage.removeItem(key); } catch {}
   }
 }
 
@@ -2076,6 +2084,7 @@ async function main() {
     _prepareCountdownDisplay();
     _initLunchWeather();
 
+    _clearOldScheduleDataCaches();
     const cachedData = _readScheduleDataCache();
     if (cachedData) {
       data = cachedData;
