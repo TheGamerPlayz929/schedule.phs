@@ -261,19 +261,18 @@
     'appearance',
     'announcements',
     'privacy',
-    'themePresets',
     'bellSchedules',
     'scheduleRules',
     'gradeMelon',
     'siteStatus',
     'scheduleOverride'
   ];
-  const LOCAL_ONLY_SETTINGS_KEYS = new Set(['themePresets', 'automations']);
-  const BACKEND_SETTINGS_KEYS = PUBLIC_SETTINGS_KEYS.filter(key => !LOCAL_ONLY_SETTINGS_KEYS.has(key));
-  const sanitizeSettingsKeys = keys => {
-    if (!keys) return BACKEND_SETTINGS_KEYS;
+  const ADMIN_METADATA_SETTINGS_KEYS = ['themePresets', 'automations'];
+  const BACKEND_SETTINGS_KEYS = [...PUBLIC_SETTINGS_KEYS, ...ADMIN_METADATA_SETTINGS_KEYS];
+  const sanitizeSettingsKeys = (keys, allowedKeys = BACKEND_SETTINGS_KEYS) => {
+    if (!keys) return allowedKeys.slice();
     const incoming = keys instanceof Set ? [...keys] : Array.from(keys || []);
-    return incoming.filter(key => BACKEND_SETTINGS_KEYS.includes(key));
+    return incoming.filter(key => allowedKeys.includes(key));
   };
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -1018,7 +1017,7 @@
   }
 
   function hasClientDraftChanges() {
-    return Boolean(state.settings && state.draft && !settingsEq(publicSettingsView(state.settings), publicSettingsView(state.draft)));
+    return Boolean(state.settings && state.draft && !settingsEq(draftSettingsView(state.settings), draftSettingsView(state.draft)));
   }
 
   function hasUnpublishedDraftChanges() {
@@ -1026,8 +1025,16 @@
   }
 
   function publicSettingsView(settings) {
+    return settingsView(settings, PUBLIC_SETTINGS_KEYS);
+  }
+
+  function draftSettingsView(settings) {
+    return settingsView(settings, BACKEND_SETTINGS_KEYS);
+  }
+
+  function settingsView(settings, keys) {
     const out = {};
-    for (const key of BACKEND_SETTINGS_KEYS) {
+    for (const key of keys) {
       if (settings?.[key] !== undefined) out[key] = settings[key];
     }
     return out;
@@ -1035,7 +1042,7 @@
 
   function changedSections(base = state.defaults, next = state.draft) {
     if (!base || !next) return [];
-    return BACKEND_SETTINGS_KEYS
+    return PUBLIC_SETTINGS_KEYS
       .filter(k => !eq(base[k], next[k]))
       .map(sectionLabelForKey)
       .filter((label, idx, arr) => arr.indexOf(label) === idx);
@@ -1049,9 +1056,12 @@
   function buildDiscardDraftPatch() {
     const patch = {};
     for (const key of BACKEND_SETTINGS_KEYS) {
-      if (state.defaults?.[key] === undefined) continue;
-      if (!eq(state.settings?.[key], state.defaults[key]) || !eq(state.draft?.[key], state.defaults[key])) {
-        patch[key] = deepClone(state.defaults[key]);
+      const defaultValue = state.defaults?.[key] !== undefined
+        ? state.defaults[key]
+        : ADMIN_METADATA_SETTINGS_KEYS.includes(key) ? [] : undefined;
+      if (defaultValue === undefined) continue;
+      if (!eq(state.settings?.[key], defaultValue) || !eq(state.draft?.[key], defaultValue)) {
+        patch[key] = deepClone(defaultValue);
       }
     }
     return patch;
@@ -1076,7 +1086,7 @@
   }
 
   function buildPublishPatch(allowedKeys = null) {
-    return buildPatchFromBase(state.defaults, sanitizeSettingsKeys(allowedKeys));
+    return buildPatchFromBase(state.defaults, sanitizeSettingsKeys(allowedKeys, PUBLIC_SETTINGS_KEYS));
   }
 
   function fieldElementId(path) {
