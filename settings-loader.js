@@ -9,7 +9,7 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260604-static-authority';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json';
   const CACHE_KEY = 'phs:site-settings:v8';
   const LAST_GOOD_KEY = 'phs:site-settings:last-good:v8';
   const OLD_CACHE_KEYS = [
@@ -155,6 +155,11 @@
   function safeCssLength(value, fallback = '') {
     const raw = String(value || '').trim();
     return /^-?\d+(\.\d+)?(px|em|rem|%)$/i.test(raw) ? raw : fallback;
+  }
+  function freshUrl(url) {
+    const next = new URL(url, location.href);
+    next.searchParams.set('_fresh', `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    return next.href;
   }
   function safeTextStyle(input = {}) {
     const style = {};
@@ -453,7 +458,8 @@
   function fetchJson(url, options = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SETTINGS_FETCH_TIMEOUT_MS);
-    return fetch(url, {
+    const requestUrl = options.noStore ? freshUrl(url) : url;
+    return fetch(requestUrl, {
       credentials: 'omit',
       cache: options.noStore ? 'no-store' : 'default',
       signal: controller.signal

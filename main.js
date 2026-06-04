@@ -527,9 +527,8 @@ function _writeLunchWeatherCache(api) {
 }
 
 function _lunchWeatherFetchUrls() {
-  const urls = [];
-  if (location.protocol !== 'file:') urls.push(`${_BACKEND_URL}/weather/lunch`);
-  urls.push(LUNCH_WEATHER_URL);
+  const urls = [LUNCH_WEATHER_URL];
+  if (!_isLocalhost() && location.protocol !== 'file:') urls.push(`${_BACKEND_URL}/weather/lunch`);
   return [...new Set(urls)];
 }
 
@@ -972,6 +971,12 @@ function _timeoutSignal(ms) {
   const controller = new AbortController();
   setTimeout(() => controller.abort(), ms);
   return controller.signal;
+}
+
+function _freshAssetUrl(path) {
+  const url = new URL(path, location.href);
+  url.searchParams.set('_fresh', `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  return url.href;
 }
 
 async function _localGradeMelonAvailable() {
@@ -2089,8 +2094,8 @@ async function main() {
     }
 
     try {
-      const response = await fetch('data.json', {
-        cache: 'no-cache',
+      const response = await fetch(_freshAssetUrl('data.json'), {
+        cache: 'no-store',
         signal: _timeoutSignal(SCHEDULE_DATA_FETCH_TIMEOUT_MS)
       });
       const freshData = await response.json();
