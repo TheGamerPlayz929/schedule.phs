@@ -1444,10 +1444,8 @@ function _setAdminStatus(text) {
 }
 
 function _initAdminPanel() {
-  if (!_isLocalhost()) return;
-  // In Theme Studio preview we KEEP the dev clock — it's how you simulate a school
-  // day / time so the ring, periods, and in-session states actually appear to style.
-  // It's docked bottom-right + dimmed via .phs-studio-preview CSS so it stays out of the way.
+  const params = new URLSearchParams(location.search);
+  if (!_IS_STUDIO_PREVIEW && !(_isLocalhost() && params.has('devClock'))) return;
   if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && !location.pathname.endsWith('/')) return;
 
   const panel = document.createElement('div');
@@ -2283,16 +2281,19 @@ function updateAll() {
 
   /* --- Hero text & Status --- */
   if (domRefs.heroTitle && domRefs.heroEyebrow && domRefs.statusPill && domRefs.statusLabel) {
+    const terminalSignature = window.innerWidth <= 640
+      ? { fontSize: 132, revealStroke: 58 }
+      : { fontSize: 178, revealStroke: 78 };
     if (noSchool) {
       setHeroLine('eyebrow', '', false);
-      setHeroLine('title', 'No School', true, { fontSize: 178, revealStroke: 78 });
+      setHeroLine('title', 'No School', true, terminalSignature);
 
       domRefs.statusPill.style.display = "inline-flex";
       domRefs.statusPill.dataset.status = "off";
       _setStyledText(domRefs.statusLabel, 'statusLabel', _heroSettings.noSchoolStatusText || "Enjoy your day");
     } else if (dayIsOver) {
       setHeroLine('eyebrow', '', false);
-      setHeroLine('title', 'School Day Ended', true, { fontSize: 178, revealStroke: 78 });
+      setHeroLine('title', 'School Day Ended', true, terminalSignature);
 
       domRefs.statusPill.style.display = "inline-flex";
       domRefs.statusPill.dataset.status = "off";

@@ -2543,6 +2543,25 @@ body.appearance-open .appearance-panel.open {
     font-size: 64px;
   }
 
+  body.site-view-schedule.schedule-terminal-state .hero[data-site-view="schedule"] {
+    min-height: calc(100vh - 96px);
+    padding: 34px 0 106px;
+  }
+
+  body.site-view-schedule.schedule-terminal-state .hero-title-wrapper {
+    width: min(100%, calc(100vw - 24px));
+    min-height: clamp(118px, 34vw, 152px);
+  }
+
+  body.site-view-schedule.schedule-terminal-state .signature-stage {
+    width: min(100%, calc(100vw - 18px));
+  }
+
+  body.site-view-schedule.schedule-terminal-state .signature-stage--title {
+    height: clamp(118px, 34vw, 152px);
+    margin-top: 0;
+  }
+
   .ring-wrap {
     width: 180px;
     height: 180px;
