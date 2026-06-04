@@ -9,7 +9,7 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260603-sync2';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260603-sync3';
   const CACHE_KEY = 'phs:site-settings:v6';
   const LAST_GOOD_KEY = 'phs:site-settings:last-good:v6';
   const OLD_CACHE_KEYS = [
@@ -458,6 +458,10 @@
       .finally(() => clearTimeout(timeout));
   }
 
+  function isAbortError(error) {
+    return error && (error.name === 'AbortError' || /aborted/i.test(String(error.message || error)));
+  }
+
   function settingsFreshness(settings) {
     const updatedAt = Number(settings?.updatedAt || 0);
     const overrideAt = Number(settings?.scheduleOverride?.timestamp || 0);
@@ -505,7 +509,7 @@
         noteBackendSuccess();
       } catch (err) {
         noteBackendFailure();
-        console.warn('[settings] backend fetch failed:', err);
+        if (!isAbortError(err)) console.warn('[settings] backend fetch failed:', err);
       }
     }
 
