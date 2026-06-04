@@ -3135,35 +3135,6 @@ body:has(.admin-shell--has-unsaved) .admin-toast-host {
   justify-content: center;
   margin-bottom: 18px;
 }
-.admin-break-glass-login {
-  display: grid;
-  gap: 9px;
-  margin: 0 0 18px;
-}
-.admin-break-glass-login label {
-  color: var(--fg-2);
-  font-size: 12px;
-  font-weight: 650;
-}
-.admin-break-glass-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-.admin-break-glass-row input {
-  min-width: 0;
-  min-height: 40px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg-0);
-  color: var(--fg-1);
-  padding: 0 12px;
-  font: inherit;
-}
-.admin-break-glass-row input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
 .admin-footer-status {
   display: flex;
   align-items: center;

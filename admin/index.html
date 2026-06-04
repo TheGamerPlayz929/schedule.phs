@@ -6,7 +6,7 @@
   <title>Admin · PHS Schedule</title>
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="phs-logo.png">
-  <link rel="stylesheet" href="admin.css?v=20260603c">
+  <link rel="stylesheet" href="admin.css?v=20260604b">
 </head>
 <body>
 
@@ -18,14 +18,6 @@
     <div id="google-login-wrap" class="admin-google-login hidden">
       <div id="google-login-btn"></div>
     </div>
-    <form id="break-glass-login-wrap" class="admin-break-glass-login hidden" autocomplete="off">
-      <label for="break-glass-token">Temporary access token</label>
-      <div class="admin-break-glass-row">
-        <input id="break-glass-token" type="password" inputmode="text" autocomplete="off" placeholder="Paste temporary token">
-        <button class="admin-btn admin-btn-primary" type="submit">Open admin</button>
-      </div>
-      <div class="admin-field-help">Temporary access only works when the live backend is explicitly enabled for a short test window.</div>
-    </form>
     <div id="google-login-loading" class="admin-field-help">Loading Google sign-in...</div>
     <button id="login-retry-btn" class="admin-btn hidden" type="button">Retry connection</button>
     <div id="login-error" class="admin-field-help" style="color:var(--danger);min-height:16px"></div>
@@ -136,6 +128,6 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="schedule-resolver.js?v=20260603-phase1"></script>
-  <script src="admin.js?v=20260604a"></script>
+  <script src="admin.js?v=20260604b"></script>
 </body>
 </html>

@@ -510,7 +510,7 @@
     try {
       publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
     } catch (err) {
-      console.warn('[settings] public fetch failed:', err);
+      if (!isAbortError(err)) console.warn('[settings] public fetch failed:', err);
     }
 
     if (publicSettings) {
