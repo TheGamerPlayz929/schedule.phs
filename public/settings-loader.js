@@ -479,7 +479,7 @@
 
     const publicFreshness = settingsFreshness(publicSettings);
     const backendFreshness = settingsFreshness(backendSettings);
-    if (publicFreshness && backendFreshness && publicFreshness >= backendFreshness) return publicSettings;
+    if (publicFreshness && backendFreshness && publicFreshness > backendFreshness) return publicSettings;
     return backendSettings;
   }
 
