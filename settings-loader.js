@@ -9,10 +9,12 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260604-footer-email';
-  const CACHE_KEY = 'phs:site-settings:v7';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v7';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260604-static-authority';
+  const CACHE_KEY = 'phs:site-settings:v8';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v8';
   const OLD_CACHE_KEYS = [
+    'phs:site-settings:v7',
+    'phs:site-settings:last-good:v7',
     'phs:site-settings:v6',
     'phs:site-settings:last-good:v6',
     'phs:site-settings:v5',
@@ -503,6 +505,12 @@
       publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
     } catch (err) {
       console.warn('[settings] public fetch failed:', err);
+    }
+
+    if (publicSettings) {
+      writeCache(publicSettings);
+      applyBindings(publicSettings);
+      return window.__SITE_SETTINGS__;
     }
 
     if (!isLocal && Date.now() >= backendRetryAt) {
