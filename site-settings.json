@@ -37,8 +37,8 @@
   },
   "footer": {
     "copyright": "Poolesville High School Student Portal",
-    "feedbackUrl": "https://forms.gle/UrULj3gWiL9eqeif9",
-    "feedbackLabel": "Feedback Form",
+    "feedbackUrl": "",
+    "feedbackLabel": "",
     "supportEmail": "For all inquiries, support, or removal requests, please contact us at emirbakir523@gmail.com or jayalternateuser@gmail.com.",
     "gradesPageOnlyEmail": true
   },
@@ -113,10 +113,6 @@
     "title": "Site paused for maintenance",
     "message": "Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon."
   },
-  "scheduleOverride": {
-    "type": "Advisory",
-    "date": "2026-06-03",
-    "timestamp": 1780491581177
-  },
+  "scheduleOverride": null,
   "updatedAt": 1780491583766
 }
