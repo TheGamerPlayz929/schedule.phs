@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Geist:wght@400..800&family=Instrument+Serif:ital@0;1&display=swap">
-  <link rel="stylesheet" href="main.css?v=20260524-desktopfix7">
+  <link rel="stylesheet" href="main.css?v=20260604-terminal1">
   <style>
     html, body { min-height: 100vh; overflow-x: hidden; overflow-y: auto; }
     .app-shell { max-width: none; padding: 0; }
@@ -25,16 +25,12 @@
     .glass-nav, .hero, .app-footer { transition: filter 180ms ease, opacity 180ms ease; }
     body.privacy-modal-open .glass-nav,
     body.privacy-modal-open .hero,
-    body.privacy-modal-open .app-footer,
-    body.gradeviewer-modal-open .glass-nav,
-    body.gradeviewer-modal-open .hero,
-    body.gradeviewer-modal-open .app-footer {
+    body.privacy-modal-open .app-footer {
       filter: blur(14px) saturate(85%);
       opacity: 0.34;
       pointer-events: none;
     }
-    body.privacy-modal-open::before,
-    body.gradeviewer-modal-open::before {
+    body.privacy-modal-open::before {
       content: ""; position: fixed; inset: 0; z-index: 20;
       pointer-events: none; background: transparent;
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -53,27 +49,6 @@
       contain: layout paint;
     }
     #grades-frame { border: none; display: block; }
-    .grades-scaler.is-modal-fullscreen {
-      position: fixed !important;
-      inset: 0 !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      max-width: none !important;
-      transform: none !important;
-      contain: none !important;
-      overflow: visible !important;
-      z-index: 80 !important;
-      background: transparent !important;
-    }
-    .grades-scaler.is-modal-fullscreen #grades-frame {
-      position: static !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      border-radius: 0 !important;
-      background: transparent !important;
-    }
   </style>
 </head>
 <body>
@@ -165,8 +140,9 @@
         data-studio-key="gradesFrame"
         data-studio-label="GradeViewer embed"
         data-studio-paths="grades.iframeUrlLocal,grades.iframeUrlProd,gradeMelon.embedUrl"
-        src="about:blank"
+        src="https://schedulephs.web.app/login?phs_embed_v=20260525-faq"
         scrolling="yes"
+        loading="eager"
         allowtransparency="true"
         referrerpolicy="strict-origin-when-cross-origin"
         title="GradeMelon Grades"
@@ -183,7 +159,7 @@
   </footer>
 </div>
 
-<script src="settings-loader.js?v=20260604-static-authority"></script>
+<script src="settings-loader.js?v=20260604-fresh-truth"></script>
 <script src="nav-renderer.js?v=20260524-desktopfix2"></script>
 <script src="privacy-analytics.js?v=20260524-desktopfix2"></script>
 <script src="google-analytics.js?v=20260506-island1"></script>
@@ -257,8 +233,8 @@
     url = safeFrameUrl(url);
     if (myToken !== applyToken) return; // a newer call superseded us
     if (frameUrlLocked) return;
-    if (url && !urlsEqual(frame.src, url)) {
-      frame.src = url;
+    if (url) {
+      if (!urlsEqual(frame.src, url)) frame.src = url;
       frameUrlLocked = true;
     }
   }
@@ -273,14 +249,9 @@
     }
   }, 2500);
 
-  let isFullscreen = false;
-  const savedTransforms = [];
-  let savedFrameCss = '';
-  let savedScalerCss = '';
   let sizeFrame = 0;
 
   function setSize() {
-    if (isFullscreen) return;
     const w = scaler.offsetWidth;
     if (!w) return; // wait for layout
     const top = scaler.getBoundingClientRect().top;
@@ -344,8 +315,6 @@
     if (event.data?.type === 'gradeviewer:privacy-modal') {
       document.body.classList.toggle('privacy-modal-open', Boolean(event.data.open));
     }
-    if (event.data?.type === 'modalOpen') goFullscreen();
-    if (event.data?.type === 'modalClose') exitFullscreen();
     if (event.data?.type === 'gradeviewer:theme-ready') postThemeToFrame();
   });
   // Push appearance updates into the iframe whenever the user tweaks the theme.
@@ -356,41 +325,6 @@
   // Also push on first iframe load (in case the iframe sends ready before we set up the listener).
   frame.addEventListener('load', () => setTimeout(postThemeToFrame, 100));
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isFullscreen) exitFullscreen();
-  });
-
-  function goFullscreen() {
-    if (isFullscreen) return;
-    isFullscreen = true;
-    savedFrameCss = frame.style.cssText;
-    savedScalerCss = scaler.style.cssText;
-    let el = frame.parentElement;
-    while (el && el !== document.body) {
-      savedTransforms.push({ el, transform: el.style.transform, willChange: el.style.willChange, animation: el.style.animation, opacity: el.style.opacity });
-      el.style.transform = 'none'; el.style.willChange = 'auto';
-      el.style.animation = 'none'; el.style.opacity = '1';
-      el = el.parentElement;
-    }
-    document.body.classList.add('gradeviewer-modal-open');
-    scaler.classList.add('is-modal-fullscreen');
-    frame.style.cssText = savedFrameCss + ';width:100vw;height:100vh;border-radius:0;background:transparent';
-    document.body.style.overflow = 'hidden';
-  }
-  function exitFullscreen() {
-    if (!isFullscreen) return;
-    isFullscreen = false;
-    document.body.classList.remove('gradeviewer-modal-open');
-    document.body.style.overflow = '';
-    scaler.classList.remove('is-modal-fullscreen');
-    scaler.style.cssText = savedScalerCss;
-    frame.style.cssText = savedFrameCss;
-    savedScalerCss = '';
-    savedFrameCss = '';
-    savedTransforms.forEach(s => { s.el.style.transform = s.transform; s.el.style.willChange = s.willChange; s.el.style.animation = s.animation; s.el.style.opacity = s.opacity; });
-    savedTransforms.length = 0;
-    setSize();
-  }
 </script>
 <script src="appearance-settings.js?v=20260524-desktopfix1"></script>
 </body>

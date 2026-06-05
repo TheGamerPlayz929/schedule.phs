@@ -33,13 +33,10 @@ const renderState = {
 
 const ACTIVE_CLOCK_MS = 1000;
 const IDLE_CLOCK_MS = 60000;
-const OVERRIDE_FETCH_TIMEOUT_MS = 5000;
 const OVERRIDE_POLL_INTERVAL_MS = 5000;
-const OVERRIDE_FAILURE_BACKOFF_MAX_MS = 60000;
-const OVERRIDE_CACHE_FALLBACK_TTL_MS = 24 * 60 * 60 * 1000;
-const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v2';
-const OLD_SCHEDULE_DATA_CACHE_KEYS = ['phs:schedule-data:v1'];
-const SCHEDULE_DATA_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const SCHEDULE_DATA_CACHE_KEY = 'phs:schedule-data:v3';
+const OLD_SCHEDULE_DATA_CACHE_KEYS = ['phs:schedule-data:v1', 'phs:schedule-data:v2'];
+const SCHEDULE_DATA_CACHE_TTL_MS = 10 * 60 * 1000;
 const SCHEDULE_DATA_FETCH_TIMEOUT_MS = 5000;
 const LUNCH_WEATHER_CACHE_KEY = 'phs:lunch-weather:v7';
 const LUNCH_WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
@@ -91,7 +88,9 @@ function _isScheduleEntry(entry) {
 
 function _isScheduleDataShape(nextData) {
   if (!nextData || typeof nextData !== 'object' || !_isScheduleEntry(nextData.base)) return false;
-  return Object.values(nextData).every(_isScheduleEntry);
+  return Object.entries(nextData).every(([key, value]) => (
+    key === 'base' || /^\d{1,2}\/\d{1,2}$/.test(key) || /^\d{4}-\d{2}-\d{2}$/.test(key)
+  ) && _isScheduleEntry(value));
 }
 
 let _siteView = 'schedule';
@@ -102,10 +101,6 @@ let _gradesFrameUrlLocked = false;
 let _gradesFrameApplyGeneration = 0;
 let _gradesFrameSizeRaf = 0;
 let _gradesFrameBridgeReady = false;
-let _gradesIsFullscreen = false;
-let _gradesSavedFrameCss = '';
-let _gradesSavedScalerCss = '';
-const _gradesSavedTransforms = [];
 let _weatherCard = null;
 let _weatherAlert = null;
 let _weatherAlertIcon = null;
@@ -120,8 +115,6 @@ let _weatherLoading = false;
 let _weatherVisible = false;
 let _weatherRetryAt = 0;
 let _lunchWeatherInterval = null;
-let _overrideFailureCount = 0;
-let _overrideRetryAt = 0;
 const _periodEntryCache = new WeakMap();
 
 async function _pollScheduleOverride() {
@@ -129,40 +122,8 @@ async function _pollScheduleOverride() {
     _scheduleOverride = _normalizeScheduleOverride(window.__SITE_SETTINGS__.scheduleOverride || null);
     return;
   }
-  if (_isLocalhost()) {
-    const previousOverride = JSON.stringify(_scheduleOverride);
-    _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
-    if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
-    return;
-  }
-  if (Date.now() < _overrideRetryAt) return;
   const previousOverride = JSON.stringify(_scheduleOverride);
-  const settingsOverride = _readSettingsScheduleOverride();
-  let timeout = 0;
-  try {
-    const controller = new AbortController();
-    timeout = setTimeout(() => controller.abort(), OVERRIDE_FETCH_TIMEOUT_MS);
-    const res = await fetch(`${_BACKEND_URL}/schedule-override`, {
-      signal: controller.signal,
-      cache: 'no-store'
-    });
-    const json = await res.json();
-    _scheduleOverride = _chooseFreshScheduleOverride(json.override || null, settingsOverride);
-    if (_scheduleOverride) {
-      _writeStoredScheduleOverride(_scheduleOverride);
-    } else {
-      localStorage.removeItem('phs_schedule_override');
-    }
-    _overrideFailureCount = 0;
-    _overrideRetryAt = 0;
-  } catch (e) {
-    _overrideFailureCount += 1;
-    const backoff = Math.min(OVERRIDE_FAILURE_BACKOFF_MAX_MS, OVERRIDE_POLL_INTERVAL_MS * (2 ** _overrideFailureCount));
-    _overrideRetryAt = Date.now() + backoff;
-    _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
-  } finally {
-    clearTimeout(timeout);
-  }
+  _scheduleOverride = _readSettingsScheduleOverride();
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
@@ -251,7 +212,7 @@ function _plannedOverrideForDate(date) {
 
 function _writeStoredScheduleOverride(override) {
   try {
-    localStorage.setItem('phs_schedule_override', JSON.stringify({ ...override, fetchedAt: Date.now() }));
+    localStorage.removeItem('phs_schedule_override');
   } catch {}
 }
 
@@ -260,21 +221,8 @@ function _readSettingsScheduleOverride() {
 }
 
 function _readStoredScheduleOverride() {
-  try {
-    const stored = localStorage.getItem('phs_schedule_override');
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    const fetchedAt = Number(parsed?.fetchedAt || 0);
-    if (!Number.isFinite(fetchedAt) || Date.now() - fetchedAt > OVERRIDE_CACHE_FALLBACK_TTL_MS) {
-      localStorage.removeItem('phs_schedule_override');
-      return null;
-    }
-    delete parsed.fetchedAt;
-    return _normalizeScheduleOverride(parsed);
-  } catch {
-    localStorage.removeItem('phs_schedule_override');
-    return null;
-  }
+  try { localStorage.removeItem('phs_schedule_override'); } catch {}
+  return null;
 }
 
 function _applySettingsScheduleOverride(settings) {
@@ -288,8 +236,7 @@ function _applySettingsScheduleOverride(settings) {
     if (activeTimestamp && (!settingsUpdatedAt || settingsUpdatedAt < activeTimestamp)) return;
   }
   _scheduleOverride = nextOverride;
-  if (_scheduleOverride) _writeStoredScheduleOverride(_scheduleOverride);
-  else localStorage.removeItem('phs_schedule_override');
+  try { localStorage.removeItem('phs_schedule_override'); } catch {}
   if (data && previousOverride !== JSON.stringify(_scheduleOverride)) updateAll();
 }
 
@@ -458,7 +405,7 @@ function _prepareCountdownDisplay() {
 
 function _readScheduleDataCache() {
   try {
-    const raw = sessionStorage.getItem(SCHEDULE_DATA_CACHE_KEY) || localStorage.getItem(SCHEDULE_DATA_CACHE_KEY);
+    const raw = sessionStorage.getItem(SCHEDULE_DATA_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') return null;
@@ -474,13 +421,15 @@ function _clearOldScheduleDataCaches() {
     try { sessionStorage.removeItem(key); } catch {}
     try { localStorage.removeItem(key); } catch {}
   }
+  try { localStorage.removeItem(SCHEDULE_DATA_CACHE_KEY); } catch {}
+  try { localStorage.removeItem('phs_schedule_override'); } catch {}
 }
 
 function _writeScheduleDataCache(nextData) {
   try {
     const payload = JSON.stringify({ ts: Date.now(), data: nextData });
     sessionStorage.setItem(SCHEDULE_DATA_CACHE_KEY, payload);
-    localStorage.setItem(SCHEDULE_DATA_CACHE_KEY, payload);
+    localStorage.removeItem(SCHEDULE_DATA_CACHE_KEY);
   } catch {}
 }
 
@@ -1288,14 +1237,14 @@ async function _applyGradesFrameUrl(settings) {
   if (_isLocalhost() && (!localUrl || !(await _localGradeMelonAvailable()))) url = prodUrl;
   url = _safeFrameUrl(url);
   if (applyGeneration !== _gradesFrameApplyGeneration || _gradesFrameUrlLocked) return;
-  if (url && !_urlsEqual(_gradesFrame.src, url)) {
-    _gradesFrame.src = url;
+  if (url) {
+    if (!_urlsEqual(_gradesFrame.src, url)) _gradesFrame.src = url;
     _gradesFrameUrlLocked = true;
   }
 }
 
 function _scheduleGradesFrameSize() {
-  if (!_gradesScaler || !_gradesFrame || _gradesIsFullscreen) return;
+  if (!_gradesScaler || !_gradesFrame) return;
   if (_gradesFrameSizeRaf) return;
   _gradesFrameSizeRaf = requestAnimationFrame(() => {
     _gradesFrameSizeRaf = 0;
@@ -1304,7 +1253,7 @@ function _scheduleGradesFrameSize() {
 }
 
 function _setGradesFrameSize() {
-  if (!_gradesScaler || !_gradesFrame || _gradesIsFullscreen) return;
+  if (!_gradesScaler || !_gradesFrame) return;
   const w = _gradesScaler.offsetWidth;
   if (!w) return;
   const top = _gradesScaler.getBoundingClientRect().top;
@@ -1386,8 +1335,6 @@ function _initGradesFrameBridge() {
     if (event.data?.type === 'gradeviewer:privacy-modal') {
       document.body.classList.toggle('privacy-modal-open', Boolean(event.data.open));
     }
-    if (event.data?.type === 'modalOpen') _goGradesFullscreen();
-    if (event.data?.type === 'modalClose') _exitGradesFullscreen();
     if (event.data?.type === 'gradeviewer:theme-ready') _postThemeToGradesFrame();
   });
 
@@ -1399,49 +1346,6 @@ function _initGradesFrameBridge() {
     setTimeout(_postThemeToGradesFrame, 100);
     _scheduleGradesFrameSize();
   });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && _gradesIsFullscreen) _exitGradesFullscreen();
-  });
-}
-
-function _goGradesFullscreen() {
-  if (_gradesIsFullscreen || !_gradesFrame || !_gradesScaler) return;
-  _gradesIsFullscreen = true;
-  _gradesSavedFrameCss = _gradesFrame.style.cssText;
-  _gradesSavedScalerCss = _gradesScaler.style.cssText;
-  let el = _gradesFrame.parentElement;
-  while (el && el !== document.body) {
-    _gradesSavedTransforms.push({ el, transform: el.style.transform, willChange: el.style.willChange, animation: el.style.animation, opacity: el.style.opacity });
-    el.style.transform = 'none';
-    el.style.willChange = 'auto';
-    el.style.animation = 'none';
-    el.style.opacity = '1';
-    el = el.parentElement;
-  }
-  document.body.classList.add('gradeviewer-modal-open');
-  _gradesScaler.classList.add('is-modal-fullscreen');
-  _gradesFrame.style.cssText = _gradesSavedFrameCss + ';width:100vw;height:100vh;border-radius:0;background:transparent';
-  document.body.style.overflow = 'hidden';
-}
-
-function _exitGradesFullscreen() {
-  if (!_gradesIsFullscreen || !_gradesFrame || !_gradesScaler) return;
-  _gradesIsFullscreen = false;
-  document.body.classList.remove('gradeviewer-modal-open');
-  document.body.style.overflow = '';
-  _gradesScaler.classList.remove('is-modal-fullscreen');
-  _gradesScaler.style.cssText = _gradesSavedScalerCss;
-  _gradesFrame.style.cssText = _gradesSavedFrameCss;
-  _gradesSavedScalerCss = '';
-  _gradesSavedFrameCss = '';
-  _gradesSavedTransforms.forEach(saved => {
-    saved.el.style.transform = saved.transform;
-    saved.el.style.willChange = saved.willChange;
-    saved.el.style.animation = saved.animation;
-    saved.el.style.opacity = saved.opacity;
-  });
-  _gradesSavedTransforms.length = 0;
-  _setGradesFrameSize();
 }
 
 function _setAdminStatus(text) {
@@ -1819,7 +1723,7 @@ function setHeroLine(line, text, visible, options = {}) {
 
   _setStyledText(fallback, styleTarget, text);
   fallback.style.display = visible ? 'block' : 'none';
-  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible && !hasLetterStyles));
+  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible && !hasLetterStyles && stage.classList.contains('is-complete')));
 
   if (!stage) return;
   if (!visible) {
@@ -2028,6 +1932,7 @@ async function signHeroText(target, text, options = {}, requestId = '') {
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
     target.classList.add('is-complete');
+    signatureFallbackForStage(target)?.classList.add('signature-fallback-hidden');
     updateHeroSignatureLayout();
     return;
   }
@@ -2050,6 +1955,7 @@ async function signHeroText(target, text, options = {}, requestId = '') {
       brush.setAttribute('width', String(viewW + brushWidth));
       glintGroup.style.opacity = '0';
       target.classList.add('is-complete');
+      signatureFallbackForStage(target)?.classList.add('signature-fallback-hidden');
       updateHeroSignatureLayout();
     }
   };
@@ -2061,8 +1967,15 @@ async function signHeroText(target, text, options = {}, requestId = '') {
     brush.setAttribute('width', String(viewW + brushWidth));
     glintGroup.style.opacity = '0';
     target.classList.add('is-complete');
+    signatureFallbackForStage(target)?.classList.add('signature-fallback-hidden');
     updateHeroSignatureLayout();
   }, totalDuration + 350);
+}
+
+function signatureFallbackForStage(target) {
+  if (target === domRefs.signatureEyebrow) return domRefs.heroEyebrow;
+  if (target === domRefs.signatureTitle) return domRefs.heroTitle;
+  return null;
 }
 
 async function main() {
@@ -2119,7 +2032,7 @@ async function main() {
     }
 
     _initAdminPanel();
-    _scheduleOverride = _readSettingsScheduleOverride() || _readStoredScheduleOverride();
+    _scheduleOverride = _readSettingsScheduleOverride();
     _updateAllOrDeferForHomepageIntro();
     _markHomepageIntroDataReady();
     _pollScheduleOverride();

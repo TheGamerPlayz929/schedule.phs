@@ -29,6 +29,12 @@
     return new Date(y, m - 1, d);
   }
 
+  function timestampISO(input) {
+    const value = Number(input || 0);
+    if (!Number.isFinite(value) || value <= 0) return '';
+    return toISODate(new Date(value));
+  }
+
   function dateOverrides(settings) {
     const map = settings?.bellSchedules?._dateOverrides
       || settings?.scheduleOverride?.dateOverrides
@@ -84,7 +90,8 @@
     }
 
     const active = settings?.scheduleOverride;
-    if (active?.type && String(active.date || '') === iso) {
+    const activeISO = String(active?.date || '').trim() || timestampISO(active?.timestamp);
+    if (active?.type && activeISO === iso) {
       return { type: active.type, source: 'active', rule: null, iso };
     }
 
@@ -101,9 +108,12 @@
     return { type: defaultType || '', source: 'default', rule: null, iso };
   }
 
-  window.PhsScheduleResolver = {
+  const api = {
     resolveScheduleType,
     toISODate,
-    localDate
+    localDate,
+    timestampISO
   };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (typeof window === 'object') window.PhsScheduleResolver = api;
 })();

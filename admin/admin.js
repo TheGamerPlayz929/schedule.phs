@@ -546,7 +546,7 @@
     }
     if (res.status === 401) {
       state.token = null;
-      localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+      clearBearerSession();
       if (!silentAuth) showLogin('Session expired — sign in again.');
       const error = new Error('Unauthorized');
       error.status = 401;
@@ -615,10 +615,8 @@
   }
 
   async function loadSettingsPair() {
-    const loadWorkingSettings = () => fetchAdminJson('/admin/site-settings')
-      .catch(() => fetchAdminJson('/site-settings'));
     const [settings, defaults] = await Promise.all([
-      loadWorkingSettings(),
+      fetchAdminJson('/admin/site-settings'),
       fetchAdminJson('/site-settings/defaults')
     ]);
     return normalizeSettingsPair(settings, defaults);
@@ -661,9 +659,18 @@
   }
 
   // ── Login / boot ───────────────────────────────────────────────────────
+  function clearBearerSession() {
+    try { sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY); } catch {}
+  }
+  function saveBearerSession(token) {
+    clearBearerSession();
+    if (!token) return;
+    try { sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token); } catch {}
+  }
   function showLogin(errorMsg) {
     state.token = null;
-    localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+    clearBearerSession();
     $('#app-shell').classList.add('hidden');
     $('#login-shell').classList.remove('hidden');
     if (errorMsg) $('#login-error').textContent = errorMsg;
@@ -724,9 +731,10 @@
 
   function restoreBearerSession() {
     try {
-      const token = localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+      const token = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
       if (token) state.token = token;
     } catch {}
+    try { localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY); } catch {}
   }
   function fetchWithTimeout(url, opts = {}, ms = 15000) {
     const controller = new AbortController();
@@ -831,8 +839,7 @@
         throw error;
       }
       state.token = json.token || null;
-      if (state.token) localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, state.token);
-      else localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+      saveBearerSession(state.token);
       setLoginStatus('Opening admin session...', { retry: false });
       const who = await waitForAdminSession();
       await bootApp(who);
@@ -848,7 +855,7 @@
     if (!confirmLeaveWithUnpublished('Sign out anyway?')) return;
     try { await api('/admin/logout', { method: 'POST' }); } catch {}
     state.token = null;
-    localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+    clearBearerSession();
     showLogin('Signed out.');
     loadAuthConfig();
   });
@@ -897,7 +904,8 @@
       syncSecurityAutoRefresh();
     } catch (e) {
       console.warn('boot error', e);
-      if (isLocal && !state.token) {
+      const backendUnreachable = /Could not reach the backend/i.test(String(e?.message || ''));
+      if (isLocal && !state.token && backendUnreachable) {
         showLogin('Local backend is not reachable at http://127.0.0.1:8080.');
         state.authConfig = { localBypassEnabled: true };
         configureGoogleLogin();

@@ -10,9 +10,11 @@
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const PUBLIC_SETTINGS_URL = 'site-settings.json';
-  const CACHE_KEY = 'phs:site-settings:v8';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v8';
+  const CACHE_KEY = 'phs:site-settings:v9';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v9';
   const OLD_CACHE_KEYS = [
+    'phs:site-settings:v8',
+    'phs:site-settings:last-good:v8',
     'phs:site-settings:v7',
     'phs:site-settings:last-good:v7',
     'phs:site-settings:v6',
@@ -489,8 +491,9 @@
 
     const publicFreshness = settingsFreshness(publicSettings);
     const backendFreshness = settingsFreshness(backendSettings);
-    if (publicFreshness && backendFreshness && publicFreshness > backendFreshness) return publicSettings;
-    return backendSettings;
+    if (backendFreshness && publicFreshness && backendFreshness > publicFreshness) return backendSettings;
+    if (backendFreshness && !publicFreshness) return backendSettings;
+    return publicSettings;
   }
 
   function noteBackendSuccess() {
@@ -505,28 +508,20 @@
 
   async function fetchAndApply() {
     if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
-    let publicSettings = null;
-    let backendSettings = null;
-    try {
-      publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
-    } catch (err) {
-      if (!isAbortError(err)) console.warn('[settings] public fetch failed:', err);
+    const publicPromise = fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
+    const backendPromise = (!isLocal && Date.now() >= backendRetryAt)
+      ? fetchJson(BACKEND + '/site-settings', { noStore: true })
+      : Promise.resolve(null);
+    const [publicResult, backendResult] = await Promise.allSettled([publicPromise, backendPromise]);
+    const publicSettings = publicResult.status === 'fulfilled' ? publicResult.value : null;
+    const backendSettings = backendResult.status === 'fulfilled' ? backendResult.value : null;
+    if (backendResult.status === 'fulfilled' && backendSettings) noteBackendSuccess();
+    if (backendResult.status === 'rejected') {
+      noteBackendFailure();
+      if (!publicSettings && !isAbortError(backendResult.reason)) console.warn('[settings] backend fetch failed:', backendResult.reason);
     }
-
-    if (publicSettings) {
-      writeCache(publicSettings);
-      applyBindings(publicSettings);
-      return window.__SITE_SETTINGS__;
-    }
-
-    if (!isLocal && Date.now() >= backendRetryAt) {
-      try {
-        backendSettings = await fetchJson(BACKEND + '/site-settings', { noStore: true });
-        noteBackendSuccess();
-      } catch (err) {
-        noteBackendFailure();
-        if (!isAbortError(err)) console.warn('[settings] backend fetch failed:', err);
-      }
+    if (publicResult.status === 'rejected' && !isAbortError(publicResult.reason)) {
+      console.warn('[settings] public fetch failed:', publicResult.reason);
     }
 
     const nextSettings = chooseFreshSettings(publicSettings, backendSettings);

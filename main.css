@@ -521,9 +521,6 @@ body.site-view-grades .app-footer {
   font-size: 14px;
 }
 
-body.gradeviewer-modal-open .glass-nav,
-body.gradeviewer-modal-open .grades-hero,
-body.gradeviewer-modal-open .app-footer,
 body.privacy-modal-open .glass-nav,
 body.privacy-modal-open .grades-hero,
 body.privacy-modal-open .app-footer {
@@ -532,7 +529,6 @@ body.privacy-modal-open .app-footer {
   pointer-events: none;
 }
 
-body.gradeviewer-modal-open::before,
 body.privacy-modal-open::before {
   content: "";
   position: fixed;
@@ -695,19 +691,6 @@ body.privacy-modal-open::before {
   line-height: 1;
   color: var(--fg-1);
   text-shadow: 0 0 28px rgba(255, 255, 255, 0.2);
-}
-
-.signature-ready .hero-eyebrow,
-.signature-ready .hero-title,
-.signature-pending .hero-eyebrow,
-.signature-pending .hero-title {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  opacity: 0;
 }
 
 .hero-eyebrow.signature-fallback-hidden,
@@ -1142,29 +1125,6 @@ body.site-view-schedule.schedule-terminal-state .app-footer.fade-up {
 #grades-frame {
   border: none;
   display: block;
-}
-
-.grades-scaler.is-modal-fullscreen {
-  position: fixed !important;
-  inset: 0 !important;
-  left: 0 !important;
-  top: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  transform: none !important;
-  contain: none !important;
-  overflow: visible !important;
-  z-index: 80 !important;
-  background: transparent !important;
-}
-
-.grades-scaler.is-modal-fullscreen #grades-frame {
-  position: static !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  border-radius: 0 !important;
-  background: transparent !important;
 }
 
 .schedule-header {

@@ -95,6 +95,120 @@
     "faqBody": "Your StudentVue credentials are sent directly from your browser to your school district's servers. They are never stored or logged on this site."
   },
   "bellSchedules": {
+    "Normal Schedule": {
+      "27900": [
+        30900,
+        "Period 1"
+      ],
+      "31200": [
+        33900,
+        "Period 2"
+      ],
+      "34200": [
+        36900,
+        "Period 3"
+      ],
+      "37200": [
+        39900,
+        "Period 4"
+      ],
+      "39900": [
+        43200,
+        "Lunch"
+      ],
+      "43500": [
+        46200,
+        "Period 5"
+      ],
+      "46500": [
+        49200,
+        "Period 6"
+      ],
+      "49500": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    },
+    "Advisory": {
+      "27900": [
+        30600,
+        "Period 1"
+      ],
+      "30900": [
+        33300,
+        "Period 2"
+      ],
+      "33600": [
+        36000,
+        "Homeroom"
+      ],
+      "36300": [
+        38700,
+        "Period 3"
+      ],
+      "39000": [
+        41400,
+        "Period 4"
+      ],
+      "41400": [
+        44100,
+        "Lunch"
+      ],
+      "44400": [
+        46800,
+        "Period 5"
+      ],
+      "47100": [
+        49500,
+        "Period 6"
+      ],
+      "49800": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    },
+    "Early Release": {
+      "27900": [
+        29700,
+        "Period 1"
+      ],
+      "30000": [
+        31620,
+        "Period 2"
+      ],
+      "31920": [
+        33540,
+        "Period 3"
+      ],
+      "33840": [
+        35460,
+        "Period 4"
+      ],
+      "35760": [
+        37380,
+        "Period 5"
+      ],
+      "37680": [
+        39300,
+        "Period 6"
+      ],
+      "39600": [
+        41220,
+        "Period 7"
+      ],
+      "41220": [
+        43080,
+        "Lunch"
+      ]
+    },
     "_dateOverrides": {
       "2026-06-03": "Advisory"
     }
@@ -114,5 +228,5 @@
     "message": "Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon."
   },
   "scheduleOverride": null,
-  "updatedAt": 1780491583766
+  "updatedAt": 1780612535321
 }
