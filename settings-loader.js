@@ -9,7 +9,7 @@
 (function () {
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
-  const PUBLIC_SETTINGS_URL = 'site-settings.json';
+  const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260605-publicready1';
   const CACHE_KEY = 'phs:site-settings:v9';
   const LAST_GOOD_KEY = 'phs:site-settings:last-good:v9';
   const OLD_CACHE_KEYS = [
@@ -37,6 +37,11 @@
   ]);
   let backendRetryAt = 0;
   let backendBackoffMs = 0;
+  let publicSettingsReadyResolved = false;
+  let resolvePublicSettingsReady = () => {};
+  window.PhsPublicSettingsReady = new Promise(resolve => {
+    resolvePublicSettingsReady = resolve;
+  });
   const isPreviewIframe = (() => {
     try { return new URLSearchParams(location.search).has('_preview') && window.parent !== window; }
     catch { return false; }
@@ -506,28 +511,41 @@
     backendRetryAt = Date.now() + backendBackoffMs;
   }
 
+  function finishPublicSettingsReady(settings) {
+    if (publicSettingsReadyResolved) return;
+    publicSettingsReadyResolved = true;
+    resolvePublicSettingsReady(settings || window.__SITE_SETTINGS__ || null);
+  }
+
   async function fetchAndApply() {
-    if (isPreviewIframe) return Promise.resolve(); // preview mode waits for parent postMessage instead
-    const publicPromise = fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
-    const backendPromise = (!isLocal && Date.now() >= backendRetryAt)
-      ? fetchJson(BACKEND + '/site-settings', { noStore: true })
-      : Promise.resolve(null);
-    const [publicResult, backendResult] = await Promise.allSettled([publicPromise, backendPromise]);
-    const publicSettings = publicResult.status === 'fulfilled' ? publicResult.value : null;
-    const backendSettings = backendResult.status === 'fulfilled' ? backendResult.value : null;
-    if (backendResult.status === 'fulfilled' && backendSettings) noteBackendSuccess();
-    if (backendResult.status === 'rejected') {
-      noteBackendFailure();
-      if (!publicSettings && !isAbortError(backendResult.reason)) console.warn('[settings] backend fetch failed:', backendResult.reason);
-    }
-    if (publicResult.status === 'rejected' && !isAbortError(publicResult.reason)) {
-      console.warn('[settings] public fetch failed:', publicResult.reason);
+    if (isPreviewIframe) {
+      finishPublicSettingsReady(window.__SITE_SETTINGS__ || null);
+      return Promise.resolve(); // preview mode waits for parent postMessage instead
     }
 
-    const nextSettings = chooseFreshSettings(publicSettings, backendSettings);
-    if (nextSettings) {
-      writeCache(nextSettings);
-      applyBindings(nextSettings);
+    try {
+      const publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
+      writeCache(publicSettings);
+      applyBindings(publicSettings);
+      finishPublicSettingsReady(publicSettings);
+    } catch (err) {
+      if (!isAbortError(err)) console.warn('[settings] public fetch failed:', err);
+      finishPublicSettingsReady(window.__SITE_SETTINGS__ || null);
+    }
+
+    if (!isLocal && Date.now() >= backendRetryAt) {
+      try {
+        const backendSettings = await fetchJson(BACKEND + '/site-settings', { noStore: true });
+        if (backendSettings) noteBackendSuccess();
+        const nextSettings = chooseFreshSettings(window.__SITE_SETTINGS__, backendSettings);
+        if (nextSettings) {
+          writeCache(nextSettings);
+          applyBindings(nextSettings);
+        }
+      } catch (err) {
+        noteBackendFailure();
+        if (!isAbortError(err)) console.warn('[settings] backend fetch failed:', err);
+      }
     }
 
     if (!window.__SITE_SETTINGS__) {
@@ -546,8 +564,10 @@
   window.PhsSettingsReady = fetchAndApply().then(settings => {
     if (!settings && cached.settings && !cached.stale && !isPreviewIframe) {
       applyBindings(cached.settings);
+      finishPublicSettingsReady(cached.settings);
       return cached.settings;
     }
+    finishPublicSettingsReady(settings);
     return settings;
   });
 

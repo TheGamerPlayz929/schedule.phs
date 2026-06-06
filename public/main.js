@@ -1723,7 +1723,7 @@ function setHeroLine(line, text, visible, options = {}) {
 
   _setStyledText(fallback, styleTarget, text);
   fallback.style.display = visible ? 'block' : 'none';
-  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible && !hasLetterStyles && stage.classList.contains('is-complete')));
+  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible && !hasLetterStyles));
 
   if (!stage) return;
   if (!visible) {
@@ -2027,8 +2027,9 @@ async function main() {
       console.warn('Using cached schedule data:', fetchError);
     }
 
-    if (window.PhsSettingsReady && typeof window.PhsSettingsReady.then === 'function') {
-      try { await window.PhsSettingsReady; } catch {}
+    const initialSettingsReady = window.PhsPublicSettingsReady || window.PhsSettingsReady;
+    if (initialSettingsReady && typeof initialSettingsReady.then === 'function') {
+      try { await initialSettingsReady; } catch {}
     }
 
     _initAdminPanel();
