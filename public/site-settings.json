@@ -217,7 +217,7 @@
   "gradeMelon": {
     "privacyButtonLabel": "Privacy & Safety FAQ",
     "privacyTitle": "Privacy & Safety FAQ",
-    "privacyDoneLabel": "Done",
+    "privacyDoneLabel": "Back",
     "privacyParagraphs": [
       "GradeViewer pages may open embedded school tools; this site shows only the information you choose to view and does not sell personal data. For support or removal requests, use the contact emails shown in the footer."
     ]
@@ -228,5 +228,5 @@
     "message": "Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon."
   },
   "scheduleOverride": null,
-  "updatedAt": 1780612535321
+  "updatedAt": 1780929698537
 }
