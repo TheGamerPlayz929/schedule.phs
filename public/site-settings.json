@@ -212,7 +212,8 @@
     "_dateOverrides": {
       "2026-06-03": "Advisory",
       "2026-06-17": "Normal Schedule",
-      "2026-06-18": "Early Release"
+      "2026-06-18": "Early Release",
+      "2026-06-10": "No School"
     }
   },
   "scheduleRules": [],
@@ -230,5 +231,5 @@
     "message": "Poolesville Schedule is temporarily unavailable while we make an update. Please check back soon."
   },
   "scheduleOverride": null,
-  "updatedAt": 1781017137932
+  "updatedAt": 1781119506342
 }
