@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connections Word Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Connections</h1>
+            <p>Create four groups of four!</p>
+        </header>
+
+        <div id="solved-categories" class="solved-categories"></div>
+
+        <div id="game-grid" class="game-grid"></div>
+
+        <div class="game-controls">
+            <div id="mistakes-container" class="mistakes-container">
+                Mistakes remaining: <span id="mistakes-dots"></span>
+            </div>
+            <div class="buttons">
+                <button id="shuffle-btn">Shuffle</button>
+                <button id="deselect-btn">Deselect All</button>
+                <button id="submit-btn" disabled>Submit</button>
+            </div>
+        </div>
+
+        <div id="message-container" class="message-container"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
