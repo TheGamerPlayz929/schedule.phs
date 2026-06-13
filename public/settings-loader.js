@@ -382,6 +382,69 @@
     const note = panel.querySelector('.site-maintenance__note');
     if (note) note.textContent = cleanStatusText(settings?.branding?.siteTitle, 'Poolesville Schedule', 80);
   }
+  function ensureDevtoolsPausePanel() {
+    let panel = document.getElementById('devtools-pause');
+    if (panel) return panel;
+
+    panel = document.createElement('main');
+    panel.id = 'devtools-pause';
+    panel.className = 'site-maintenance devtools-pause';
+    panel.hidden = true;
+    panel.setAttribute('role', 'alert');
+    panel.setAttribute('aria-live', 'assertive');
+
+    const mark = document.createElement('div');
+    mark.className = 'site-maintenance__mark';
+    const logo = document.createElement('img');
+    logo.src = 'phs-logo-96.png';
+    logo.alt = 'PHS Logo';
+    logo.width = 48;
+    logo.height = 40;
+    logo.decoding = 'async';
+    mark.appendChild(logo);
+
+    const title = document.createElement('h1');
+    title.textContent = 'Site paused';
+
+    const message = document.createElement('p');
+    message.textContent = 'Developer tools were detected. Close them to continue.';
+
+    const note = document.createElement('span');
+    note.className = 'site-maintenance__note';
+    note.textContent = 'Poolesville Schedule';
+
+    panel.append(mark, title, message, note);
+    document.body.appendChild(panel);
+    return panel;
+  }
+  function setDevtoolsPaused(paused) {
+    const panel = ensureDevtoolsPausePanel();
+    document.body.classList.toggle('devtools-pause-active', paused);
+    document.querySelectorAll('.app-shell').forEach(shell => {
+      if (paused) shell.setAttribute('aria-hidden', 'true');
+      else if (!document.body.classList.contains('site-maintenance-active')) shell.removeAttribute('aria-hidden');
+    });
+    panel.hidden = !paused;
+  }
+  function likelyDevtoolsOpen() {
+    const widthGap = Math.abs(window.outerWidth - window.innerWidth);
+    const heightGap = Math.abs(window.outerHeight - window.innerHeight);
+    if (widthGap > 160 || heightGap > 160) return true;
+
+    const start = performance.now();
+    // eslint-disable-next-line no-debugger
+    debugger;
+    return performance.now() - start > 120;
+  }
+  function installDevtoolsPauseGuard() {
+    if (isLocal || isPreviewIframe) return;
+    const check = () => setDevtoolsPaused(likelyDevtoolsOpen());
+    const timer = setInterval(check, 1800);
+    window.addEventListener('resize', check);
+    window.addEventListener('focus', check);
+    window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
+    check();
+  }
 
   function applyBindings(settings) {
     if (!settings || typeof settings !== 'object') return;
@@ -598,6 +661,7 @@
   });
 
   installStudioPreview();
+  installDevtoolsPauseGuard();
 
   // Tell parent we're ready to receive (admin side waits for this signal).
   if (isPreviewIframe && window.parent !== window) {

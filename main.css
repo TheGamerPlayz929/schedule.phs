@@ -79,20 +79,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-body.site-maintenance-active {
+body.site-maintenance-active,
+body.devtools-pause-active {
   min-height: 100vh;
   background:
     linear-gradient(115deg, rgba(255,255,255,0.06), transparent 34%),
     radial-gradient(circle at 50% 10%, rgba(255,255,255,0.08), transparent 38rem),
     #050607;
 }
-body.site-maintenance-active .app-shell {
+body.site-maintenance-active .app-shell,
+body.devtools-pause-active .app-shell {
   display: none;
 }
 body.site-maintenance-active .homepage-intro,
 body.site-maintenance-active .local-view-switcher,
 body.site-maintenance-active #admin-panel,
-body.site-maintenance-active .appearance-panel {
+body.site-maintenance-active .appearance-panel,
+body.devtools-pause-active .homepage-intro,
+body.devtools-pause-active .local-view-switcher,
+body.devtools-pause-active #admin-panel,
+body.devtools-pause-active .appearance-panel {
   display: none !important;
 }
 .site-maintenance {

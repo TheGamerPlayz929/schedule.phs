@@ -11,9 +11,8 @@
   const isBackendHostedAdmin = location.hostname === BACKEND_HOST;
   const LOCAL_BACKEND = location.protocol === 'file:' ? 'http://localhost:8080' : location.origin;
   const BACKEND = isBackendHostedAdmin ? location.origin : (isLocal ? (location.port === '3000' ? location.origin : LOCAL_BACKEND) : `https://${BACKEND_HOST}`);
-  const ADMIN_SESSION_STORAGE_KEY = 'phs:admin-session:v1';
-  const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
   const SIDEBAR_COLLAPSED_KEY = 'phs:admin-sidebar-collapsed:v1';
+  const IMPORT_STATE_KEY = 'phs:admin-import-assistant:v1';
   const ACTIVE_TAB_KEY = 'phs:admin-active-tab:v2';
   const THEME_KEY = 'phs:admin-theme:v1';
   const STYLE_KEY = 'phs:admin-style:v1';
@@ -28,7 +27,6 @@
   }
   // ── State ──────────────────────────────────────────────────────────────
   const state = {
-    token: null,
     authConfig: null,
     settings: null,    // current saved settings (server)
     defaults: null,
@@ -533,7 +531,6 @@
       opts.headers || {},
       opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {});
     init.credentials = opts.credentials || 'include';
-    if (state.token) init.headers['Authorization'] = 'Bearer ' + state.token;
     let res;
     try {
       res = await fetch(BACKEND + path, init);
@@ -545,8 +542,6 @@
       throw new Error(`Could not reach the backend at ${target}.`);
     }
     if (res.status === 401) {
-      state.token = null;
-      clearBearerSession();
       if (!silentAuth) showLogin('Session expired — sign in again.');
       const error = new Error('Unauthorized');
       error.status = 401;
@@ -586,7 +581,6 @@
 
   async function fetchAdminJson(path) {
     const headers = { Accept: 'application/json' };
-    if (state.token) headers.Authorization = 'Bearer ' + state.token;
     const res = await fetch(adminNoCacheUrl(path), {
       cache: 'no-store',
       credentials: 'include',
@@ -659,18 +653,7 @@
   }
 
   // ── Login / boot ───────────────────────────────────────────────────────
-  function clearBearerSession() {
-    try { sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY); } catch {}
-    try { localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY); } catch {}
-  }
-  function saveBearerSession(token) {
-    clearBearerSession();
-    if (!token) return;
-    try { sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token); } catch {}
-  }
   function showLogin(errorMsg) {
-    state.token = null;
-    clearBearerSession();
     $('#app-shell').classList.add('hidden');
     $('#login-shell').classList.remove('hidden');
     if (errorMsg) $('#login-error').textContent = errorMsg;
@@ -729,13 +712,6 @@
     });
   }
 
-  function restoreBearerSession() {
-    try {
-      const token = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
-      if (token) state.token = token;
-    } catch {}
-    try { localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY); } catch {}
-  }
   function fetchWithTimeout(url, opts = {}, ms = 15000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ms);
@@ -838,8 +814,6 @@
         error.status = res.status;
         throw error;
       }
-      state.token = json.token || null;
-      saveBearerSession(state.token);
       setLoginStatus('Opening admin session...', { retry: false });
       const who = await waitForAdminSession();
       await bootApp(who);
@@ -854,15 +828,12 @@
   $('#logout-btn').addEventListener('click', async () => {
     if (!confirmLeaveWithUnpublished('Sign out anyway?')) return;
     try { await api('/admin/logout', { method: 'POST' }); } catch {}
-    state.token = null;
-    clearBearerSession();
     showLogin('Signed out.');
     loadAuthConfig();
   });
 
   $('#login-retry-btn')?.addEventListener('click', () => {
-    if (isLocal || state.token) bootApp();
-    else loadAuthConfig();
+    bootApp();
   });
 
   async function waitForAdminSession() {
@@ -904,8 +875,7 @@
       syncSecurityAutoRefresh();
     } catch (e) {
       console.warn('boot error', e);
-      const backendUnreachable = /Could not reach the backend/i.test(String(e?.message || ''));
-      if (isLocal && !state.token && backendUnreachable) {
+      if (isLocal) {
         showLogin('Local backend is not reachable at http://127.0.0.1:8080.');
         state.authConfig = { localBypassEnabled: true };
         configureGoogleLogin();
@@ -9460,7 +9430,6 @@
   }
   syncThemePreference();
   syncStylePreference();
-  restoreBearerSession();
-  if (isLocal || isBackendHostedAdmin || state.token) bootApp(); else showLogin();
+  bootApp();
   if (!isLocal) loadAuthConfig();
 })();
