@@ -427,23 +427,25 @@
     panel.hidden = !paused;
   }
   function likelyDevtoolsOpen() {
-    const widthGap = Math.abs(window.outerWidth - window.innerWidth);
-    const heightGap = Math.abs(window.outerHeight - window.innerHeight);
-    if (widthGap > 160 || heightGap > 160) return true;
+    if (document.visibilityState && document.visibilityState !== 'visible') return false;
 
     const start = performance.now();
     // eslint-disable-next-line no-debugger
     debugger;
-    return performance.now() - start > 120;
+    return performance.now() - start > 350;
   }
   function installDevtoolsPauseGuard() {
     if (isLocal || isPreviewIframe) return;
-    const check = () => setDevtoolsPaused(likelyDevtoolsOpen());
+    let detectionStrikes = 0;
+    const check = () => {
+      detectionStrikes = likelyDevtoolsOpen() ? Math.min(detectionStrikes + 1, 2) : 0;
+      setDevtoolsPaused(detectionStrikes >= 2);
+    };
     const timer = setInterval(check, 1800);
     window.addEventListener('resize', check);
     window.addEventListener('focus', check);
     window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
-    check();
+    setTimeout(check, 1200);
   }
 
   function applyBindings(settings) {
