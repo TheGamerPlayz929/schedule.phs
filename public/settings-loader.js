@@ -429,17 +429,21 @@
   function likelyDevtoolsOpen() {
     if (document.visibilityState && document.visibilityState !== 'visible') return false;
 
+    const alreadyPaused = document.body.classList.contains('devtools-pause-active');
+    if (!alreadyPaused) setDevtoolsPaused(true);
     const start = performance.now();
     // eslint-disable-next-line no-debugger
     debugger;
-    return performance.now() - start > 350;
+    const detected = performance.now() - start > 350;
+    if (!detected && !alreadyPaused) setDevtoolsPaused(false);
+    return detected;
   }
   function installDevtoolsPauseGuard() {
     if (isLocal || isPreviewIframe) return;
     let detectionStrikes = 0;
     const check = () => {
       detectionStrikes = likelyDevtoolsOpen() ? Math.min(detectionStrikes + 1, 2) : 0;
-      setDevtoolsPaused(detectionStrikes >= 2);
+      setDevtoolsPaused(detectionStrikes > 0);
     };
     const timer = setInterval(check, 1800);
     window.addEventListener('resize', check);
