@@ -137,6 +137,18 @@ body.devtools-pause-active .appearance-panel {
   object-fit: contain;
   filter: drop-shadow(0 8px 20px rgba(0,0,0,0.22));
 }
+.devtools-pause .site-maintenance__mark {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.devtools-pause .site-maintenance__mark img {
+  width: 92px;
+  max-height: 92px;
+}
 .site-maintenance h1 {
   max-width: 760px;
   color: var(--fg-1);
