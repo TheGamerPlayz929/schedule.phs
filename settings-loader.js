@@ -426,26 +426,47 @@
     });
     panel.hidden = !paused;
   }
-  function likelyDevtoolsOpen() {
-    if (document.visibilityState && document.visibilityState !== 'visible') return false;
+  function likelyDockedDevtoolsOpen() {
+    const outerWidth = Number(window.outerWidth) || 0;
+    const outerHeight = Number(window.outerHeight) || 0;
+    const innerWidth = Number(window.innerWidth) || 0;
+    const innerHeight = Number(window.innerHeight) || 0;
+    if (!outerWidth || !outerHeight || !innerWidth || !innerHeight) return false;
+    if (Math.min(innerWidth, innerHeight) < 520) return false;
 
+    const widthGap = Math.max(0, outerWidth - innerWidth);
+    const heightGap = Math.max(0, outerHeight - innerHeight);
+    return widthGap > 240 || heightGap > 240;
+  }
+  function likelyDebuggerPaused() {
     const alreadyPaused = document.body.classList.contains('devtools-pause-active');
     if (!alreadyPaused) setDevtoolsPaused(true);
     const start = performance.now();
     // eslint-disable-next-line no-debugger
     debugger;
-    const detected = performance.now() - start > 350;
+    const detected = performance.now() - start > 250;
     if (!detected && !alreadyPaused) setDevtoolsPaused(false);
     return detected;
   }
+  function likelyDevtoolsOpen() {
+    if (document.visibilityState && document.visibilityState !== 'visible') return false;
+    return likelyDockedDevtoolsOpen() || likelyDebuggerPaused();
+  }
   function installDevtoolsPauseGuard() {
-    if (isLocal || isPreviewIframe) return;
+    const guardTestMode = (() => {
+      try {
+        return isLocal && new URLSearchParams(location.search).has('_devtools_guard_test');
+      } catch (_) {
+        return false;
+      }
+    })();
+    if ((isLocal && !guardTestMode) || isPreviewIframe) return;
     let detectionStrikes = 0;
     const check = () => {
       detectionStrikes = likelyDevtoolsOpen() ? Math.min(detectionStrikes + 1, 2) : 0;
       setDevtoolsPaused(detectionStrikes > 0);
     };
-    const timer = setInterval(check, 1800);
+    const timer = setInterval(check, 1000);
     window.addEventListener('resize', check);
     window.addEventListener('focus', check);
     window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
