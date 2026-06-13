@@ -26,6 +26,10 @@
           {
             "key": "X-Robots-Tag",
             "value": "noindex, noarchive"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "base-uri 'self'; object-src 'none'; frame-ancestors 'self' https://phs-grades-backend.onrender.com https://poolesville.web.app https://poolesville.firebaseapp.com https://schedulephs.web.app https://schedulephs.firebaseapp.com https://thegamerplayz929.github.io"
           }
         ]
       },
