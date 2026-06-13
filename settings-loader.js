@@ -420,11 +420,35 @@
   function setDevtoolsPaused(paused) {
     const panel = ensureDevtoolsPausePanel();
     document.body.classList.toggle('devtools-pause-active', paused);
-    document.querySelectorAll('.app-shell').forEach(shell => {
-      if (paused) shell.setAttribute('aria-hidden', 'true');
-      else if (!document.body.classList.contains('site-maintenance-active')) shell.removeAttribute('aria-hidden');
-    });
+    if (paused) detachAppShellForDevtools();
+    else restoreAppShellAfterDevtools();
     panel.hidden = !paused;
+  }
+  const devtoolsDetachedShells = [];
+  let devtoolsShellMarker = null;
+  function detachAppShellForDevtools() {
+    if (devtoolsDetachedShells.length) return;
+    const shells = Array.from(document.querySelectorAll('.app-shell'));
+    if (!shells.length) return;
+    devtoolsShellMarker = document.createComment('devtools pause');
+    shells[0].before(devtoolsShellMarker);
+    shells.forEach(shell => {
+      shell.setAttribute('aria-hidden', 'true');
+      devtoolsDetachedShells.push(shell);
+      shell.remove();
+    });
+  }
+  function restoreAppShellAfterDevtools() {
+    if (!devtoolsDetachedShells.length) return;
+    const marker = devtoolsShellMarker;
+    const parent = marker?.parentNode || document.body;
+    devtoolsDetachedShells.forEach(shell => {
+      if (!document.body.classList.contains('site-maintenance-active')) shell.removeAttribute('aria-hidden');
+      parent.insertBefore(shell, marker || null);
+    });
+    devtoolsDetachedShells.length = 0;
+    if (marker?.parentNode) marker.remove();
+    devtoolsShellMarker = null;
   }
   function likelyDockedDevtoolsOpen() {
     const outerWidth = Number(window.outerWidth) || 0;
@@ -438,19 +462,9 @@
     const heightGap = Math.max(0, outerHeight - innerHeight);
     return widthGap > 240 || heightGap > 240;
   }
-  function likelyDebuggerPaused() {
-    const alreadyPaused = document.body.classList.contains('devtools-pause-active');
-    if (!alreadyPaused) setDevtoolsPaused(true);
-    const start = performance.now();
-    // eslint-disable-next-line no-debugger
-    debugger;
-    const detected = performance.now() - start > 250;
-    if (!detected && !alreadyPaused) setDevtoolsPaused(false);
-    return detected;
-  }
   function likelyDevtoolsOpen() {
     if (document.visibilityState && document.visibilityState !== 'visible') return false;
-    return likelyDockedDevtoolsOpen() || likelyDebuggerPaused();
+    return likelyDockedDevtoolsOpen();
   }
   function installDevtoolsPauseGuard() {
     const guardTestMode = (() => {
