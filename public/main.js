@@ -1025,7 +1025,7 @@ function _updateNavActive(view = _siteView) {
 function _titleForView(view) {
   if (view === 'announcements') return 'Announcements - PHS';
   if (view === 'grades') return window.__SITE_SETTINGS__?.grades?.pageTitle || 'Grades - PHS';
-  return window.__SITE_SETTINGS__?.branding?.siteTitle || 'PHS Schedule';
+  return 'PHS Schedule';
 }
 
 function _applyViewTitle(view = _siteView) {
@@ -1609,7 +1609,7 @@ function _updateAllOrDeferForHomepageIntro() {
 
 function _renderScheduleDataUnavailable(error) {
   console.warn('Schedule data unavailable:', error);
-  document.title = 'Schedule unavailable | PHS';
+  _applyViewTitle('schedule');
   document.body.classList.add('schedule-terminal-state');
   document.body.classList.remove('schedule-no-school-state', 'schedule-ended-state');
   _setTimerSurfaceVisible(false);
@@ -2192,11 +2192,7 @@ function updateAll() {
   }
 
   if (_siteView === 'schedule') {
-    document.title = isTimerInactive
-      ? `${noSchool ? scheduleType : 'Done'} | PHS`
-      : (h === 0
-        ? `${m}:${String(s).padStart(2, '0')} PHS`
-        : `${h}:${String(m).padStart(2, '0')} PHS`);
+    _applyViewTitle('schedule');
   }
 
   /* --- Hero text & Status --- */
