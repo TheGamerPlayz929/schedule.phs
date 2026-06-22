@@ -1025,7 +1025,7 @@ function _updateNavActive(view = _siteView) {
 function _titleForView(view) {
   if (view === 'announcements') return 'Announcements - PHS';
   if (view === 'grades') return window.__SITE_SETTINGS__?.grades?.pageTitle || 'Grades - PHS';
-  return 'PHS Schedule';
+  return 'Poolesville Web App | PHS Schedule';
 }
 
 function _applyViewTitle(view = _siteView) {

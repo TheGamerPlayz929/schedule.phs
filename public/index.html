@@ -6,22 +6,34 @@
 
   <meta name="google-site-verification" content="8Zxv2gF9pWq9mWpM6Uhl2qUUUKUzTzohabLAoEfYpxg" />
 
-  <title data-bind="branding.siteTitle">PHS Schedule</title>
-  <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.">
+  <title data-bind="branding.siteTitle">Poolesville Web App | PHS Schedule</title>
+  <meta name="description" data-bind="branding.siteDescription" data-bind-attr="content" content="Poolesville Web App for today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.">
   <meta name="robots" content="index,follow">
-  <meta name="application-name" content="PHS Schedule">
-  <meta name="apple-mobile-web-app-title" content="PHS Schedule">
+  <meta name="application-name" content="Poolesville Web App">
+  <meta name="apple-mobile-web-app-title" content="Poolesville Web App">
   <link rel="canonical" href="https://poolesville.web.app/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PHS Schedule">
-  <meta property="og:title" content="PHS Schedule">
-  <meta property="og:description" content="Today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.">
+  <meta property="og:title" content="Poolesville Web App | PHS Schedule">
+  <meta property="og:description" content="Poolesville Web App for today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.">
   <meta property="og:url" content="https://poolesville.web.app/">
   <meta property="og:image" content="https://poolesville.web.app/phs-logo.png">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="PHS Schedule">
-  <meta name="twitter:description" content="Today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.">
+  <meta name="twitter:title" content="Poolesville Web App | PHS Schedule">
+  <meta name="twitter:description" content="Poolesville Web App for today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.">
   <meta name="twitter:image" content="https://poolesville.web.app/phs-logo.png">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Poolesville Web App",
+      "alternateName": "PHS Schedule",
+      "url": "https://poolesville.web.app/",
+      "applicationCategory": "EducationApplication",
+      "operatingSystem": "Any",
+      "description": "Poolesville Web App for today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes."
+    }
+  </script>
   <link rel="icon" data-bind="branding.favicon" data-bind-attr="href" href="Icons8-Windows-8-Animals-Falcon.ico">
   <script>
     try {
@@ -124,6 +136,7 @@
 
   <!-- Hero Section -->
   <main class="hero" data-site-view="schedule">
+    <p class="seo-kicker fade-up" style="--stagger: 0">Poolesville Web App</p>
     <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off" data-studio-key="statusPill" data-studio-label="Status pill" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">
       <span class="status-dot"></span>
       <span id="status-label" data-bind="hero.schedulePageStatusFallback" data-text-style="statusLabel" data-studio-key="statusLabel" data-studio-label="Status label" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">Loading...</span>
