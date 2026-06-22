@@ -2,7 +2,7 @@
   "version": 1,
   "branding": {
     "siteTitle": "Poolesville Web App | PHS Schedule",
-    "siteDescription": "Poolesville Web App for today's Poolesville High School bell schedule, period times, lunch timing, announcements, and schedule changes.",
+    "siteDescription": "Poolesville Web App shows today's PHS bell schedule, period times, lunch, announcements, and schedule changes for Poolesville High School.",
     "logoSrc": "phs-logo-96.png",
     "logoAlt": "PHS Logo",
     "logoLink": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/",
