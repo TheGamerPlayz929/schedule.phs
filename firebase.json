@@ -7,6 +7,23 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      {
+        "source": "/admin",
+        "destination": "https://phs-grades-backend.onrender.com/admin",
+        "type": 302
+      },
+      {
+        "source": "/admin/",
+        "destination": "https://phs-grades-backend.onrender.com/admin",
+        "type": 302
+      },
+      {
+        "source": "/admin.html",
+        "destination": "https://phs-grades-backend.onrender.com/admin",
+        "type": 302
+      }
+    ],
     "headers": [
       {
         "source": "**",
