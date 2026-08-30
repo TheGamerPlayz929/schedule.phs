@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="strict-origin">
+  <title>Admin Sign In - PHS Schedule</title>
+  <style>
+    :root { color-scheme: dark; --bg:#090a0b; --card:#111317; --line:#30343a; --fg:#f4f5f7; --muted:#969da9; --danger:#ff8585; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { min-height:100vh; display:grid; place-items:center; padding:24px; }
+    section { width:min(420px,calc(100vw - 48px)); min-width:0; padding:30px 28px; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+    h1 { margin:0 0 8px; font-size:24px; letter-spacing:0; }
+    p { margin:0 0 24px; color:var(--muted); line-height:1.5; }
+    #google-login-btn { min-width:0; min-height:44px; overflow:hidden; }
+    #login-status { min-height:20px; margin-top:16px; color:var(--muted); font-size:13px; line-height:1.45; }
+    #login-status.error { color:var(--danger); }
+  </style>
+</head>
+<body>
+  <main>
+    <section aria-labelledby="login-title">
+      <h1 id="login-title">Sign in</h1>
+      <p>Use an approved Google account to manage the PHS site.</p>
+      <div id="google-login-btn"></div>
+      <div id="login-status" role="status" aria-live="polite">Loading sign-in...</div>
+    </section>
+  </main>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="admin-login.js?v=20260830-handoff1"></script>
+</body>
+</html>

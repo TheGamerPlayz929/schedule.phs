@@ -26,3 +26,25 @@ test('static admin entry files retain a backend redirect fallback', () => {
     assert.doesNotMatch(html, /accounts\.google\.com\/gsi\/client/);
   }
 });
+
+test('Firebase Google login uses a top-level form handoff to establish a first-party backend cookie', () => {
+  for (const file of ['admin-login.html', 'public/admin-login.html']) {
+    const html = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(html, /accounts\.google\.com\/gsi\/client/);
+    assert.match(html, /admin-login\.js/);
+    assert.match(html, /name="referrer" content="strict-origin"/);
+    assert.doesNotMatch(html, /name="referrer" content="no-referrer"/);
+  }
+
+  for (const file of ['admin-login.js', 'public/admin-login.js']) {
+    const js = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(js, /form\.method = 'POST'/);
+    assert.match(js, /form\.action = BACKEND \+ '\/admin\/google-login'/);
+    assert.match(js, /input\.name = 'credential'/);
+    assert.match(js, /form\.requestSubmit\(\)/);
+    assert.match(js, /const buttonWidth = Math\.min\(320, Math\.max\(200, window\.innerWidth - 106\)\);/);
+    assert.match(js, /width: buttonWidth/);
+    assert.doesNotMatch(js, /fetch\(BACKEND \+ '\/admin\/google-login'/);
+    assert.doesNotMatch(js, /localStorage|sessionStorage/);
+  }
+});
