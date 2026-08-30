@@ -1,16 +1,16 @@
-/* Anonymous first-party usage totals with browser-controlled opt-out. */
+/* Anonymous first-party usage totals with explicit browser consent. */
 (function () {
-  const STORAGE_KEY = 'phs:privacy:analytics-optout:v1';
+  const STORAGE_KEY = 'phs:privacy:analytics-consent:v2';
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const privacySignal = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
 
-  function storedOptOut() {
-    try { return localStorage.getItem(STORAGE_KEY) === 'true'; }
-    catch { return true; }
+  function consentGranted() {
+    try { return localStorage.getItem(STORAGE_KEY) === 'granted'; }
+    catch { return false; }
   }
 
-  function setStoredOptOut(value) {
-    try { localStorage.setItem(STORAGE_KEY, value ? 'true' : 'false'); }
+  function setConsent(granted) {
+    try { localStorage.setItem(STORAGE_KEY, granted ? 'granted' : 'denied'); }
     catch {}
   }
 
@@ -18,11 +18,11 @@
     const control = document.getElementById('aggregate-analytics-toggle');
     const status = document.getElementById('aggregate-analytics-status');
     if (!control) return;
-    control.checked = !privacySignal && !storedOptOut();
+    control.checked = !privacySignal && consentGranted();
     control.disabled = privacySignal;
     if (privacySignal && status) status.textContent = 'Your browser privacy signal is active, so anonymous analytics are off.';
     control.addEventListener('change', () => {
-      setStoredOptOut(!control.checked);
+      setConsent(control.checked);
       if (status) status.textContent = control.checked
         ? 'Anonymous analytics are on for future page visits.'
         : 'Anonymous analytics are off for future page visits.';
@@ -32,7 +32,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeControl, { once: true });
   else initializeControl();
 
-  if (isLocal || privacySignal || storedOptOut() || new URLSearchParams(location.search).has('_preview')) return;
+  if (isLocal || privacySignal || !consentGranted() || new URLSearchParams(location.search).has('_preview')) return;
 
   const BACKEND = 'https://phs-grades-backend.onrender.com';
   const PAGE_MAP = {
