@@ -42,6 +42,11 @@
     return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
   }
 
+  function officialOverrides(settings) {
+    const map = settings?.officialSchedule?.overrides || {};
+    return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+  }
+
   function enabledRules(settings) {
     return Array.isArray(settings?.scheduleRules)
       ? settings.scheduleRules.filter(rule => rule && rule.enabled !== false && rule.scheduleType)
@@ -93,6 +98,11 @@
     const activeISO = String(active?.date || '').trim() || timestampISO(active?.timestamp);
     if (active?.type && activeISO === iso) {
       return { type: active.type, source: 'active', rule: null, iso };
+    }
+
+    const officialType = officialOverrides(settings)[iso];
+    if (officialType) {
+      return { type: officialType, source: 'official-mcps', rule: null, iso };
     }
 
     const rules = enabledRules(settings);

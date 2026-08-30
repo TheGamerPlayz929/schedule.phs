@@ -10,9 +10,11 @@
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
   const BACKEND = isLocal ? location.origin : 'https://phs-grades-backend.onrender.com';
   const PUBLIC_SETTINGS_URL = 'site-settings.json?v=20260605-publicready1';
-  const CACHE_KEY = 'phs:site-settings:v9';
-  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v9';
+  const CACHE_KEY = 'phs:site-settings:v10';
+  const LAST_GOOD_KEY = 'phs:site-settings:last-good:v10';
   const OLD_CACHE_KEYS = [
+    'phs:site-settings:v9',
+    'phs:site-settings:last-good:v9',
     'phs:site-settings:v8',
     'phs:site-settings:last-good:v8',
     'phs:site-settings:v7',
@@ -605,6 +607,27 @@
     return publicSettings;
   }
 
+  function normalizeOfficialSchedule(payload) {
+    const source = payload?.officialSchedule || payload;
+    const raw = source?.overrides;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const entries = Object.entries(raw)
+      .filter(([date, type]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && ['No School', 'Early Release'].includes(type))
+      .slice(0, 500);
+    if (!entries.length) return null;
+    return {
+      source: source.source || null,
+      checkedAt: String(source.checkedAt || ''),
+      stale: source.stale === true,
+      overrides: Object.fromEntries(entries)
+    };
+  }
+
+  function withOfficialSchedule(settings, officialSchedule) {
+    if (!settings || typeof settings !== 'object' || !officialSchedule) return settings;
+    return { ...settings, officialSchedule };
+  }
+
   function noteBackendSuccess() {
     backendRetryAt = 0;
     backendBackoffMs = 0;
@@ -627,21 +650,37 @@
       return Promise.resolve(); // preview mode waits for parent postMessage instead
     }
 
-    try {
-      const publicSettings = await fetchJson(PUBLIC_SETTINGS_URL, { noStore: true });
+    const [publicResult, officialResult] = await Promise.allSettled([
+      fetchJson(PUBLIC_SETTINGS_URL, { noStore: true }),
+      fetchJson(BACKEND + '/schedule-calendar', { noStore: true })
+    ]);
+    const officialSchedule = normalizeOfficialSchedule(
+      officialResult.status === 'fulfilled'
+        ? officialResult.value
+        : cached.settings?.officialSchedule
+    );
+
+    if (publicResult.status === 'fulfilled') {
+      const publicSettings = withOfficialSchedule(publicResult.value, officialSchedule);
       writeCache(publicSettings);
       applyBindings(publicSettings);
       finishPublicSettingsReady(publicSettings);
-    } catch (err) {
-      if (!isAbortError(err)) console.warn('[settings] public fetch failed:', err);
+    } else {
+      if (!isAbortError(publicResult.reason)) console.warn('[settings] public fetch failed:', publicResult.reason);
       finishPublicSettingsReady(window.__SITE_SETTINGS__ || null);
+    }
+    if (officialResult.status === 'rejected' && !isAbortError(officialResult.reason)) {
+      console.warn('[settings] official MCPS calendar fetch failed:', officialResult.reason);
     }
 
     if (!isLocal && Date.now() >= backendRetryAt) {
       try {
         const backendSettings = await fetchJson(BACKEND + '/site-settings', { noStore: true });
         if (backendSettings) noteBackendSuccess();
-        const nextSettings = chooseFreshSettings(window.__SITE_SETTINGS__, backendSettings);
+        const nextSettings = withOfficialSchedule(
+          chooseFreshSettings(window.__SITE_SETTINGS__, backendSettings),
+          officialSchedule
+        );
         if (nextSettings) {
           writeCache(nextSettings);
           applyBindings(nextSettings);
