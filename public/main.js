@@ -1158,67 +1158,6 @@ function _initAnnouncementsView() {
   }, 2500);
 }
 
-function _analyticsPageName() {
-  const path = location.pathname.toLowerCase();
-  const hash = location.hash.toLowerCase();
-  if (path.includes('announcement') || hash.includes('announcement')) return 'announcements';
-  if (path.includes('grade') || hash.includes('grade')) return 'grades';
-  if (path.includes('privacy') || hash.includes('privacy')) return 'privacy';
-  return 'schedule';
-}
-
-function _analyticsDeviceType() {
-  const width = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
-  if (width < 760) return 'mobile';
-  if (width < 1100) return 'tablet';
-  return 'desktop';
-}
-
-function _analyticsEndpoint() {
-  return _isLocalhost() ? '/analytics/event' : `${_BACKEND_URL}/analytics/event`;
-}
-
-function _sendAnalyticsEvent(payload) {
-  if (new URLSearchParams(location.search).has('_preview')) return;
-  if (_isLocalhost()) return;
-  const endpoint = _analyticsEndpoint();
-  const body = JSON.stringify({
-    page: _analyticsPageName(),
-    device: _analyticsDeviceType(),
-    ...payload
-  });
-  try {
-    if (navigator.sendBeacon) {
-      const ok = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
-      if (ok) return;
-    }
-  } catch {}
-  try {
-    fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      keepalive: true
-    }).catch(() => {});
-  } catch {}
-}
-
-function _initFirstPartyAnalytics() {
-  if (new URLSearchParams(location.search).has('_preview')) return;
-  const start = Date.now();
-  let sentDuration = false;
-  _sendAnalyticsEvent({ type: 'view' });
-  const sendDuration = () => {
-    if (sentDuration) return;
-    sentDuration = true;
-    _sendAnalyticsEvent({ type: 'duration', durationSeconds: Math.max(1, Math.round((Date.now() - start) / 1000)) });
-  };
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') sendDuration();
-  });
-  window.addEventListener('pagehide', sendDuration);
-}
-
 function _ensureGradesFrame() {
   _gradesFrame = _gradesFrame || document.getElementById('grades-frame');
   _gradesScaler = _gradesScaler || document.getElementById('grades-scaler');
@@ -2361,7 +2300,6 @@ document.addEventListener('site-settings:applied', e => {
 });
 
 _initHomepageIntro();
-_initFirstPartyAnalytics();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', main, { once: true });
 } else {

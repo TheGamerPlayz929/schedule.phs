@@ -4,10 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Privacy & Safety | Poolesville Schedule</title>
-<meta name="description" content="Privacy and analytics notice for the Poolesville schedule site." />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="description" content="Privacy, safety, retention, and data rights notice for Poolesville Schedule and GradeViewer." />
 <link rel="icon" href="phs-logo-96.png" />
 <link rel="stylesheet" href="main.css?v=20260604-terminal1">
 </head>
@@ -32,27 +29,55 @@
   <main class="privacy-page">
     <article class="privacy-card fade-up" style="--stagger: 1">
       <h1>Privacy &amp; Safety</h1>
-      <p class="privacy-updated">Updated May 25, 2026</p>
+      <p class="privacy-updated">Effective August 30, 2026</p>
 
       <section>
-        <h2>Analytics</h2>
-        <p>We use basic, aggregate analytics to see whether the site is working well and which pages are used most. This includes page views and approximate time on page.</p>
-        <p>We do not collect names, StudentVUE passwords, grades, emails, or personal school records through analytics.</p>
+        <h2>Who we are</h2>
+        <p>Poolesville Schedule and GradeViewer are independent, student-run services for the Poolesville High School community. They are not operated, sponsored, or approved by Poolesville High School, MCPS, Edupoint, or StudentVUE.</p>
       </section>
 
       <section>
-        <h2>Google Analytics</h2>
-        <p>This site may use Google Analytics. Google Analytics can use cookies or similar identifiers to measure site usage. We have disabled Google signals and ad personalization in our Google Analytics setup.</p>
+        <h2>Schedule-site analytics</h2>
+        <p>We keep anonymous totals for page category, device class, local day and hour, page views, and approximate visible time. These events contain no name, email, account, grades, StudentVUE data, IP address, user agent, or persistent identifier. Totals are deleted after 90 days.</p>
+        <p>Google Analytics and advertising trackers are not used. Our hosting and security providers still receive ordinary network information, such as an IP address, when your browser connects. The backend may use an IP briefly in memory for abuse prevention, but it is not added to analytics.</p>
+        <label class="privacy-choice" for="aggregate-analytics-toggle">
+          <input id="aggregate-analytics-toggle" type="checkbox" />
+          <span>Allow anonymous aggregate analytics</span>
+        </label>
+        <p class="privacy-choice-status" id="aggregate-analytics-status" aria-live="polite">This setting is stored only in this browser. Global Privacy Control and Do Not Track turn analytics off automatically.</p>
       </section>
 
       <section>
         <h2>GradeViewer</h2>
-        <p>GradeViewer is separate from analytics. If you sign in to GradeViewer, your login is used only to request your own StudentVUE data so the dashboard can display it.</p>
+        <p>Your StudentVUE username and password pass through our protected backend and the StudentVUE connection only to sign in and request your information. We do not intentionally store or log the password. District session cookies are kept in server memory for up to eight hours or until logout.</p>
+        <p>Grades, attendance, schedules, documents, photos, and basic student details are displayed in your browser and are not intentionally written to our database. If you select Remember me, GradeViewer stores only your username in your browser for up to seven days. Use only an account you own.</p>
       </section>
 
       <section>
-        <h2>Questions</h2>
-        <p>For privacy questions or removal requests, contact emirbakir523@gmail.com or jayalternateuser@gmail.com.</p>
+        <h2>Administrators and uploads</h2>
+        <p>Approved administrators sign in with Google. We process their email, display name, profile image, session information, IP address, and actions for authentication and security. Admin sessions last up to eight hours; audit records and settings backups are limited to 180 days. Uploaded public images remain until an administrator deletes them.</p>
+        <p>When an administrator intentionally uses an AI tool, the selected text, settings, or images are sent to the configured AI provider to answer that request. Student GradeViewer records are not used for admin AI features or model training by this service.</p>
+      </section>
+
+      <section>
+        <h2>Service providers</h2>
+        <p>Firebase hosts the public pages, Render runs the backend, a private GitHub repository may store site settings and operational records, Google provides administrator sign-in, and MCPS/Edupoint provides StudentVUE. Each provider processes data under its own terms. We do not sell personal data, use it for targeted advertising, or create advertising profiles.</p>
+      </section>
+
+      <section>
+        <h2>Children and location</h2>
+        <p>The service is designed for a high-school community and is not directed to children under 13. A child under 13 should not use GradeViewer without a parent or guardian. The service is operated from the United States and intended primarily for the Poolesville community; laws outside Maryland may provide additional rights.</p>
+      </section>
+
+      <section>
+        <h2>Your choices and rights</h2>
+        <p>You may ask what personal data we hold about you, request correction or deletion, appeal a denied request, or ask a privacy question. We will verify requests before disclosing or deleting data and will not discriminate against you for making one. Because anonymous analytics cannot identify a person, we cannot retrieve one person’s aggregate events.</p>
+        <p>Contact <a href="mailto:emirbakir523@gmail.com">emirbakir523@gmail.com</a> or <a href="mailto:thegamerp929@gmail.com">thegamerp929@gmail.com</a>. For account safety, also change your StudentVUE password if you believe it was exposed.</p>
+      </section>
+
+      <section>
+        <h2>Security and changes</h2>
+        <p>We use encrypted connections, restricted administrator access, short-lived sessions, input limits, and security logging. No online service can promise perfect security. Material policy changes will be posted here with a new effective date; we will seek consent first if a new use legally requires it.</p>
       </section>
 
       <a class="privacy-back" href="index.html" aria-label="Back to schedule">
@@ -69,15 +94,14 @@
 
   <footer class="app-footer fade-up" style="--stagger: 2">
     <div class="footer-links">
-      <span class="footer-contact">For all inquiries, support, or removal requests, please contact us at emirbakir523@gmail.com or jayalternateuser@gmail.com.</span>
+      <span class="footer-contact">For inquiries, support, or privacy requests, contact emirbakir523@gmail.com or thegamerp929@gmail.com.</span>
     </div>
   </footer>
 </div>
 
 <script defer src="settings-loader.js?v=20260604-fresh-truth"></script>
 <script defer src="nav-renderer.js?v=20260524-desktopfix2"></script>
-<script defer src="privacy-analytics.js?v=20260524-desktopfix2"></script>
-<script defer src="google-analytics.js?v=20260506-island1"></script>
+<script defer src="privacy-analytics.js?v=20260830-privacy1"></script>
 <script defer src="appearance-settings.js?v=20260524-desktopfix1"></script>
 </body>
 </html>

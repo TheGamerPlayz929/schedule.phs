@@ -9,7 +9,8 @@
     denied: 'This Google account is not authorized.',
     verification: 'Google sign-in could not be verified. Try again.',
     unavailable: 'Admin sign-in is temporarily unavailable.',
-    missing: 'Google did not return a sign-in credential. Try again.'
+    missing: 'Google did not return a sign-in credential. Try again.',
+    session: 'Google sign-in succeeded, but this browser did not save the admin session. Try again with cross-site tracking prevention disabled for this site.'
   };
 
   function setStatus(message, error = false) {
@@ -44,7 +45,7 @@
       if (!response.ok) throw new Error('Auth config unavailable');
       config = await response.json();
     } catch {
-      setStatus('Admin backend is waking up. Refresh in a few seconds.', true);
+      if (!errors[errorCode]) setStatus('Admin backend is waking up. Refresh in a few seconds.', true);
       return;
     }
     if (!config.googleClientId) {

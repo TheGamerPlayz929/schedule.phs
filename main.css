@@ -9,9 +9,9 @@
 }
 
 :root {
-  --font-ui: 'Geist', 'Inter', system-ui, sans-serif;
-  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --text-title: 30px;
@@ -1538,9 +1538,9 @@ body.appearance-open .appearance-toggle {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 8px 24px 12px;
+  padding: 32px 24px 48px;
 }
 .privacy-card {
   width: min(980px, 100%);
@@ -1567,6 +1567,35 @@ body.appearance-open .appearance-toggle {
 }
 .privacy-card section + section {
   margin-top: 18px;
+}
+.privacy-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  min-height: 44px;
+  margin-top: 10px;
+  color: var(--fg-1);
+  font-size: 14px;
+  cursor: pointer;
+}
+.privacy-choice input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.privacy-choice input:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 3px;
+}
+.privacy-choice input:disabled,
+.privacy-choice:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.privacy-card .privacy-choice-status {
+  color: var(--fg-3);
+  font-size: 12px;
 }
 .privacy-card h2 {
   margin: 0 0 6px;
