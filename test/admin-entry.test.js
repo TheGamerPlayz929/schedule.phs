@@ -32,6 +32,7 @@ test('Firebase Google login uses a top-level form handoff to establish a first-p
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     assert.match(html, /accounts\.google\.com\/gsi\/client/);
     assert.match(html, /admin-login\.js/);
+    assert.match(html, /rel="icon" href="phs-logo-96\.png"/);
     assert.match(html, /name="referrer" content="strict-origin"/);
     assert.doesNotMatch(html, /name="referrer" content="no-referrer"/);
   }
