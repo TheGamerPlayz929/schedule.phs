@@ -1,0 +1,29 @@
+/* Reading layout, scoped to the public privacy policy. */
+.site-view-privacy .ambient-canvas { display: none; }
+.site-view-privacy .privacy-page { padding: 64px 28px 72px; }
+.site-view-privacy .privacy-card { width: min(740px, 100%); }
+.privacy-card .privacy-header { margin-bottom: 36px; }
+.privacy-card h1 { font-size: clamp(36px, 6vw, 52px); line-height: 1.12; letter-spacing: -.035em; }
+.privacy-card .privacy-updated { margin: 14px 0 28px; font-family: inherit; font-size: 13px; }
+.privacy-card .privacy-intro { color: var(--fg-1); font-size: 20px; line-height: 1.5; margin-bottom: 16px; }
+.privacy-card p, .privacy-card li { font-size: 16px; line-height: 1.75; overflow-wrap: anywhere; }
+.privacy-card p { margin-bottom: 16px; }
+.privacy-card ul { margin: 12px 0 20px; padding-left: 22px; }
+.privacy-card li + li { margin-top: 12px; }
+.privacy-card h2 { font-size: 23px; font-weight: 600; line-height: 1.35; letter-spacing: -.02em; margin-bottom: 18px; }
+.privacy-card section[id] { margin-top: 44px; scroll-margin-top: 100px; }
+.privacy-card strong { color: var(--fg-1); font-weight: 600; }
+.privacy-card a { text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.privacy-card a:focus-visible { outline: 2px solid currentColor; outline-offset: 5px; border-radius: 2px; }
+.privacy-card .privacy-toc { border: 0; border-block: 1px solid var(--fg-3); border-radius: 0; padding: 24px 0; margin: 32px 0 44px; background: transparent; }
+.privacy-card .privacy-toc h2 { font-size: 14px; letter-spacing: 0; margin-bottom: 16px; }
+.privacy-toc ol { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; row-gap: 10px; list-style: none; padding: 0; }
+.privacy-card .privacy-toc li { margin: 0; font-size: 14px; line-height: 1.5; }
+.privacy-card .privacy-contacts { list-style: none; padding: 0; }
+.privacy-card .privacy-contacts li + li { margin-top: 4px; }
+.privacy-card .privacy-back { margin-top: 32px; }
+@media (max-width: 600px) {
+  .site-view-privacy .privacy-page { padding: 36px 20px 48px; }
+  .privacy-toc ol { grid-template-columns: 1fr; }
+  .privacy-card section[id] { margin-top: 36px; }
+}

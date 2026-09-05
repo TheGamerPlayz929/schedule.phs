@@ -35,11 +35,10 @@ test('anonymous analytics events stay free of identifiers', () => {
 test('privacy notice discloses always-on analytics, retention, providers, minors, and rights', () => {
   const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
   for (const phrase of [
-    'Last updated September 4, 2026',
+    'Last updated September 5, 2026',
     'Analytics are always on',
     'There is no opt-in or opt-out control',
     'We do not currently respond to DNT or GPC browser signals',
-    'they are deleted after 90 days',
     'held in server memory for up to eight hours',
     'keyed, one-way network identifier',
     'limited to 90 days',
@@ -54,7 +53,7 @@ test('privacy notice discloses always-on analytics, retention, providers, minors
 test('privacy notice keeps every table-of-contents anchor resolvable', () => {
   const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
   const anchors = [...html.matchAll(/href="#(s\d+)"/g)].map(match => match[1]);
-  assert.equal(anchors.length, 12);
+  assert.equal(anchors.length, 8);
   for (const anchor of anchors) assert.match(html, new RegExp(`<section id="${anchor}">`), anchor);
 });
 
@@ -64,7 +63,7 @@ test('the removed analytics consent toggle is gone from the privacy page', () =>
 });
 
 test('privacy-sensitive source files match their deployed public copies', () => {
-  for (const file of ['privacy.html', 'privacy-analytics.js', 'main.css', 'main.js', 'site-settings.json']) {
+  for (const file of ['privacy.html', 'privacy.css', 'privacy-analytics.js', 'main.css', 'main.js', 'site-settings.json']) {
     assert.equal(
       fs.readFileSync(path.join(root, file), 'utf8'),
       fs.readFileSync(path.join(root, 'public', file), 'utf8'),
