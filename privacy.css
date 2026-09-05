@@ -1,5 +1,4 @@
 /* Reading layout, scoped to the public privacy policy. */
-.site-view-privacy .ambient-canvas { display: none; }
 .site-view-privacy .privacy-page { padding: 64px 28px 72px; }
 .site-view-privacy .privacy-card { width: min(740px, 100%); }
 .privacy-card .privacy-header { margin-bottom: 36px; }
