@@ -732,7 +732,9 @@ function _weatherPayloadFromApi(api, referenceDate = _effectiveClockDate()) {
   const context = _lunchWeatherContext(referenceDate);
   const lunchStartMs = _weatherDateAt(referenceDate, context.startSec).getTime();
   const lunchEndMs = _weatherDateAt(referenceDate, context.endSec).getTime();
-  const forecastEndMs = Math.max(lunchEndMs, _weatherDateAt(referenceDate, LUNCH_WEATHER_FORECAST_END_SEC).getTime());
+  const forecastEndMs = window.PhsStudentWidget
+    ? referenceDate.getTime() + LUNCH_WEATHER_MAX_HOURS * 60 * 60 * 1000
+    : Math.max(lunchEndMs, _weatherDateAt(referenceDate, LUNCH_WEATHER_FORECAST_END_SEC).getTime());
   const primarySourceIndex = _nearestWeatherHourIndex(times, referenceDate.getTime(), lunchStartMs, lunchEndMs);
   const nowTime = primarySourceIndex !== null ? times[primarySourceIndex] : referenceDate.toISOString();
   const currentCode = Number(hourly.weather_code?.[primarySourceIndex] ?? current.weather_code ?? 3);
