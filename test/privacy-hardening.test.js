@@ -32,7 +32,7 @@ test('anonymous analytics events stay free of identifiers', () => {
   assert.doesNotMatch(source, /email|username|userAgent|googletagmanager|document\.cookie/i);
 });
 
-test('privacy notice discloses always-on analytics, retention, providers, minors, and rights', () => {
+test('privacy notice discloses always-on analytics, retention, providers, and rights', () => {
   const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
   for (const phrase of [
     'Last updated September 5, 2026',
@@ -40,10 +40,8 @@ test('privacy notice discloses always-on analytics, retention, providers, minors
     'There is no opt-in or opt-out control',
     'We do not currently respond to DNT or GPC browser signals',
     'held in server memory for up to eight hours',
-    'keyed, one-way network identifier',
     'limited to 90 days',
     'We do not sell personal data',
-    'not directed to children under 13',
     'not a school or district service',
     'request correction or deletion',
     'appeal a denied request'
@@ -53,7 +51,7 @@ test('privacy notice discloses always-on analytics, retention, providers, minors
 test('privacy notice keeps every table-of-contents anchor resolvable', () => {
   const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
   const anchors = [...html.matchAll(/href="#(s\d+)"/g)].map(match => match[1]);
-  assert.equal(anchors.length, 8);
+  assert.equal(anchors.length, 7);
   for (const anchor of anchors) assert.match(html, new RegExp(`<section id="${anchor}">`), anchor);
 });
 
@@ -70,4 +68,11 @@ test('privacy-sensitive source files match their deployed public copies', () => 
       file
     );
   }
+});
+
+test('public policy distinguishes the schedule from embedded GradeViewer', () => {
+  const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
+  assert.match(html, /schedule and announcements pages have no registration or sign-in/i);
+  assert.match(html, /Grades tab embeds GradeViewer/);
+  assert.doesNotMatch(html, /Administrator access|Administrator sessions|configured AI provider|Younger users|Google Identity Services/);
 });
