@@ -18,6 +18,13 @@
     status.classList.toggle('error', error);
   }
 
+  /* The placeholder only reserves the button's box. Drop it once the real
+     button lands, and on any path where no button is coming. */
+  function hidePlaceholder() {
+    const placeholder = document.getElementById('google-login-placeholder');
+    if (placeholder) placeholder.hidden = true;
+  }
+
   function handoffCredential(response) {
     if (!response?.credential) {
       setStatus(errors.missing, true);
@@ -46,25 +53,29 @@
       config = await response.json();
     } catch {
       if (!errors[errorCode]) setStatus('Admin backend is waking up. Refresh in a few seconds.', true);
+      hidePlaceholder();
       return;
     }
     if (!config.googleClientId) {
       setStatus(errors.unavailable, true);
+      hidePlaceholder();
       return;
     }
 
     const render = () => {
       if (!window.google?.accounts?.id) return false;
-      const buttonWidth = Math.min(320, Math.max(200, window.innerWidth - 106));
+      const buttonWidth = Math.min(320, googleButton.clientWidth);
       window.google.accounts.id.initialize({ client_id: config.googleClientId, callback: handoffCredential });
       window.google.accounts.id.renderButton(googleButton, {
-        theme: 'outline',
+        theme: 'outline_dark',
         size: 'large',
         type: 'standard',
-        text: 'signin_with',
+        text: 'continue_with',
         shape: 'rectangular',
+        logo_alignment: 'center',
         width: buttonWidth
       });
+      hidePlaceholder();
       if (!errors[errorCode]) setStatus('');
       return true;
     };
@@ -75,7 +86,7 @@
       attempts += 1;
       if (render() || attempts >= 60) {
         clearInterval(timer);
-        if (attempts >= 60) setStatus('Google sign-in did not load. Refresh and try again.', true);
+        if (attempts >= 60) { setStatus('Google sign-in did not load. Refresh and try again.', true); hidePlaceholder(); }
       }
     }, 100);
   }

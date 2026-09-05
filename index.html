@@ -133,13 +133,12 @@
 
   <!-- Hero Section -->
   <main class="hero" data-site-view="schedule">
-    <p class="seo-kicker fade-up" style="--stagger: 0">Poolesville Web App</p>
-    <div class="status-badge fade-up" style="--stagger: 1" id="status-pill" data-status="off" data-studio-key="statusPill" data-studio-label="Status pill" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">
+    <div class="status-badge fade-up" style="--stagger: 0" id="status-pill" data-status="off" data-studio-key="statusPill" data-studio-label="Status pill" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">
       <span class="status-dot"></span>
       <span id="status-label" data-bind="hero.schedulePageStatusFallback" data-text-style="statusLabel" data-studio-key="statusLabel" data-studio-label="Status label" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">Loading...</span>
     </div>
 
-    <div class="hero-title-wrapper fade-up" style="--stagger: 2" data-studio-key="heroText" data-studio-label="Hero text" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">
+    <div class="hero-title-wrapper fade-up" style="--stagger: 1" data-studio-key="heroText" data-studio-label="Hero text" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">
       <h2 class="hero-eyebrow" id="hero-eyebrow" data-bind="hero.schedulePageEyebrow" data-text-style="heroEyebrow" data-studio-key="heroEyebrow" data-studio-label="Hero eyebrow" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.textStyles.targets.heroEyebrow">Currently in</h2>
       <div class="signature-stage signature-stage--eyebrow" id="signature-eyebrow" aria-hidden="true"></div>
       <h1 class="hero-title" id="hero-title" data-text-style="heroTitle" data-studio-key="heroTitle" data-studio-label="Hero title" data-studio-paths="appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">—</h1>
@@ -147,7 +146,7 @@
     </div>
 
     <!-- Glass Countdown Panel -->
-    <div class="ring-wrap fade-up" style="--stagger: 3" data-studio-key="countdownRing" data-studio-label="Countdown ring" data-studio-paths="appearance.countdownSize,theme.accent">
+    <div class="ring-wrap fade-up" style="--stagger: 2" data-studio-key="countdownRing" data-studio-label="Countdown ring" data-studio-paths="appearance.countdownSize,theme.accent">
       <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
         <defs>
           <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -181,7 +180,7 @@
       </div>
     </div>
 
-    <section class="lunch-weather-card fade-up" id="lunch-weather" aria-label="Lunch weather for Poolesville" aria-hidden="true" style="--stagger: 4" hidden>
+    <section class="lunch-weather-card fade-up" id="lunch-weather" aria-label="Lunch weather for Poolesville" aria-hidden="true" style="--stagger: 3" hidden>
       <div class="lunch-weather-summary">
         <div class="lunch-weather-alert"><span id="lunch-weather-alert" aria-live="polite">Checking lunch weather...</span></div>
         <div class="lunch-weather-details" id="lunch-weather-details" aria-label="Weather details">
@@ -201,7 +200,7 @@
   </main>
 
   <!-- Schedule Section -->
-  <section class="schedule-section fade-up" data-site-view="schedule" style="--stagger: 4" data-studio-key="scheduleSection" data-studio-label="Schedule section" data-studio-paths="appearance.periodCardPadding,appearance.periodCardRadius">
+  <section class="schedule-section fade-up" data-site-view="schedule" style="--stagger: 3" data-studio-key="scheduleSection" data-studio-label="Schedule section" data-studio-paths="appearance.periodCardPadding,appearance.periodCardRadius">
     <div class="schedule-header">
       <h3 id="schedule-title" data-text-style="scheduleTitle" data-studio-key="scheduleTitle" data-studio-label="Schedule title" data-studio-paths="appearance.scheduleTitleSize,appearance.textStyles.targets.scheduleTitle">Loading schedule</h3>
       <span class="date" id="schedule-date" data-text-style="scheduleDate" data-studio-key="scheduleDate" data-studio-label="Schedule date" data-studio-paths="appearance.textStyles.targets.scheduleDate"></span>
@@ -211,7 +210,7 @@
     </ol>
   </section>
 
-  <section class="announcements-view fade-up" id="announcements-view" data-site-view="announcements" hidden aria-hidden="true" style="--stagger: 4">
+  <section class="announcements-view fade-up" id="announcements-view" data-site-view="announcements" hidden aria-hidden="true" style="--stagger: 3">
     <div class="hero hero--compact announcements-hero">
       <div class="hero-title-wrapper">
         <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.announcementsPageTitle" data-text-style="announcementTitle" data-studio-key="announcementTitle" data-studio-label="Announcements title" data-studio-paths="hero.announcementsPageTitle,appearance.textStyles.targets.announcementTitle">Announcements</h1>
@@ -224,7 +223,7 @@
     </section>
   </section>
 
-  <section class="grades-view fade-up" id="grades-view" data-site-view="grades" hidden aria-hidden="true" style="--stagger: 4">
+  <section class="grades-view fade-up" id="grades-view" data-site-view="grades" hidden aria-hidden="true" style="--stagger: 3">
     <div class="hero hero--compact grades-hero">
       <div class="hero-title-wrapper">
         <h1 class="hero-title" style="font-size: 56px;" data-bind="hero.gradesPageTitle" data-text-style="gradesTitle" data-studio-key="gradesTitle" data-studio-label="Grades title" data-studio-paths="hero.gradesPageTitle,appearance.textStyles.targets.gradesTitle">Grades</h1>
@@ -246,10 +245,10 @@
     </section>
   </section>
 
-  <footer class="app-footer fade-up" style="--stagger: 5">
+  <footer class="app-footer fade-up" style="--stagger: 4">
     <div class="footer-links">
       <span class="footer-contact" data-studio-key="footerContact" data-studio-label="Footer contact" data-studio-paths="appearance.footerSize,appearance.footerColor,footer.supportEmail">For all inquiries, support, or privacy requests, please contact us at emirbakir523@gmail.com or thegamerp929@gmail.com.</span>
-      <a href="privacy.html" data-text-style="footerLink" data-studio-key="footerLink" data-studio-label="Footer privacy link" data-studio-paths="appearance.footerSize,appearance.footerColor,appearance.textStyles.targets.footerLink">Privacy &amp; Safety</a>
+      <a href="privacy.html" data-text-style="footerLink" data-studio-key="footerLink" data-studio-label="Footer privacy link" data-studio-paths="appearance.footerSize,appearance.footerColor,appearance.textStyles.targets.footerLink">Privacy Notice</a>
     </div>
   </footer>
 </div>

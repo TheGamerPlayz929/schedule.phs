@@ -7,29 +7,307 @@
   <meta name="referrer" content="strict-origin">
   <link rel="icon" href="phs-logo-96.png">
   <title>Admin Sign In - PHS Schedule</title>
+  <link rel="preload" href="fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
   <style>
-    :root { color-scheme: dark; --bg:#090a0b; --card:#111317; --line:#30343a; --fg:#f4f5f7; --muted:#969da9; --danger:#ff8585; }
+    @font-face {
+      font-family: "DM Sans";
+      font-style: normal;
+      font-weight: 400 500;
+      font-display: swap;
+      src: url("fonts/dm-sans-latin.woff2") format("woff2");
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #000000;
+      --fg: #ffffff;
+      --muted: rgba(255, 255, 255, 0.7);
+      --faint: rgba(255, 255, 255, 0.5);
+      --pill: rgba(255, 255, 255, 0.05);
+      --pill-hover: rgba(255, 255, 255, 0.1);
+      --pill-line: rgba(255, 255, 255, 0.1);
+      --danger: #ff9a9a;
+    }
+
     * { box-sizing: border-box; }
-    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    main { min-height:100vh; display:grid; place-items:center; padding:24px; }
-    section { width:min(420px,calc(100vw - 48px)); min-width:0; padding:30px 28px; border:1px solid var(--line); border-radius:12px; background:var(--card); }
-    h1 { margin:0 0 8px; font-size:24px; letter-spacing:0; }
-    p { margin:0 0 24px; color:var(--muted); line-height:1.5; }
-    #google-login-btn { min-width:0; min-height:44px; overflow:hidden; }
-    #login-status { min-height:20px; margin-top:16px; color:var(--muted); font-size:13px; line-height:1.45; }
-    #login-status.error { color:var(--danger); }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* Backdrop: dot matrix plus the reference's three black vignettes. */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: var(--bg);
+      pointer-events: none;
+    }
+    #login-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+    }
+    .vignette--up {
+      background: linear-gradient(to top, #000 0%, transparent 100%);
+    }
+    .vignette--center {
+      background: radial-gradient(circle at center, rgba(0, 0, 0, 1) 0%, transparent 100%);
+    }
+    .vignette--top {
+      inset: 0 0 auto 0;
+      height: 33.333%;
+      background: linear-gradient(to bottom, #000 0%, transparent 100%);
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+
+    .stack {
+      width: 100%;
+      max-width: 20rem;
+      text-align: center;
+    }
+
+    .signin-brand {
+      display: flex;
+      width: fit-content;
+      margin-inline: auto;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      color: #e5e5e5;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 24px;
+    }
+    .signin-brand span {
+      position: relative;
+      color: #d4d4d4;
+      text-shadow: 0 1px 5px #000;
+      --brand-shimmer-mask: linear-gradient(105deg, transparent 32%, #000 48%, #000 52%, transparent 68%);
+    }
+    .signin-brand span::before,
+    .signin-brand span::after {
+      content: attr(data-shimmer) / "";
+      position: absolute;
+      inset: 0;
+      color: #111;
+      -webkit-mask-image: var(--brand-shimmer-mask);
+      mask-image: var(--brand-shimmer-mask);
+      -webkit-mask-size: 250% 100%;
+      mask-size: 250% 100%;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      animation: brand-shimmer 1.8s linear infinite;
+      pointer-events: none;
+    }
+    .signin-brand span::before {
+      animation-delay: -0.9s;
+      filter: blur(0.2px);
+      text-shadow: 0 0 5px #000;
+    }
+    .signin-brand span::after {
+      filter: blur(0.2px);
+    }
+    @keyframes brand-shimmer {
+      0% {
+        -webkit-mask-position: 150% 0;
+        mask-position: 150% 0;
+        opacity: 0;
+      }
+      20%, 80% { opacity: 0.3; }
+      100% {
+        -webkit-mask-position: -50% 0;
+        mask-position: -50% 0;
+        opacity: 0;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .signin-brand span::before,
+      .signin-brand span::after { display: none; }
+    }
+    .mark {
+      display: block;
+      width: 24px;
+      height: 20px;
+      object-fit: contain;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      color: var(--fg);
+    }
+
+    .lede {
+      margin: 4px 0 24px;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    /* The Google button renders into #google-login-btn. The placeholder holds
+       its box so the column does not shift when Google's iframe arrives. */
+    .signin-slot {
+      width: 100%;
+      max-width: 320px;
+      margin-inline: auto;
+      position: relative;
+      min-height: 44px;
+      color-scheme: dark;
+    }
+    #google-login-btn {
+      display: flex;
+      justify-content: center;
+      min-width: 0;
+      min-height: 44px;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+    #google-login-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: #000;
+      color: #fff;
+      font-size: 14px;
+      pointer-events: none;
+    }
+    #google-login-placeholder[hidden] { display: none; }
+
+    #login-status {
+      min-height: 20px;
+      margin-top: 16px;
+      color: var(--faint);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #login-status.error { color: var(--danger); }
+
+    .local-dev-btn {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      margin-top: 12px;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--pill-line);
+      border-radius: 4px;
+      background: var(--pill);
+      color: var(--fg);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 150ms linear;
+    }
+    .local-dev-btn:hover { background: var(--pill-hover); }
+    .local-dev-btn[hidden] { display: none; }
+
+    :focus-visible {
+      outline: 2px solid rgba(255, 255, 255, 0.6);
+      outline-offset: 3px;
+    }
+
+    /* Style the actual Google control without replacing its click handler. */
+    #google-login-btn [role="button"] {
+      height: 44px !important;
+      min-height: 44px;
+      border: 1px solid transparent !important;
+      border-radius: 10px !important;
+      background: #000 !important;
+      color: #fff !important;
+      box-shadow: none !important;
+    }
+    #google-login-btn [role="button"]:hover {
+      background: #080808 !important;
+    }
+    #google-login-btn [role="button"]:focus:not(:focus-visible) {
+      outline: none !important;
+    }
+    .signin-outline {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 44px;
+      overflow: visible;
+      pointer-events: none;
+      fill: none;
+      stroke-width: 1;
+    }
+    .signin-outline-base { stroke: #292929; }
+    .signin-slot:has(:focus-visible) {
+      border-radius: 10px;
+      outline: 1px solid #737373;
+      outline-offset: 3px;
+    }
   </style>
 </head>
 <body>
+  <div class="backdrop" aria-hidden="true">
+    <canvas id="login-canvas"></canvas>
+    <div class="vignette vignette--up"></div>
+    <div class="vignette vignette--center"></div>
+    <div class="vignette vignette--top"></div>
+  </div>
+
   <main>
-    <section aria-labelledby="login-title">
-      <h1 id="login-title">Sign in</h1>
-      <p>Use an approved Google account to manage the PHS site.</p>
-      <div id="google-login-btn"></div>
+    <div class="stack">
+      <div class="signin-brand">
+        <img class="mark" src="phs-logo-96.png" width="24" height="20" alt="" decoding="async">
+        <span data-shimmer="PHS Schedule">PHS Schedule</span>
+      </div>
+      <h1>Welcome back</h1>
+      <p class="lede">This is where the magic happens.</p>
+
+      <div class="signin-slot">
+        <div id="google-login-btn"></div>
+        <div id="google-login-placeholder">Continue with Google</div>
+        <svg class="signin-outline" viewBox="0 0 320 44" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <rect class="signin-outline-base" x="0.5" y="0.5" width="319" height="43" rx="10" vector-effect="non-scaling-stroke" />
+        </svg>
+      </div>
+
       <div id="login-status" role="status" aria-live="polite">Loading sign-in...</div>
-    </section>
+    </div>
   </main>
+
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="admin-login.js?v=20260830-handoff1"></script>
+  <script defer src="admin-login-canvas.js?v=20260904-canvas16"></script>
+  <script src="admin-login.js?v=20260904-signin6"></script>
 </body>
 </html>

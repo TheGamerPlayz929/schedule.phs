@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>PHS student view</title>
+<script src="student-widget.js"></script><script src="theme-primer.js"></script>
+<link rel="stylesheet" href="main.css"><link rel="stylesheet" href="student-widget.css">
+</head><body>  <main class="hero" data-site-view="schedule">
+    <div class="status-badge fade-up" style="--stagger: 0" id="status-pill" data-status="off" data-studio-key="statusPill" data-studio-label="Status pill" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">
+      <span class="status-dot"></span>
+      <span id="status-label" data-bind="hero.schedulePageStatusFallback" data-text-style="statusLabel" data-studio-key="statusLabel" data-studio-label="Status label" data-studio-paths="hero.schedulePageStatusFallback,appearance.textStyles.targets.statusLabel">Loading...</span>
+    </div>
+
+    <div class="hero-title-wrapper fade-up" style="--stagger: 1" data-studio-key="heroText" data-studio-label="Hero text" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">
+      <h2 class="hero-eyebrow" id="hero-eyebrow" data-bind="hero.schedulePageEyebrow" data-text-style="heroEyebrow" data-studio-key="heroEyebrow" data-studio-label="Hero eyebrow" data-studio-paths="hero.schedulePageEyebrow,appearance.heroEyebrowSize,appearance.textStyles.targets.heroEyebrow">Currently in</h2>
+      <div class="signature-stage signature-stage--eyebrow" id="signature-eyebrow" aria-hidden="true"></div>
+      <h1 class="hero-title" id="hero-title" data-text-style="heroTitle" data-studio-key="heroTitle" data-studio-label="Hero title" data-studio-paths="appearance.heroTitleSize,appearance.textStyles.targets.heroTitle">—</h1>
+      <div class="signature-stage signature-stage--title" id="signature-title" aria-hidden="true"></div>
+    </div>
+
+    <!-- Glass Countdown Panel -->
+    <div class="ring-wrap fade-up" style="--stagger: 2" data-studio-key="countdownRing" data-studio-label="Countdown ring" data-studio-paths="appearance.countdownSize,theme.accent">
+      <svg class="progress-ring" viewBox="0 0 220 220" aria-hidden="true">
+        <defs>
+          <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="var(--ring-start, #ecece8)"/>
+            <stop offset="100%" stop-color="var(--ring-end, #a8aaa8)"/>
+          </linearGradient>
+        </defs>
+        <path
+          class="progress-ring__track"
+          d="M 110 14
+             A 96 96 0 1 0 110 206
+             A 96 96 0 1 0 110 14"
+          pathLength="100"
+        />
+        <path
+          class="progress-ring__fill"
+          id="ring-fill"
+          d="M 110 14
+             A 96 96 0 1 0 110 206
+             A 96 96 0 1 0 110 14"
+          pathLength="100"
+        />
+      </svg>
+      <div class="glass-circle">
+        <div class="countdown-wrapper" aria-live="polite">
+          <div class="cd-main" id="cd-hm"><span class="cd-min-label" data-bind="countdown.minSuffix">m</span></div>
+          <div class="cd-sub" id="cd-sub">
+            <span class="cd-sec" id="cd-s"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="lunch-weather-card fade-up" id="lunch-weather" aria-label="Lunch weather for Poolesville" aria-hidden="true" style="--stagger: 3" hidden>
+      <div class="lunch-weather-summary">
+        <div class="lunch-weather-alert"><span id="lunch-weather-alert" aria-live="polite">Checking lunch weather...</span></div>
+        <div class="lunch-weather-details" id="lunch-weather-details" aria-label="Weather details">
+          <span class="lunch-weather-detail"><span>Feels</span><strong>--°</strong></span>
+          <span class="lunch-weather-detail"><span>Wind</span><strong>-- mph</strong></span>
+          <span class="lunch-weather-detail"><span>Rain</span><strong>--%</strong></span>
+        </div>
+      </div>
+      <div class="lunch-weather-hours" id="lunch-weather-hours" aria-label="Hourly lunch weather">
+        <div class="lunch-weather-hour"><span>Now</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+        <div class="lunch-weather-hour"><span>Next</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+        <div class="lunch-weather-hour"><span>Later</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+        <div class="lunch-weather-hour"><span>After</span><span class="weather-symbol weather-symbol--mini" aria-hidden="true">☁️</span><strong>--°</strong><span class="lunch-weather-rain">--%</span></div>
+      </div>
+    </section>
+
+  </main>
+
+
+<section hidden><h3 id="schedule-title"></h3><span id="schedule-date"></span><ol id="period-list"></ol></section>
+<script defer src="settings-loader.js"></script><script defer src="schedule-resolver.js"></script><script defer src="main.js"></script>
+</body></html>

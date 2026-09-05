@@ -13091,5 +13091,455 @@
         "NONE"
       ]
     }
-  ]
+  ],
+  "_calendar": {
+    "source": {
+      "authority": "Montgomery County Public Schools",
+      "school": "Poolesville High School",
+      "url": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/calendar-index/",
+      "calendarUrl": "https://www.montgomeryschoolsmd.org/siteassets/district/calendar/2026/0775.26_2026-27_SchoolCalendar.pdf"
+    },
+    "checkedAt": "2026-09-05T19:54:46.193Z",
+    "range": {
+      "start": "2026-08-01",
+      "end": "2027-11-01"
+    },
+    "overrides": {
+      "2026-09-07": "No School",
+      "2026-09-18": "Early Release",
+      "2026-09-21": "No School",
+      "2026-10-16": "No School",
+      "2026-11-02": "No School",
+      "2026-11-03": "No School",
+      "2026-11-23": "Early Release",
+      "2026-11-24": "Early Release",
+      "2026-11-25": "Early Release",
+      "2026-11-26": "No School",
+      "2026-11-27": "No School",
+      "2026-12-23": "Early Release",
+      "2026-12-24": "No School",
+      "2026-12-25": "No School",
+      "2026-12-28": "No School",
+      "2026-12-29": "No School",
+      "2026-12-30": "No School",
+      "2026-12-31": "No School",
+      "2027-01-01": "No School",
+      "2027-01-18": "No School",
+      "2027-01-25": "No School",
+      "2027-02-15": "No School",
+      "2027-02-26": "Early Release",
+      "2027-03-09": "No School",
+      "2027-03-26": "No School",
+      "2027-03-27": "No School",
+      "2027-03-28": "No School",
+      "2027-03-29": "No School",
+      "2027-03-30": "No School",
+      "2027-03-31": "No School",
+      "2027-04-01": "No School",
+      "2027-04-02": "No School",
+      "2027-04-12": "No School",
+      "2027-04-22": "No School",
+      "2027-05-17": "No School",
+      "2027-05-31": "No School",
+      "2027-06-11": "Early Release",
+      "2027-06-18": "No School"
+    },
+    "events": [
+      {
+        "date": "2026-09-07",
+        "scheduleType": "No School",
+        "title": "Labor Day—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/labor-dayschools-and-offices-closed/?dt=2026-09-07"
+      },
+      {
+        "date": "2026-09-18",
+        "scheduleType": "Early Release",
+        "title": "Early release day for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/early-release-day-for-students/?dt=2026-09-18"
+      },
+      {
+        "date": "2026-09-21",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers/?dt=2026-09-21"
+      },
+      {
+        "date": "2026-10-16",
+        "scheduleType": "No School",
+        "title": "Professional Development Day for staff; no school for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/professional-development-day-for-staff-no-school-for-students/?dt=2026-10-16"
+      },
+      {
+        "date": "2026-11-02",
+        "scheduleType": "No School",
+        "title": "Grading and Planning for the end of term; no school for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/grading-and-planning-for-the-end-of-term-no-school-for-students/?dt=2026-11-02"
+      },
+      {
+        "date": "2026-11-03",
+        "scheduleType": "No School",
+        "title": "Election Day—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/election-dayschools-and-offices-closed/?dt=2026-11-03"
+      },
+      {
+        "date": "2026-11-23",
+        "scheduleType": "Early Release",
+        "title": "Early release days for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/early-release-days-for-students/?dt=2026-11-23"
+      },
+      {
+        "date": "2026-11-24",
+        "scheduleType": "Early Release",
+        "title": "Early release days for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/early-release-days-for-students/?dt=2026-11-24"
+      },
+      {
+        "date": "2026-11-25",
+        "scheduleType": "Early Release",
+        "title": "Early release days for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/early-release-days-for-students/?dt=2026-11-25"
+      },
+      {
+        "date": "2026-11-26",
+        "scheduleType": "No School",
+        "title": "Thanksgiving Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/thanksgiving-holidayschools-and-offices-closed/?dt=2026-11-26"
+      },
+      {
+        "date": "2026-11-27",
+        "scheduleType": "No School",
+        "title": "Thanksgiving Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/thanksgiving-holidayschools-and-offices-closed/?dt=2026-11-27"
+      },
+      {
+        "date": "2026-12-23",
+        "scheduleType": "Early Release",
+        "title": "Early release day for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/early-release-day-for-students2/?dt=2026-12-23"
+      },
+      {
+        "date": "2026-12-24",
+        "scheduleType": "No School",
+        "title": "Winter Break Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/winter-break-holidayschools-and-offices-closed/?dt=2026-12-24"
+      },
+      {
+        "date": "2026-12-25",
+        "scheduleType": "No School",
+        "title": "Winter Break Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/winter-break-holidayschools-and-offices-closed/?dt=2026-12-25"
+      },
+      {
+        "date": "2026-12-28",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers2/?dt=2026-12-28"
+      },
+      {
+        "date": "2026-12-29",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers2/?dt=2026-12-29"
+      },
+      {
+        "date": "2026-12-30",
+        "scheduleType": "No School",
+        "title": "Systemwide Closure—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/systemwide-closureschools-and-offices-closed/?dt=2026-12-30"
+      },
+      {
+        "date": "2026-12-31",
+        "scheduleType": "No School",
+        "title": "Systemwide Closure—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/systemwide-closureschools-and-offices-closed/?dt=2026-12-31"
+      },
+      {
+        "date": "2027-01-01",
+        "scheduleType": "No School",
+        "title": "New Year's Day—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/new-years-dayschools-and-offices-closed/?dt=2027-01-01"
+      },
+      {
+        "date": "2027-01-18",
+        "scheduleType": "No School",
+        "title": "Dr. Martin Luther King, Jr. Day Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/dr.-martin-luther-king-jr.-day-holidayschools-and-offices-closed/?dt=2027-01-18"
+      },
+      {
+        "date": "2027-01-25",
+        "scheduleType": "No School",
+        "title": "Grading and Planning for the end of term; no school for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/grading-and-planning-for-the-end-of-term-no-school-for-students2/?dt=2027-01-25"
+      },
+      {
+        "date": "2027-02-15",
+        "scheduleType": "No School",
+        "title": "Presidents' Day Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/presidents-day-holidayschools-and-offices-closed/?dt=2027-02-15"
+      },
+      {
+        "date": "2027-02-26",
+        "scheduleType": "Early Release",
+        "title": "Early release day for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/early-release-day-for-students3/?dt=2027-02-26"
+      },
+      {
+        "date": "2027-03-09",
+        "scheduleType": "No School",
+        "title": "Professional Development Day for staff; no school for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/professional-development-day-for-staff-no-school-for-students2/?dt=2027-03-09"
+      },
+      {
+        "date": "2027-03-26",
+        "scheduleType": "No School",
+        "title": "Spring Break Holiday—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/spring-break-holidayno-school-for-students-and-teachers/?dt=2027-03-26"
+      },
+      {
+        "date": "2027-03-27",
+        "scheduleType": "No School",
+        "title": "Spring Break Holiday—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/spring-break-holidayno-school-for-students-and-teachers/?dt=2027-03-27"
+      },
+      {
+        "date": "2027-03-28",
+        "scheduleType": "No School",
+        "title": "Spring Break Holiday—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/spring-break-holidayno-school-for-students-and-teachers/?dt=2027-03-28"
+      },
+      {
+        "date": "2027-03-29",
+        "scheduleType": "No School",
+        "title": "Spring Break Holiday—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/spring-break-holidayno-school-for-students-and-teachers/?dt=2027-03-29"
+      },
+      {
+        "date": "2027-03-30",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers3/?dt=2027-03-30"
+      },
+      {
+        "date": "2027-03-31",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers3/?dt=2027-03-31"
+      },
+      {
+        "date": "2027-04-01",
+        "scheduleType": "No School",
+        "title": "Systemwide Closures—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/systemwide-closuresschools-and-offices-closed/?dt=2027-04-01"
+      },
+      {
+        "date": "2027-04-02",
+        "scheduleType": "No School",
+        "title": "Systemwide Closures—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/systemwide-closuresschools-and-offices-closed/?dt=2027-04-02"
+      },
+      {
+        "date": "2027-04-12",
+        "scheduleType": "No School",
+        "title": "Grading and Planning for the end of term; no school for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/grading-and-planning-for-the-end-of-term-no-school-for-students3/?dt=2027-04-12"
+      },
+      {
+        "date": "2027-04-22",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers4/?dt=2027-04-22"
+      },
+      {
+        "date": "2027-05-17",
+        "scheduleType": "No School",
+        "title": "Non-Instructional Day—No school for students and teachers",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/non-instructional-dayno-school-for-students-and-teachers5/?dt=2027-05-17"
+      },
+      {
+        "date": "2027-05-31",
+        "scheduleType": "No School",
+        "title": "Memorial Day Holiday—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/memorial-day-holidayschools-and-offices-closed/?dt=2027-05-31"
+      },
+      {
+        "date": "2027-06-11",
+        "scheduleType": "Early Release",
+        "title": "Last day of school for students; early release day for students",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/last-day-of-school-for-students-early-release-day-for-students/?dt=2027-06-11"
+      },
+      {
+        "date": "2027-06-18",
+        "scheduleType": "No School",
+        "title": "Systemwide Closure—Schools and offices closed",
+        "link": "https://www.montgomeryschoolsmd.org/district-calendar/2026-2027/systemwide-closureschools-and-offices-closed2/?dt=2027-06-18"
+      }
+    ],
+    "stale": true,
+    "cache": "snapshot",
+    "schoolYears": [
+      {
+        "start": "2026-08-25",
+        "end": "2027-06-11"
+      }
+    ]
+  },
+  "_templates": {
+    "Advisory": {
+      "27900": [
+        30600,
+        "Period 1"
+      ],
+      "30900": [
+        33300,
+        "Period 2"
+      ],
+      "33600": [
+        36000,
+        "Homeroom"
+      ],
+      "36300": [
+        38700,
+        "Period 3"
+      ],
+      "39000": [
+        41400,
+        "Period 4"
+      ],
+      "41400": [
+        44100,
+        "Lunch"
+      ],
+      "44400": [
+        46800,
+        "Period 5"
+      ],
+      "47100": [
+        49500,
+        "Period 6"
+      ],
+      "49800": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    },
+    "Normal Schedule": {
+      "27900": [
+        30900,
+        "Period 1"
+      ],
+      "31200": [
+        33900,
+        "Period 2"
+      ],
+      "34200": [
+        36900,
+        "Period 3"
+      ],
+      "37200": [
+        39900,
+        "Period 4"
+      ],
+      "39900": [
+        43200,
+        "Lunch"
+      ],
+      "43500": [
+        46200,
+        "Period 5"
+      ],
+      "46500": [
+        49200,
+        "Period 6"
+      ],
+      "49500": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    },
+    "Early Release": {
+      "27900": [
+        29700,
+        "Period 1"
+      ],
+      "30000": [
+        31620,
+        "Period 2"
+      ],
+      "31920": [
+        33540,
+        "Period 3"
+      ],
+      "33840": [
+        35460,
+        "Period 4"
+      ],
+      "35760": [
+        37380,
+        "Period 5"
+      ],
+      "37680": [
+        39300,
+        "Period 6"
+      ],
+      "39600": [
+        41220,
+        "Period 7"
+      ],
+      "41220": [
+        43080,
+        "Lunch"
+      ]
+    },
+    "Delayed Opening": {
+      "35100": [
+        37140,
+        "Period 1"
+      ],
+      "37440": [
+        39300,
+        "Period 2"
+      ],
+      "39600": [
+        41460,
+        "Period 3"
+      ],
+      "41460": [
+        43560,
+        "Lunch"
+      ],
+      "43860": [
+        45720,
+        "Period 4"
+      ],
+      "46020": [
+        47880,
+        "Period 5"
+      ],
+      "48180": [
+        50040,
+        "Period 6"
+      ],
+      "50340": [
+        52200,
+        "Period 7"
+      ],
+      "52620": [
+        55500,
+        "Period 8"
+      ]
+    }
+  },
+  "_bellSource": {
+    "title": "PHS Bell Schedules 23–24 (still linked by PHS on 2026-09-05)",
+    "url": "https://www.montgomeryschoolsmd.org/schools/poolesvillehs/about/schedules",
+    "documentUrl": "https://docs.google.com/document/d/1CuroPtuLpbRhBv_smS3HbzXw7DV014EB/edit"
+  }
 }

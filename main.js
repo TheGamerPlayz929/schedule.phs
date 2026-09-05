@@ -88,9 +88,13 @@ function _isScheduleEntry(entry) {
 
 function _isScheduleDataShape(nextData) {
   if (!nextData || typeof nextData !== 'object' || !_isScheduleEntry(nextData.base)) return false;
-  return Object.entries(nextData).every(([key, value]) => (
-    key === 'base' || /^\d{1,2}\/\d{1,2}$/.test(key) || /^\d{4}-\d{2}-\d{2}$/.test(key)
-  ) && _isScheduleEntry(value));
+  return Object.entries(nextData).every(([key, value]) => {
+    if (['_calendar', '_templates', '_bellSource'].includes(key)) {
+      return value && typeof value === 'object' && !Array.isArray(value);
+    }
+    return (key === 'base' || /^\d{1,2}\/\d{1,2}$/.test(key) || /^\d{4}-\d{2}-\d{2}$/.test(key))
+      && _isScheduleEntry(value);
+  });
 }
 
 let _siteView = 'schedule';
@@ -268,10 +272,10 @@ function _startOfDay(date) {
 function _getScheduleDataForDate(date) {
   const baseEntry = _defaultScheduleDataForDate(date);
   const resolved = window.PhsScheduleResolver?.resolveScheduleType
-    ? window.PhsScheduleResolver.resolveScheduleType(date, window.__SITE_SETTINGS__ || {}, baseEntry?.[0] || '')
+    ? window.PhsScheduleResolver.resolveScheduleType(date, { ...window.__SITE_SETTINGS__, officialSchedule: window.__SITE_SETTINGS__?.officialSchedule || data?._calendar }, baseEntry?.[0] || '')
     : { type: _plannedOverrideForDate(date)?.type || baseEntry?.[0] || '', source: _plannedOverrideForDate(date) ? 'manual' : 'default' };
   if (resolved?.type && resolved.source !== 'default') {
-    const template = window.__SITE_SETTINGS__?.bellSchedules?.[resolved.type];
+    const template = window.__SITE_SETTINGS__?.bellSchedules?.[resolved.type] || data?._templates?.[resolved.type];
     if (template && typeof template === 'object' && !Array.isArray(template) && Object.keys(template).length) {
       return [resolved.type, template];
     }
@@ -284,6 +288,7 @@ function _getScheduleDataForDate(date) {
 }
 
 function _defaultScheduleDataForDate(date) {
+  if (window.PhsScheduleResolver?.baseScheduleEntry) return window.PhsScheduleResolver.baseScheduleEntry(date, data, window.__SITE_SETTINGS__?.officialSchedule);
   const key = _scheduleKeyForDate(date);
   if (key in data) return data[key];
   return _isWeekendDate(date) ? ['No School', {}] : data.base;
@@ -476,6 +481,7 @@ function _writeLunchWeatherCache(api) {
 
 function _lunchWeatherFetchUrls() {
   const urls = [];
+  if(window.PhsStudentWidget===true && _isLocalhost())urls.push(`${location.origin}/weather/lunch`);
   if (!_isLocalhost() && location.protocol !== 'file:') urls.push(`${_BACKEND_URL}/weather/lunch`);
   return [...new Set(urls)];
 }
@@ -780,6 +786,7 @@ function _isLunchNow() {
 }
 
 function _shouldShowLunchWeather() {
+  if(window.PhsStudentWidget===true)return true;
   if (_isNonInstructionalSchedule(scheduleType)) return false;
   const { startSec, endSec } = _lunchWeatherWindowSeconds();
   const currentSec = _currentScheduleSeconds();
@@ -2009,11 +2016,10 @@ function calculateGoal() {
   let val = _clockSeconds(date);
 
   let arr = _getScheduleDataForDate(date);
-  const effectiveOverride = _devScheduleType
-    ? { type: _devScheduleType }
-    : (_scheduleOverride && _scheduleOverride.type && _overrideAppliesToday(_scheduleOverride) ? _scheduleOverride : null);
+  const effectiveOverride = _devScheduleType ? { type: _devScheduleType } : null;
 
-  // Apply local dev or admin schedule override if one is active
+  // The shared resolver already applies manual and active admin overrides in priority order.
+  // This second pass exists only for the explicit local developer preview control.
   if (effectiveOverride) {
     const overrideArr = _getOverrideData(effectiveOverride.type);
     if (overrideArr) arr = overrideArr;

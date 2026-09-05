@@ -619,6 +619,7 @@
       source: source.source || null,
       checkedAt: String(source.checkedAt || ''),
       stale: source.stale === true,
+      schoolYears: Array.isArray(source.schoolYears) ? source.schoolYears.filter(year => /^\d{4}-\d{2}-\d{2}$/.test(year.start) && /^\d{4}-\d{2}-\d{2}$/.test(year.end) && year.start <= year.end) : [],
       overrides: Object.fromEntries(entries)
     };
   }
@@ -657,7 +658,7 @@
     const officialSchedule = normalizeOfficialSchedule(
       officialResult.status === 'fulfilled'
         ? officialResult.value
-        : cached.settings?.officialSchedule
+        : (window.__SITE_SETTINGS__?.officialSchedule || cached.settings?.officialSchedule)
     );
 
     if (publicResult.status === 'fulfilled') {

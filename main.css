@@ -617,13 +617,6 @@ body.privacy-modal-open::before {
   align-items: center;
 }
 
-.seo-kicker {
-  margin: 0 0 12px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 14px;
-  font-weight: 700;
-}
-
 .hero--compact {
   margin-top: clamp(16px, 2vh, 28px);
   margin-bottom: clamp(18px, 2.5vh, 32px);
@@ -1568,34 +1561,112 @@ body.appearance-open .appearance-toggle {
 .privacy-card section + section {
   margin-top: 18px;
 }
-.privacy-choice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: fit-content;
-  min-height: 44px;
-  margin-top: 10px;
+.privacy-card h3 {
+  margin: 16px 0 6px;
   color: var(--fg-1);
   font-size: 14px;
-  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0;
 }
-.privacy-choice input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--accent);
+.privacy-card .privacy-inshort {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border-left: 2px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--fg-2);
+  font-size: 13px;
 }
-.privacy-choice input:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.5);
-  outline-offset: 3px;
+.privacy-card .privacy-inshort em {
+  color: var(--fg-1);
+  font-style: normal;
+  font-weight: 700;
 }
-.privacy-choice input:disabled,
-.privacy-choice:has(input:disabled) {
-  cursor: not-allowed;
-  opacity: 0.65;
+.privacy-summary {
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
 }
-.privacy-card .privacy-choice-status {
+.privacy-summary ul {
+  padding-left: 18px;
+}
+.privacy-toc {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.privacy-toc h2 {
+  margin-bottom: 10px;
+}
+.privacy-toc ol {
+  margin: 0;
+  padding-left: 20px;
   color: var(--fg-3);
+  font-size: 14px;
+  line-height: 1.5;
+  list-style: decimal;
+}
+.privacy-toc li + li {
+  margin-top: 5px;
+}
+.privacy-toc li::marker {
+  color: var(--fg-3);
+}
+.privacy-toc a {
+  color: var(--fg-2);
+  text-decoration: none;
+}
+.privacy-toc a:hover,
+.privacy-toc a:focus-visible {
+  color: var(--fg-1);
+  text-decoration: underline;
+}
+.privacy-card section[id] {
+  scroll-margin-top: 90px;
+}
+.privacy-table-wrap {
+  overflow-x: auto;
+  margin: 10px 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+}
+.privacy-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  color: var(--fg-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.privacy-table th,
+.privacy-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+  text-align: left;
+  vertical-align: top;
+}
+.privacy-table thead th {
+  color: var(--fg-1);
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.045);
+}
+.privacy-table tbody tr:last-child th,
+.privacy-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.privacy-table td:last-child {
+  width: 1%;
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
 }
 .privacy-card h2 {
   margin: 0 0 6px;
@@ -1615,6 +1686,13 @@ body.appearance-open .appearance-toggle {
 .privacy-card ul {
   margin: 0;
   padding-left: 20px;
+  list-style: disc;
+}
+.privacy-card li + li {
+  margin-top: 6px;
+}
+.privacy-card li::marker {
+  color: var(--fg-3);
 }
 .privacy-card a {
   color: var(--fg-1);

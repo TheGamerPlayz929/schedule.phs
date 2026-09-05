@@ -45,8 +45,9 @@ test('Firebase Google login uses a top-level form handoff to establish a first-p
     assert.match(js, /form\.requestSubmit\(\)/);
     assert.match(js, /session: 'Google sign-in succeeded/);
     assert.match(js, /if \(!errors\[errorCode\]\) setStatus\('Admin backend is waking up/);
-    assert.match(js, /const buttonWidth = Math\.min\(320, Math\.max\(200, window\.innerWidth - 106\)\);/);
+    assert.match(js, /const buttonWidth = Math\.min\(320, googleButton\.clientWidth\);/);
     assert.match(js, /width: buttonWidth/);
+    assert.match(js, /function hidePlaceholder\(\)/);
     assert.doesNotMatch(js, /fetch\(BACKEND \+ '\/admin\/google-login'/);
     assert.doesNotMatch(js, /localStorage|sessionStorage/);
   }

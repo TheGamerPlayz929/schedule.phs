@@ -118,7 +118,25 @@
     return { type: defaultType || '', source: 'default', rule: null, iso };
   }
 
+  // Calendar dates are ISO/year-qualified. Legacy M/D entries are templates only.
+  function baseScheduleEntry(input, data, official) {
+    const date = localDate(input), iso = toISODate(input);
+    if (!date || !data) return null;
+    const calendar = data._calendar;
+    const years = official?.schoolYears?.length ? official.schoolYears : calendar?.schoolYears;
+    if (!years?.length) {
+      const key = `${date.getMonth() + 1}/${date.getDate()}`;
+      return data[key] || (date.getDay() === 0 || date.getDay() === 6 ? ['No School', {}] : data.base);
+    }
+    if (!years?.some(year => iso >= year.start && iso <= year.end)
+        || date.getDay() === 0 || date.getDay() === 6) return ['No School', {}];
+    const type = date.getDay() === 3 ? 'Advisory' : 'Normal Schedule';
+    const legacyTemplate = Object.values(data).find(entry => Array.isArray(entry) && entry[0] === type)?.[1];
+    return [type, data._templates?.[type] || legacyTemplate || {}];
+  }
+
   const api = {
+    baseScheduleEntry,
     resolveScheduleType,
     toISODate,
     localDate,

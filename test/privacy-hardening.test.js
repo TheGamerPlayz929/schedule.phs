@@ -13,32 +13,54 @@ test('public pages do not load advertising analytics or remote Google fonts', ()
   assert.equal(fs.existsSync(path.join(root, 'google-analytics.js')), false);
 });
 
-test('anonymous analytics requires explicit browser consent and respects privacy signals', () => {
+test('anonymous analytics run on every visit without a consent gate', () => {
   const source = fs.readFileSync(path.join(root, 'privacy-analytics.js'), 'utf8');
-  assert.match(source, /navigator\.globalPrivacyControl === true/);
-  assert.match(source, /navigator\.doNotTrack === '1'/);
-  assert.match(source, /phs:privacy:analytics-consent:v2/);
-  assert.match(source, /=== 'granted'/);
   assert.match(source, /credentials: 'omit'/);
-  assert.doesNotMatch(source, /analytics-optout:v1/);
-  assert.doesNotMatch(source, /cookie|email|username|userAgent|googletagmanager/i);
+  assert.match(source, /LEGACY_CONSENT_KEYS\.forEach\(key => localStorage\.removeItem\(key\)\)/);
+  assert.doesNotMatch(source, /consentGranted\(\)/);
+  assert.doesNotMatch(source, /aggregate-analytics-toggle/);
+  assert.doesNotMatch(source, /navigator\.globalPrivacyControl === true \|\|/);
+  assert.doesNotMatch(source, /if \(isLocal \|\| privacySignal/);
 });
 
-test('privacy notice covers authenticated data, retention, providers, children, and rights', () => {
+test('anonymous analytics events stay free of identifiers', () => {
+  const source = fs.readFileSync(path.join(root, 'privacy-analytics.js'), 'utf8');
+  const start = source.indexOf('function post(');
+  const end = source.indexOf('function sendDuration(', start);
+  const payloadSource = source.slice(start, end);
+  assert.match(payloadSource, /JSON\.stringify\(\{ page, device, \.\.\.payload \}\)/);
+  assert.doesNotMatch(source, /email|username|userAgent|googletagmanager|document\.cookie/i);
+});
+
+test('privacy notice discloses always-on analytics, retention, providers, minors, and rights', () => {
   const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
   for (const phrase of [
-    'Effective August 30, 2026',
-    'Analytics stay off unless you enable them',
-    'Totals are deleted after 90 days',
-    'District session cookies are kept in server memory for up to eight hours',
+    'Last updated September 4, 2026',
+    'Analytics are always on',
+    'There is no opt-in or opt-out control',
+    'We do not currently respond to DNT or GPC browser signals',
+    'they are deleted after 90 days',
+    'held in server memory for up to eight hours',
     'keyed, one-way network identifier',
-    'audit records and settings backups are limited to 90 days',
+    'limited to 90 days',
     'We do not sell personal data',
     'not directed to children under 13',
     'not a school or district service',
     'request correction or deletion',
     'appeal a denied request'
-  ]) assert.match(html, new RegExp(phrase, 'i'));
+  ]) assert.match(html, new RegExp(phrase, 'i'), phrase);
+});
+
+test('privacy notice keeps every table-of-contents anchor resolvable', () => {
+  const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
+  const anchors = [...html.matchAll(/href="#(s\d+)"/g)].map(match => match[1]);
+  assert.equal(anchors.length, 12);
+  for (const anchor of anchors) assert.match(html, new RegExp(`<section id="${anchor}">`), anchor);
+});
+
+test('the removed analytics consent toggle is gone from the privacy page', () => {
+  const html = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
+  assert.doesNotMatch(html, /aggregate-analytics-toggle|privacy-choice|Allow anonymous aggregate analytics/);
 });
 
 test('privacy-sensitive source files match their deployed public copies', () => {

@@ -1,0 +1,8 @@
+Cormorant Garamond, Medium Italic (500), Latin WOFF2
+Copyright 2015 the Cormorant Project Authors (github.com/CatharsisFonts/Cormorant)
+License: SIL Open Font License 1.1; see CormorantGaramond-OFL.txt.
+
+Unmodified Google Fonts webfont, self-hosted for the V4 student clock.
+Font source: https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd5wDD-iNM8.woff2
+Official license: https://github.com/google/fonts/blob/main/ofl/cormorantgaramond/OFL.txt
+Project: https://github.com/CatharsisFonts/Cormorant

@@ -1,38 +1,12 @@
-/* Anonymous first-party usage totals with explicit browser consent. */
+/* Anonymous first-party usage totals. Always on. No identifiers, no cross-site tracking. */
 (function () {
-  const STORAGE_KEY = 'phs:privacy:analytics-consent:v2';
+  const LEGACY_CONSENT_KEYS = ['phs:privacy:analytics-consent:v2', 'phs:privacy:analytics-optout:v1'];
   const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(location.hostname);
-  const privacySignal = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
 
-  function consentGranted() {
-    try { return localStorage.getItem(STORAGE_KEY) === 'granted'; }
-    catch { return false; }
-  }
+  /* The consent toggle is gone: analytics are always on, so drop the stale browser flag. */
+  try { LEGACY_CONSENT_KEYS.forEach(key => localStorage.removeItem(key)); } catch {}
 
-  function setConsent(granted) {
-    try { localStorage.setItem(STORAGE_KEY, granted ? 'granted' : 'denied'); }
-    catch {}
-  }
-
-  function initializeControl() {
-    const control = document.getElementById('aggregate-analytics-toggle');
-    const status = document.getElementById('aggregate-analytics-status');
-    if (!control) return;
-    control.checked = !privacySignal && consentGranted();
-    control.disabled = privacySignal;
-    if (privacySignal && status) status.textContent = 'Your browser privacy signal is active, so anonymous analytics are off.';
-    control.addEventListener('change', () => {
-      setConsent(control.checked);
-      if (status) status.textContent = control.checked
-        ? 'Anonymous analytics are on for future page visits.'
-        : 'Anonymous analytics are off for future page visits.';
-    });
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeControl, { once: true });
-  else initializeControl();
-
-  if (isLocal || privacySignal || !consentGranted() || new URLSearchParams(location.search).has('_preview')) return;
+  if (isLocal || new URLSearchParams(location.search).has('_preview')) return;
 
   const BACKEND = 'https://phs-grades-backend.onrender.com';
   const PAGE_MAP = {
