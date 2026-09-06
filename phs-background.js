@@ -10,6 +10,10 @@
 (() => {
   'use strict';
 
+  /* Console-checkable build tag: run `PHSBackground.version` in devtools
+     to confirm which background bundle is live. */
+  window.PHSBackground = { version: '20260906-glyph4' };
+
   function init() {
     const canvas = document.getElementById('site-bg-canvas');
     if (!canvas || canvas.dataset.phsBgInit) return false;
@@ -183,19 +187,22 @@ void main() {
     float wave = pow(0.5 + 0.5 * sin(cell.x * 0.085 + cell.y * 0.045 - u_time * 1.4), 3.0);
     float opacity = (0.2 + 0.8 * wave) * (0.55 + 0.45 * twinkle);
     float reach = clamp(1.0 - distance(offset + cell * TOTAL_SIZE + 2.0, u_pointer) / 360.0, 0.0, 1.0);
-    float reveal = pow(reach, 1.55) * u_hover;
+    /* Feathered reveal: brightness breathes in over a wide halo instead of a hard spotlight edge. */
+    float reveal = pow(reach, 2.4) * u_hover;
+    float halo = pow(reach, 3.5) * u_hover;
     float morph = 0.0, correction = 0.0;
     int glyph = 0;
+    opacity += halo * 0.25;
     if (reveal > 0.001) {
       uint seed = uint(cell.x) * 374761393u ^ uint(cell.y) * 668265263u ^ u_revision * 1274126177u;
       seed = (seed ^ (seed >> 13u)) * 1274126177u;
       glyph = int((seed ^ (seed >> 16u)) % 36u);
-      morph = smoothstep(0.0, 0.24, reveal);
+      morph = smoothstep(0.05, 0.55, reveal) * 0.85;
       float encodedCorrection = texture(u_morph_corrections,
         vec2((morph * 16.0 + 0.5) / 17.0, (float(glyph) + 0.5) / 36.0)).r;
       correction = (encodedCorrection * 255.0 - 128.0) / 64.0;
       /* Glyphs near the pointer resolve brighter than the dot field so they read as text. */
-      opacity = mix(opacity, max(opacity, 0.6), morph);
+      opacity = mix(opacity, max(opacity, 0.55), morph);
     }
     float introOffset = distance(u_resolution / 2.0 / TOTAL_SIZE, cell) * 0.006 + random(cell) * 0.15;
     opacity *= step(introOffset, u_time * 0.5);
@@ -300,7 +307,7 @@ void main() {
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     const finePointer = matchMedia('(any-pointer: fine)');
     const start = performance.now();
-    let x = -1000, y = -1000, active = false, dirty = false, revision = 0;
+    let x = -1000, y = -1000, active = false, dirty = false, revision = 0, lastMove = start;
     let frame = 0, strength = 0, lastNow = start;
     let resizeNeeded = true, pixelRatio = 0;
 
@@ -336,6 +343,9 @@ void main() {
       const dt = Math.min(50, now - lastNow);
       lastNow = now;
       const reduceGlow = document.body && document.body.classList.contains('user-reduce-glow');
+      /* Failsafe: if pointer events go quiet (iframe capture, drags, devtools),
+         release the hover so the glow can never freeze mid-morph. */
+      if (now - lastMove > 1200) active = false;
       if (document.activeElement && document.activeElement.tagName === 'IFRAME') stop();
       strength = motion.matches ? 0 : Math.max(0, Math.min(1, strength + (active && !reduceGlow ? dt / 60 : -dt / 150)));
       if (dirty) {
@@ -348,7 +358,7 @@ void main() {
       /* Dark field, brighter glyphs: dots stay faint while morphed text near the pointer pops. */
       const motionDim = motion.matches ? 0.5 : 1.0;
       gl.uniform1f(dimLocation, 0.12 * (reduceGlow ? 0.3 : 1.0) * motionDim);
-      gl.uniform1f(glyphLocation, 0.8 * (reduceGlow ? 0.35 : 1.0) * motionDim);
+      gl.uniform1f(glyphLocation, 0.7 * (reduceGlow ? 0.35 : 1.0) * motionDim);
       gl.uniform1ui(revisionLocation, revision);
       if (cacheCells) {
         gl.activeTexture(gl.TEXTURE2);
@@ -403,6 +413,7 @@ void main() {
       if (active && cx === x && cy === y) return;
       x = cx;
       y = cy;
+      lastMove = performance.now();
       active = true;
       dirty = true;
     }, { passive: true });
