@@ -192,7 +192,7 @@ void main() {
         vec2((morph * 16.0 + 0.5) / 17.0, (float(glyph) + 0.5) / 36.0)).r;
       correction = (encodedCorrection * 255.0 - 128.0) / 64.0;
       /* Subtle default: keep emerging strokes dim so text stays legible. */
-      opacity = mix(opacity, max(opacity, 0.22), morph);
+      opacity = mix(opacity, max(opacity, 0.18), morph);
     }
     float introOffset = distance(u_resolution / 2.0 / TOTAL_SIZE, cell) * 0.006 + random(cell) * 0.15;
     opacity *= step(introOffset, u_time * 0.5);
@@ -340,8 +340,8 @@ void main() {
       gl.uniform1f(timeLocation, motion.matches ? 6 : (now - start) / 1000);
       gl.uniform2f(pointerLocation, x * shaderUnitsPerPixel, y * shaderUnitsPerPixel);
       gl.uniform1f(hoverLocation, reduceGlow ? strength * 0.25 : strength);
-      /* Subtle default: halve the login-page brightness; dim further for reduce-glow / reduced-motion. */
-      gl.uniform1f(dimLocation, 0.5 * (reduceGlow ? 0.35 : 1.0) * (motion.matches ? 0.6 : 1.0));
+      /* Darker default: dim the login-page brightness; dim further for reduce-glow / reduced-motion. */
+      gl.uniform1f(dimLocation, 0.34 * (reduceGlow ? 0.3 : 1.0) * (motion.matches ? 0.5 : 1.0));
       gl.uniform1ui(revisionLocation, revision);
       if (cacheCells) {
         gl.activeTexture(gl.TEXTURE2);
@@ -376,9 +376,14 @@ void main() {
     window.addEventListener('pointermove', event => {
       if (event.pointerType === 'touch' || motion.matches || !finePointer.matches) return;
       if (document.body && document.body.classList.contains('user-reduce-glow')) return;
-      if (active && event.clientX === x && event.clientY === y) return;
-      x = event.clientX;
-      y = event.clientY;
+      /* .ambient-canvas is inset -20vw, so the canvas origin sits off-viewport:
+         map viewport coords into canvas-relative coords. */
+      const rect = canvas.getBoundingClientRect();
+      const cx = event.clientX - rect.left;
+      const cy = event.clientY - rect.top;
+      if (active && cx === x && cy === y) return;
+      x = cx;
+      y = cy;
       active = true;
       dirty = true;
     }, { passive: true });
