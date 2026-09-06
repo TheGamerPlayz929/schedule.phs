@@ -1,8 +1,9 @@
 /* PHS shared default background: subtle gray dot/letter field.
  * Generalized from admin-login-canvas.js for site-wide use.
  * Targets <canvas id="site-bg-canvas"> inside .ambient-canvas.
- * Subtle by default (dimmed glyphs + non-linear CSS glow in main.css)
- * so body text stays legible. Respects prefers-reduced-motion and
+ * Dark field by default (faint dots via u_dim) with brighter morphed glyphs
+ * near the pointer (u_glyph) so hover text reads clearly without lifting the
+ * overall background. Respects prefers-reduced-motion and
  * body.user-reduce-glow. Fails silently (CSS orbs remain) if WebGL2 is missing.
  */
 (() => {
@@ -145,6 +146,7 @@ uniform vec2 u_resolution;
 uniform vec2 u_pointer;
 uniform float u_hover;
 uniform float u_dim;
+uniform float u_glyph;
 uniform uint u_revision;
 uniform sampler2D u_atlas;
 uniform sampler2D u_morph_corrections;
@@ -191,8 +193,8 @@ void main() {
       float encodedCorrection = texture(u_morph_corrections,
         vec2((morph * 16.0 + 0.5) / 17.0, (float(glyph) + 0.5) / 36.0)).r;
       correction = (encodedCorrection * 255.0 - 128.0) / 64.0;
-      /* Subtle default: keep emerging strokes dim so text stays legible. */
-      opacity = mix(opacity, max(opacity, 0.18), morph);
+      /* Glyphs near the pointer resolve brighter than the dot field so they read as text. */
+      opacity = mix(opacity, max(opacity, 0.55), morph);
     }
     float introOffset = distance(u_resolution / 2.0 / TOTAL_SIZE, cell) * 0.006 + random(cell) * 0.15;
     opacity *= step(introOffset, u_time * 0.5);
@@ -216,7 +218,7 @@ void main() {
     float surface = mix(dotDistance, glyphDistance, state.y) + state.z;
     shape = smoothstep(-aa, aa, surface);
   }
-  float opacity = state.x * u_dim;
+  float opacity = state.x * mix(u_dim, u_glyph, state.y);
   opacity *= shape * step(0.0, st.x) * step(0.0, st.y);
   fragColor = vec4(vec3(opacity), opacity);
 }`;
@@ -275,6 +277,7 @@ void main() {
     const pointerLocation = gl.getUniformLocation(program, 'u_pointer');
     const hoverLocation = gl.getUniformLocation(program, 'u_hover');
     const dimLocation = gl.getUniformLocation(program, 'u_dim');
+    const glyphLocation = gl.getUniformLocation(program, 'u_glyph');
     const revisionLocation = gl.getUniformLocation(program, 'u_revision');
     const cellPassLocation = gl.getUniformLocation(program, 'u_cell_pass');
     const useCellStateLocation = gl.getUniformLocation(program, 'u_use_cell_state');
@@ -340,8 +343,10 @@ void main() {
       gl.uniform1f(timeLocation, motion.matches ? 6 : (now - start) / 1000);
       gl.uniform2f(pointerLocation, x * shaderUnitsPerPixel, y * shaderUnitsPerPixel);
       gl.uniform1f(hoverLocation, reduceGlow ? strength * 0.25 : strength);
-      /* Darker default: dim the login-page brightness; dim further for reduce-glow / reduced-motion. */
-      gl.uniform1f(dimLocation, 0.34 * (reduceGlow ? 0.3 : 1.0) * (motion.matches ? 0.5 : 1.0));
+      /* Dark field, brighter glyphs: dots stay faint while morphed text near the pointer pops. */
+      const motionDim = motion.matches ? 0.5 : 1.0;
+      gl.uniform1f(dimLocation, 0.12 * (reduceGlow ? 0.3 : 1.0) * motionDim);
+      gl.uniform1f(glyphLocation, 0.65 * (reduceGlow ? 0.35 : 1.0) * motionDim);
       gl.uniform1ui(revisionLocation, revision);
       if (cacheCells) {
         gl.activeTexture(gl.TEXTURE2);

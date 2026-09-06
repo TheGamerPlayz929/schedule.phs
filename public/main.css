@@ -35,7 +35,7 @@
   --user-orb-3: rgba(70, 72, 72, 0.13);
   --user-gradient-angle: 281deg;
   --user-text-scale: 1;
-  --site-bg-opacity: 0.34;
+  --site-bg-opacity: 1;
   --ring-start: #ecece8;
   --ring-end: #a8aaa8;
   --page-content-max: 1180px;
@@ -192,7 +192,9 @@ body.devtools-pause-active .appearance-panel {
   width: 100%;
   height: 100%;
   display: block;
-  opacity: var(--site-bg-opacity, 0.5);
+  /* Field darkness lives shader-side (u_dim) so hover glyphs (u_glyph)
+     can run brighter than the dots; keep element opacity full. */
+  opacity: var(--site-bg-opacity, 1);
 }
 
 .ambient-scrim {
@@ -204,10 +206,10 @@ body.devtools-pause-active .appearance-panel {
   pointer-events: none;
 }
 
-.user-reduce-glow #site-bg-canvas { opacity: 0.12; }
 .user-reduce-glow .ambient-orb { opacity: 0.2; }
+/* Canvas dimming for reduce-glow / reduced-motion is handled shader-side
+   (u_dim / u_glyph) so glyphs stay proportionally brighter than the dots. */
 @media (prefers-reduced-motion: reduce) {
-  #site-bg-canvas { opacity: 0.2; }
   .ambient-orb { animation: none; }
 }
 
