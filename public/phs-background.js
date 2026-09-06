@@ -4,7 +4,8 @@
  * Dark field by default (faint dots via u_dim) with brighter morphed glyphs
  * near the pointer (u_glyph) so hover text reads clearly without lifting the
  * overall background. Respects prefers-reduced-motion and
- * body.user-reduce-glow. Fails silently (CSS orbs remain) if WebGL2 is missing.
+ * body.user-reduce-glow. Pointer over embedded iframes releases the hover
+ * so the morph can't freeze over embeds. Fails silently (CSS orbs remain) if WebGL2 is missing.
  */
 (() => {
   'use strict';
@@ -335,6 +336,7 @@ void main() {
       const dt = Math.min(50, now - lastNow);
       lastNow = now;
       const reduceGlow = document.body && document.body.classList.contains('user-reduce-glow');
+      if (document.activeElement && document.activeElement.tagName === 'IFRAME') stop();
       strength = motion.matches ? 0 : Math.max(0, Math.min(1, strength + (active && !reduceGlow ? dt / 60 : -dt / 150)));
       if (dirty) {
         revision += 1;
@@ -378,6 +380,18 @@ void main() {
       active = false;
       dirty = false;
     }
+    /* Hovering an embedded frame (e.g. the Grades sign-in) silences parent
+       pointermove, which would freeze the morph mid-glow: treat frames as exits. */
+    function armIframeGuards() {
+      document.querySelectorAll('iframe').forEach(frame => {
+        if (frame.dataset.phsBgGuard) return;
+        frame.dataset.phsBgGuard = '1';
+        frame.addEventListener('pointerenter', stop);
+        frame.addEventListener('pointerover', stop);
+        frame.addEventListener('mouseenter', stop);
+        frame.addEventListener('focus', stop);
+      });
+    }
     window.addEventListener('pointermove', event => {
       if (event.pointerType === 'touch' || motion.matches || !finePointer.matches) return;
       if (document.body && document.body.classList.contains('user-reduce-glow')) return;
@@ -393,6 +407,7 @@ void main() {
       dirty = true;
     }, { passive: true });
     document.documentElement.addEventListener('pointerleave', stop);
+    document.addEventListener('pointerleave', stop);
     window.addEventListener('blur', stop);
     window.addEventListener('resize', () => {
       resizeNeeded = true;
@@ -404,6 +419,7 @@ void main() {
       if (document.hidden) { stop(); strength = 0; }
       render();
     });
+    armIframeGuards();
     render();
     return true;
   }
