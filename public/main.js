@@ -1633,65 +1633,27 @@ function updateHeroSignatureLayout() {
   wrapper.classList.toggle('signature-double', layoutCount === 2);
 }
 
-function setHeroLine(line, text, visible, options = {}) {
+function setHeroLine(line, text, visible) {
   const isEyebrow = line === 'eyebrow';
   const fallback = isEyebrow ? domRefs.heroEyebrow : domRefs.heroTitle;
   const stage = isEyebrow ? domRefs.signatureEyebrow : domRefs.signatureTitle;
   const styleTarget = isEyebrow ? 'heroEyebrow' : 'heroTitle';
-  const hasLetterStyles = _IS_STUDIO_PREVIEW || _hasTextStyleRuns(styleTarget);
 
   if (!fallback) return;
 
   _setStyledText(fallback, styleTarget, text);
   fallback.style.display = visible ? 'block' : 'none';
-  fallback.classList.toggle('signature-fallback-hidden', Boolean(stage && visible && !hasLetterStyles));
+  fallback.classList.remove('signature-fallback-hidden');
 
-  if (!stage) return;
-  if (!visible) {
-    delete stage.dataset.pendingHeroScriptText;
+  if (stage) {
+    if (stage._signatureRaf) cancelAnimationFrame(stage._signatureRaf);
+    delete stage.dataset.heroScriptText;
     delete stage.dataset.heroScriptRequestId;
+    delete stage.dataset.pendingHeroScriptText;
     stage.classList.remove('is-visible', 'is-complete');
     stage.innerHTML = '';
-    fallback.classList.remove('signature-fallback-hidden');
-    if (isEyebrow) renderState.lastSignedEyebrow = '';
-    else renderState.lastSignedTitle = '';
-    updateHeroSignatureLayout();
-    return;
   }
-
-  if (hasLetterStyles) {
-    delete stage.dataset.pendingHeroScriptText;
-    delete stage.dataset.heroScriptRequestId;
-    stage.classList.remove('is-visible', 'is-complete');
-    stage.innerHTML = '';
-    fallback.classList.remove('signature-fallback-hidden');
-    updateHeroSignatureLayout();
-    return;
-  }
-
-  const currentText = isEyebrow ? renderState.lastSignedEyebrow : renderState.lastSignedTitle;
-  if (currentText === text && (stage.classList.contains('is-visible') || stage.dataset.pendingHeroScriptText === text)) return;
-
-  if (isEyebrow) renderState.lastSignedEyebrow = text;
-  else renderState.lastSignedTitle = text;
-
-  const requestId = String(++_heroScriptRequestId);
-  stage.dataset.pendingHeroScriptText = text;
-  stage.dataset.heroScriptRequestId = requestId;
-  stage.classList.remove('is-visible', 'is-complete');
-  stage.innerHTML = '';
   updateHeroSignatureLayout();
-
-  signHeroText(stage, text, options, requestId).catch((error) => {
-    console.warn('Signature renderer fallback:', error);
-    if (stage.dataset.heroScriptRequestId !== requestId) return;
-    delete stage.dataset.heroScriptRequestId;
-    delete stage.dataset.pendingHeroScriptText;
-    stage.classList.remove('is-visible', 'is-complete');
-    stage.innerHTML = '';
-    fallback.classList.remove('signature-fallback-hidden');
-    updateHeroSignatureLayout();
-  });
 }
 
 async function signHeroText(target, text, options = {}, requestId = '') {
