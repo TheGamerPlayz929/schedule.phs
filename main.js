@@ -335,26 +335,6 @@ function _isNonInstructionalSchedule(type) {
   return /\b(no school|holiday|closure|closed)\b/i.test(String(type || ''));
 }
 
-function _nextInstructionalDate(from = new Date()) {
-  if (!data) return null;
-  const cursor = _startOfDay(from);
-  for (let i = 1; i <= 30; i += 1) {
-    cursor.setDate(cursor.getDate() + 1);
-    const arr = _getScheduleDataForDate(cursor);
-    if (arr && !_isNonInstructionalSchedule(arr[0])) return new Date(cursor);
-  }
-  return null;
-}
-
-function _getNextSchoolDayLabel(from = new Date()) {
-  const next = _nextInstructionalDate(from);
-  if (!next) return 'See you next school day';
-  const diffDays = Math.round((_startOfDay(next) - _startOfDay(from)) / 86400000);
-  if (diffDays === 1) return 'See you tomorrow';
-  const weekday = next.toLocaleDateString(undefined, { weekday: 'long' });
-  return weekday ? `See you ${weekday}` : 'See you next school day';
-}
-
 function _resetTimerState() {
   goal = 0;
   period = "";
@@ -1423,8 +1403,6 @@ const domRefs = {
   signatureTitle: null,
   signatureEyebrow: null,
   ringFill: null,
-  statusPill: null,
-  statusLabel: null,
   schedTitle: null,
   schedDate: null,
   periodList: null
@@ -1564,11 +1542,6 @@ function _renderScheduleDataUnavailable(error) {
   _clearCountdownDisplay();
   if (domRefs.heroEyebrow) setHeroLine('eyebrow', '', false);
   if (domRefs.heroTitle) setHeroLine('title', 'Schedule unavailable', true, { fontSize: 96, revealStroke: 40 });
-  if (domRefs.statusPill && domRefs.statusLabel) {
-    domRefs.statusPill.style.display = 'inline-flex';
-    domRefs.statusPill.dataset.status = 'off';
-    _setStyledText(domRefs.statusLabel, 'statusLabel', 'Refresh to retry');
-  }
   _setStyledText(domRefs.schedTitle, 'scheduleTitle', 'Schedule unavailable');
   _setStyledText(domRefs.schedDate, 'scheduleDate', '');
   if (domRefs.periodList) {
@@ -1935,8 +1908,6 @@ async function main() {
     domRefs.signatureTitle = document.getElementById('signature-title');
     domRefs.signatureEyebrow = document.getElementById('signature-eyebrow');
     domRefs.ringFill = document.getElementById('ring-fill');
-    domRefs.statusPill = document.getElementById('status-pill');
-    domRefs.statusLabel = document.getElementById('status-label');
     domRefs.schedTitle = document.getElementById('schedule-title');
     domRefs.schedDate = document.getElementById('schedule-date');
     domRefs.periodList = document.getElementById('period-list');
@@ -2143,43 +2114,22 @@ function updateAll() {
   }
 
   /* --- Hero text & Status --- */
-  if (domRefs.heroTitle && domRefs.heroEyebrow && domRefs.statusPill && domRefs.statusLabel) {
+  if (domRefs.heroTitle && domRefs.heroEyebrow) {
     const terminalSignature = window.innerWidth <= 640
       ? { fontSize: 132, revealStroke: 58 }
       : { fontSize: 178, revealStroke: 78 };
     if (noSchool) {
       setHeroLine('eyebrow', '', false);
       setHeroLine('title', 'No School', true, terminalSignature);
-
-      domRefs.statusPill.style.display = "inline-flex";
-      domRefs.statusPill.dataset.status = "off";
-      _setStyledText(domRefs.statusLabel, 'statusLabel', _heroSettings.noSchoolStatusText || "Enjoy your day");
     } else if (dayIsOver) {
       setHeroLine('eyebrow', '', false);
       setHeroLine('title', 'School Day Ended', true, terminalSignature);
-
-      domRefs.statusPill.style.display = "inline-flex";
-      domRefs.statusPill.dataset.status = "off";
-      _setStyledText(domRefs.statusLabel, 'statusLabel', _getNextSchoolDayLabel(date));
     } else if (isBeforeSchool) {
       setHeroLine('eyebrow', 'Starts in', true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', '', false);
-      domRefs.statusPill.style.display = "none";
     } else {
       setHeroLine('eyebrow', isTransition ? "Passing" : "Currently in", true, { fontSize: 112, revealStroke: 52 });
       setHeroLine('title', period, true, { fontSize: 142, revealStroke: 62 });
-
-      domRefs.statusPill.style.display = "inline-flex";
-      if (isTransition) {
-        domRefs.statusPill.dataset.status = "passing";
-        _setStyledText(domRefs.statusLabel, 'statusLabel', "Next period soon");
-      } else if (timeleft <= 60 && timeleft > 0) {
-        domRefs.statusPill.dataset.status = "urgent";
-        _setStyledText(domRefs.statusLabel, 'statusLabel', "Ending Soon");
-      } else {
-        domRefs.statusPill.dataset.status = "live";
-        _setStyledText(domRefs.statusLabel, 'statusLabel', "In Session");
-      }
     }
   }
 

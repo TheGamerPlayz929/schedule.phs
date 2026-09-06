@@ -653,50 +653,6 @@ body.privacy-modal-open::before {
   margin-bottom: clamp(18px, 2.5vh, 32px);
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  border-radius: 99px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 10px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
-    0 18px 48px rgba(0, 0, 0, 0.22),
-    0 0 42px color-mix(in srgb, var(--accent), transparent 88%);
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--status-off);
-}
-
-.status-badge[data-status="live"] .status-dot {
-  background: var(--status-live);
-  box-shadow: 0 0 8px var(--status-live);
-}
-
-.status-badge[data-status="passing"] .status-dot {
-  background: var(--status-passing);
-  box-shadow: 0 0 8px var(--status-passing);
-}
-
-.status-badge[data-status="soon"] .status-dot,
-.status-badge[data-status="urgent"] .status-dot {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
-}
-
 .hero-title-wrapper {
   margin-bottom: 10px;
   position: relative;
@@ -782,10 +738,6 @@ body.site-view-schedule.schedule-terminal-state .hero[data-site-view="schedule"]
   justify-content: center;
   margin: 0;
   padding: clamp(40px, 7vh, 90px) 0 clamp(82px, 12vh, 150px);
-}
-
-body.site-view-schedule.schedule-terminal-state .status-badge {
-  margin-bottom: clamp(12px, 2vh, 24px);
 }
 
 body.site-view-schedule.schedule-terminal-state .hero-title-wrapper {
@@ -2514,11 +2466,6 @@ body.appearance-open .appearance-panel.open {
 }
 .user-reduce-glow .progress-ring__fill {
   filter: none;
-}
-.user-reduce-glow .status-badge {
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
-    0 12px 32px rgba(0, 0, 0, 0.18);
 }
 @media (prefers-reduced-motion: reduce) {
   .appearance-panel {
