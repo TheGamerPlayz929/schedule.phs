@@ -194,7 +194,7 @@ void main() {
         vec2((morph * 16.0 + 0.5) / 17.0, (float(glyph) + 0.5) / 36.0)).r;
       correction = (encodedCorrection * 255.0 - 128.0) / 64.0;
       /* Glyphs near the pointer resolve brighter than the dot field so they read as text. */
-      opacity = mix(opacity, max(opacity, 0.55), morph);
+      opacity = mix(opacity, max(opacity, 0.6), morph);
     }
     float introOffset = distance(u_resolution / 2.0 / TOTAL_SIZE, cell) * 0.006 + random(cell) * 0.15;
     opacity *= step(introOffset, u_time * 0.5);
@@ -346,7 +346,7 @@ void main() {
       /* Dark field, brighter glyphs: dots stay faint while morphed text near the pointer pops. */
       const motionDim = motion.matches ? 0.5 : 1.0;
       gl.uniform1f(dimLocation, 0.12 * (reduceGlow ? 0.3 : 1.0) * motionDim);
-      gl.uniform1f(glyphLocation, 0.65 * (reduceGlow ? 0.35 : 1.0) * motionDim);
+      gl.uniform1f(glyphLocation, 0.8 * (reduceGlow ? 0.35 : 1.0) * motionDim);
       gl.uniform1ui(revisionLocation, revision);
       if (cacheCells) {
         gl.activeTexture(gl.TEXTURE2);
