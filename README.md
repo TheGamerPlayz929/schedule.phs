@@ -1,6 +1,6 @@
 # PHS Student Portal
 
-A public student portal for Poolesville High School schedule information, announcements, privacy notes, and the embedded GradeViewer entrypoint. Made by Jayaditya Buddan Ramesh and Emir Bakir. 
+A public student portal for Poolesville High School schedule information, announcements, privacy notes, and the embedded GradeViewer entrypoint. Made by Jay and Emir. 
 
 ## Live Site
 
