@@ -47,37 +47,6 @@
       overflow-x: hidden;
     }
 
-    /* Backdrop: dot matrix plus the reference's three black vignettes. */
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: var(--bg);
-      pointer-events: none;
-    }
-    #login-canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-    .vignette {
-      position: absolute;
-      inset: 0;
-    }
-    .vignette--up {
-      background: linear-gradient(to top, #000 0%, transparent 100%);
-    }
-    .vignette--center {
-      background: radial-gradient(circle at center, rgba(0, 0, 0, 1) 0%, transparent 100%);
-    }
-    .vignette--top {
-      inset: 0 0 auto 0;
-      height: 33.333%;
-      background: linear-gradient(to bottom, #000 0%, transparent 100%);
-    }
-
     main {
       position: relative;
       z-index: 1;
@@ -278,13 +247,6 @@
   </style>
 </head>
 <body>
-  <div class="backdrop" aria-hidden="true">
-    <canvas id="login-canvas"></canvas>
-    <div class="vignette vignette--up"></div>
-    <div class="vignette vignette--center"></div>
-    <div class="vignette vignette--top"></div>
-  </div>
-
   <main>
     <div class="stack">
       <div class="signin-brand">
@@ -307,7 +269,6 @@
   </main>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script defer src="admin-login-canvas.js?v=20260904-canvas16"></script>
   <script src="admin-login.js?v=20260904-signin6"></script>
 </body>
 </html>

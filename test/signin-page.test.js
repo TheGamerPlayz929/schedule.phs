@@ -17,7 +17,7 @@ test('sign-in page keeps only what the reference kept', () => {
     assert.match(html, /This is where the magic happens\./, file);
     assert.match(html, /id="google-login-btn"/, file);
     assert.match(html, /id="login-status"/, file);
-    assert.match(html, /id="login-canvas"/, file);
+    assert.doesNotMatch(html, /login-canvas|class="vignette|class="backdrop"/, file);
   }
 });
 
@@ -55,9 +55,9 @@ test('sign-in page carries no vibecoded tells', () => {
     assert.doesNotMatch(html, /backdrop-filter/, file);
     assert.doesNotMatch(html, /\u2014/, file);
     assert.doesNotMatch(html, /Inter/, file);
-    /* Three background vignettes and the owner's soft charcoal shimmer mask. */
+    /* The only remaining gradient belongs to the small brand text shimmer. */
     const gradients = html.match(/linear-gradient|radial-gradient/g) || [];
-    assert.equal(gradients.length, 4, `${file} should have 3 vignettes and 1 brand shimmer mask`);
+    assert.equal(gradients.length, 1, `${file} should not restore the canvas or circular vignette`);
   }
 });
 
@@ -74,7 +74,7 @@ test('sign-in page reserves the Google button box before it loads', () => {
 });
 
 test('sign-in assets stay mirrored into public', () => {
-  for (const file of ['admin-login.html', 'admin-login.js', 'admin-login-canvas.js']) {
+  for (const file of ['admin-login.html', 'admin-login.js']) {
     assert.equal(
       fs.readFileSync(path.join(root, file), 'utf8'),
       fs.readFileSync(path.join(root, 'public', file), 'utf8'),

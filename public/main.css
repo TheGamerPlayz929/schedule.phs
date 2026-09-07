@@ -3,15 +3,31 @@
    ========================================================================== */
 
 @font-face {
+  font-family: 'PHS Geist';
+  src: url('fonts/geist-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PHS Cormorant';
+  src: url('assets/fonts/CormorantGaramond-MediumItalic-latin.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Alex Brush Local';
   src: url('assets/fonts/AlexBrush-Regular.ttf') format('truetype');
   font-display: swap;
 }
 
 :root {
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-ui: 'PHS Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'PHS Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-serif: 'PHS Cormorant', Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --text-title: 30px;
@@ -35,7 +51,6 @@
   --user-orb-3: rgba(70, 72, 72, 0.13);
   --user-gradient-angle: 281deg;
   --user-text-scale: 1;
-  --site-bg-opacity: 1;
   --ring-start: #ecece8;
   --ring-end: #a8aaa8;
   --page-content-max: 1180px;
@@ -186,17 +201,6 @@ body.devtools-pause-active .appearance-panel {
   transition: background var(--theme-speed) ease;
 }
 
-#site-bg-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  /* Field darkness lives shader-side (u_dim) so hover glyphs (u_glyph)
-     can run brighter than the dots; keep element opacity full. */
-  opacity: var(--site-bg-opacity, 1);
-}
-
 .ambient-scrim {
   position: absolute;
   inset: 0;
@@ -207,8 +211,6 @@ body.devtools-pause-active .appearance-panel {
 }
 
 .user-reduce-glow .ambient-orb { opacity: 0.2; }
-/* Canvas dimming for reduce-glow / reduced-motion is handled shader-side
-   (u_dim / u_glyph) so glyphs stay proportionally brighter than the dots. */
 @media (prefers-reduced-motion: reduce) {
   .ambient-orb { animation: none; }
 }
