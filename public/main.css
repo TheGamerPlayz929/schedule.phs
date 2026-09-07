@@ -3,18 +3,34 @@
    ========================================================================== */
 
 @font-face {
-  font-family: 'PHS Geist';
-  src: url('fonts/geist-latin.woff2') format('woff2');
+  font-family: 'Figtree';
+  src: url('fonts/figtree-latin.woff2') format('woff2');
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 300 900;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'PHS Cormorant';
-  src: url('assets/fonts/CormorantGaramond-MediumItalic-latin.woff2') format('woff2');
+  font-family: 'Figtree';
+  src: url('fonts/figtree-italic-latin.woff2') format('woff2');
   font-style: italic;
-  font-weight: 500;
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('fonts/instrument-serif-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('fonts/instrument-serif-italic-latin.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 400;
   font-display: swap;
 }
 
@@ -25,9 +41,9 @@
 }
 
 :root {
-  --font-ui: 'PHS Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-sans: 'PHS Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-serif: 'PHS Cormorant', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --text-title: 30px;

@@ -1,0 +1,7 @@
+Figtree and Instrument Serif local webfonts
+
+Downloaded from the official Google Fonts CDN on 2026-09-06.
+Figtree project: https://github.com/erikdkennedy/figtree
+Instrument Serif project: https://github.com/Instrument/instrument-serif
+Stylesheet source: https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap
+Licenses: SIL Open Font License 1.1; see the adjacent OFL files.
