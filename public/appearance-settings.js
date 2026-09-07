@@ -2,7 +2,7 @@
 (function () {
   const KEY = 'phs:appearance:v3';
   const OLD_KEYS = ['phs:appearance:v1', 'phs:appearance:v2'];
-  const defaults = { accent: '#A8AAA8', colors: ['#A8AAA8', '#131414', '#ECECE8'], hue: 40, planeX: 1, planeY: 33, intensity: 48, textScale: 1, headingGlow: 100, reduceGlow: false };
+  const defaults = { accent: '#A8AAA8', colors: ['#A8AAA8', '#131414', '#ECECE8'], hue: 40, planeX: 1, planeY: 33, intensity: 48, textScale: 1, reduceGlow: false };
   const MAX_COLORS = 5;
   const isAdminPreview = (() => {
     try { return new URLSearchParams(location.search).has('_preview') && window.parent !== window; }
@@ -33,10 +33,6 @@
   }
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
-  }
-  function normalizeHeadingGlow(value) {
-    const number = Number(value);
-    return Number.isFinite(number) ? Math.round(clamp(number, 0, 200)) : defaults.headingGlow;
   }
   function hexToHsv(hex) {
     const { r, g, b } = hexToRgb(hex);
@@ -124,7 +120,7 @@
       const merged = { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
       const intensity = Number(merged.intensity);
       const textScale = Number(merged.textScale);
-      merged.headingGlow = normalizeHeadingGlow(merged.headingGlow);
+      delete merged.headingGlow;
       merged.intensity = Number.isFinite(intensity) ? Math.max(15, Math.min(100, intensity)) : defaults.intensity;
       merged.textScale = Number.isFinite(textScale) ? Math.max(0.85, Math.min(1.2, textScale)) : defaults.textScale;
       merged.accent = clampHex(merged.accent);
@@ -156,7 +152,6 @@
       stop.setAttribute('stop-color', index === 0 ? mix(accent, 0.28) : accent);
     });
     const scale = Number(settings.textScale);
-    root.style.setProperty('--heading-glow-factor', String(normalizeHeadingGlow(settings.headingGlow) / 100));
     root.style.setProperty('--user-text-scale', String(Number.isFinite(scale) ? Math.max(0.85, Math.min(1.2, scale)) : 1));
     document.body.classList.toggle('user-reduce-glow', Boolean(settings.reduceGlow));
   }
@@ -230,12 +225,6 @@
     const intensity = panel.querySelector('[data-appearance="intensity"]');
     const scale = panel.querySelector('[data-appearance="textScale"]');
     const glow = panel.querySelector('[data-appearance="reduceGlow"]');
-    const headingGlowLabel = document.createElement('label');
-    headingGlowLabel.className = 'appearance-slider';
-    headingGlowLabel.innerHTML = '<span>Text Glow <output data-appearance-glow-value for="heading-glow">100%</output></span><input id="heading-glow" type="range" data-appearance="headingGlow" min="0" max="200" step="1" value="100" aria-label="Text glow" aria-valuetext="100%">';
-    scale.closest('label').after(headingGlowLabel);
-    const headingGlow = headingGlowLabel.querySelector('input');
-    const headingGlowValue = headingGlowLabel.querySelector('output');
     const reset = panel.querySelector('[data-appearance-reset]');
     const close = panel.querySelector('[data-appearance-close]');
     const surprise = panel.querySelector('[data-appearance-surprise]');
@@ -249,7 +238,6 @@
     const dot = panel.querySelector('[data-theme-picker-dot]');
     enhanceAppearanceSlider(intensity);
     enhanceAppearanceSlider(scale);
-    enhanceAppearanceSlider(headingGlow);
     let current = read();
     let activeSlot = slotForAccent(current);
     let stopsLayoutStamp = '';
@@ -264,7 +252,6 @@
       const safeScale = Number.isFinite(Number(current.textScale)) ? Math.max(0.85, Math.min(1.2, Number(current.textScale))) : defaults.textScale;
       current.intensity = safeIntensity;
       current.textScale = safeScale;
-      current.headingGlow = normalizeHeadingGlow(current.headingGlow);
       if (syncPicker) syncPickerFromAccent(current);
       current.hue = Number.isFinite(Number(current.hue)) ? clamp(Number(current.hue), 0, 360) : defaults.hue;
       current.planeX = Number.isFinite(Number(current.planeX)) ? clamp(Number(current.planeX), 0, 100) : defaults.planeX;
@@ -293,10 +280,6 @@
       hue.value = current.hue;
       intensity.value = current.intensity;
       scale.value = current.textScale;
-      headingGlow.value = current.headingGlow;
-      headingGlowValue.textContent = `${current.headingGlow}%`;
-      headingGlow.setAttribute('aria-valuetext', `${current.headingGlow}%`);
-      paintAppearanceSlider(headingGlow, current.headingGlow, 0, 200, current.accent);
       glow.checked = Boolean(current.reduceGlow);
       intensityValue.textContent = `${current.intensity}%`;
       scaleValue.textContent = `${Math.round(current.textScale * 100)}%`;
@@ -410,7 +393,6 @@
     });
     intensity.addEventListener('input', () => { current.intensity = Number(intensity.value); paint(); });
     scale.addEventListener('input', () => { current.textScale = Number(scale.value); paint(); });
-    headingGlow.addEventListener('input', () => { current.headingGlow = Number(headingGlow.value); paint(); });
     glow.addEventListener('change', () => { current.reduceGlow = glow.checked; paint(); });
     eyeDropper.addEventListener('click', async event => {
       event.stopPropagation();

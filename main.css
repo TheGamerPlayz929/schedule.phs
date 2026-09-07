@@ -67,6 +67,7 @@
   --user-orb-3: rgba(70, 72, 72, 0.13);
   --user-gradient-angle: 281deg;
   --user-text-scale: 1;
+  --heading-glow-factor: 1.9;
   --ring-start: #ecece8;
   --ring-end: #a8aaa8;
   --page-content-max: 1180px;

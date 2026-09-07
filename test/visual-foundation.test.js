@@ -44,7 +44,24 @@ test('the shared theme uses the original bundled project fonts', () => {
   for (const base of [root, path.join(root, 'public')]) {
     for (const page of [...pages, 'student-widget.html']) {
       const html = fs.readFileSync(path.join(base, page), 'utf8');
-      assert.match(html, /main\.css\?v=20260907-glowslider1/, `${base}: ${page}`);
+      assert.match(html, /main\.css\?v=20260907-glow190/, `${base}: ${page}`);
     }
+  }
+});
+
+test('cursive heading glow is fixed at 190 percent with no visitor control', () => {
+  for (const file of ['main.css', 'public/main.css']) {
+    const css = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(css, /--heading-glow-factor:\s*1\.9\s*;/, file);
+  }
+
+  for (const file of [
+    'appearance-settings.js',
+    'theme-primer.js',
+    'public/appearance-settings.js',
+    'public/theme-primer.js'
+  ]) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.doesNotMatch(source, /data-appearance=["']headingGlow|heading-glow|Text Glow/, file);
   }
 });

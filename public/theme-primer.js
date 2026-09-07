@@ -60,8 +60,6 @@
     root.style.setProperty('--ring-start', mix(accent, 0.28));
     root.style.setProperty('--ring-end', accent);
     root.style.setProperty('--user-text-scale', String(Math.max(0.85, Math.min(1.2, Number(settings.textScale) || 1))));
-    const glow = Number(settings.headingGlow ?? 100);
-    root.style.setProperty('--heading-glow-factor', String((Number.isFinite(glow) ? Math.max(0, Math.min(200, glow)) : 100) / 100));
     if (settings.reduceGlow) {
       document.addEventListener('DOMContentLoaded', () => document.body.classList.add('user-reduce-glow'), { once: true });
     }
