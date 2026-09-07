@@ -697,9 +697,9 @@ body.privacy-modal-open::before {
 }
 
 .hero-eyebrow {
-  font-family: var(--font-serif);
+  font-family: 'Alex Brush Local', var(--font-serif);
   font-size: calc(var(--hero-eyebrow-size, 56px) * var(--user-text-scale));
-  font-style: italic;
+  font-style: normal;
   font-weight: 400;
   color: var(--fg-2);
   line-height: 1.1;
@@ -707,13 +707,13 @@ body.privacy-modal-open::before {
 }
 
 .hero-title {
-  font-family: var(--font-sans);
+  font-family: 'Alex Brush Local', var(--font-serif);
   font-size: calc(var(--hero-title-size, 90px) * var(--user-text-scale));
   font-weight: 400;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1;
   color: var(--fg-1);
-  text-shadow: none;
+  text-shadow: 0 0 28px rgba(255, 255, 255, 0.2);
 }
 
 .hero-eyebrow.signature-fallback-hidden,

@@ -26,7 +26,7 @@ test('deployed homepage also renders without a status pill', () => {
   assert.doesNotMatch(css, /\.status-(?:badge|dot)\b/);
 });
 
-test('homepage keeps the previous static schedule text treatment', () => {
+test('homepage keeps readable schedule text with the saved handwritten headings', () => {
   for (const base of [root, path.join(root, 'public')]) {
     const html = fs.readFileSync(path.join(base, 'index.html'), 'utf8');
     const source = fs.readFileSync(path.join(base, 'main.js'), 'utf8');
@@ -37,8 +37,8 @@ test('homepage keeps the previous static schedule text treatment', () => {
     assert.equal(settings.hero.schedulePageEyebrow, 'Currently in');
     assert.doesNotMatch(html, /id="hero-title"[^>]*>—/);
     assert.doesNotMatch(html, /id="hero-eyebrow"[^>]*data-bind="hero\.schedulePageEyebrow"/);
-    assert.match(css, /\.hero-eyebrow\s*\{[\s\S]*?font-family:\s*var\(--font-serif\);/);
-    assert.match(css, /\.hero-title\s*\{[\s\S]*?font-family:\s*var\(--font-sans\);/);
+    assert.match(css, /\.hero-eyebrow\s*\{[\s\S]*?font-family:\s*'Alex Brush Local', var\(--font-serif\);/);
+    assert.match(css, /\.hero-title\s*\{[\s\S]*?font-family:\s*'Alex Brush Local', var\(--font-serif\);/);
     assert.match(setHeroLine, /_setStyledText\(fallback, styleTarget, text\)/);
     assert.doesNotMatch(setHeroLine, /signHeroText\(/);
   }
