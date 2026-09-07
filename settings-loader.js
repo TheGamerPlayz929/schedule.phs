@@ -652,7 +652,14 @@
     }
 
     const [publicResult, officialResult] = await Promise.allSettled([
-      fetchJson(PUBLIC_SETTINGS_URL, { noStore: true }),
+      fetchJson(PUBLIC_SETTINGS_URL, { noStore: true }).then(settings => {
+        // Published settings and data.json already contain the calendar needed
+        // for first paint. The live calendar refresh must not delay that paint.
+        writeCache(settings);
+        applyBindings(settings);
+        finishPublicSettingsReady(settings);
+        return settings;
+      }),
       fetchJson(BACKEND + '/schedule-calendar', { noStore: true })
     ]);
     const officialSchedule = normalizeOfficialSchedule(

@@ -1544,6 +1544,7 @@ function _renderScheduleDataUnavailable(error) {
   if (domRefs.heroTitle) setHeroLine('title', 'Schedule unavailable', true, { fontSize: 96, revealStroke: 40 });
   _setStyledText(domRefs.schedTitle, 'scheduleTitle', 'Schedule unavailable');
   _setStyledText(domRefs.schedDate, 'scheduleDate', '');
+  document.documentElement.classList.remove('schedule-loading');
   if (domRefs.periodList) {
     domRefs.periodList.innerHTML = '';
     const li = document.createElement('li');
@@ -2119,6 +2120,7 @@ function updateAll() {
 
   /* --- Period list --- */
   renderPeriodList(val);
+  document.documentElement.classList.remove('schedule-loading');
   _setClockCadence(!isTimerInactive);
 }
 

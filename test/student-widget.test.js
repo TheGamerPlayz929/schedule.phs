@@ -23,7 +23,7 @@ test('student embed ships mirrored assets and shares the student renderer',()=>{
     assert.equal(fs.readFileSync(path.join(root,file),'utf8'),fs.readFileSync(path.join(root,'public',file),'utf8'));
   }
   const html=fs.readFileSync(path.join(root,'student-widget.html'),'utf8');
-  assert.match(html,/src="main.js"/);
+  assert.match(html,/src="main\.js(?:\?[^\"]+)?"/);
   assert.match(html,/href="main\.css(?:\?[^\"]+)?"/);
   assert.match(html,/id="lunch-weather"/);
   assert.match(html,/id="ring-fill"/);
