@@ -44,7 +44,7 @@ test('the shared theme uses the original bundled project fonts', () => {
   for (const base of [root, path.join(root, 'public')]) {
     for (const page of [...pages, 'student-widget.html']) {
       const html = fs.readFileSync(path.join(base, page), 'utf8');
-      assert.match(html, /main\.css\?v=20260907-glow3/, `${base}: ${page}`);
+      assert.match(html, /main\.css\?v=20260907-glowslider1/, `${base}: ${page}`);
     }
   }
 });
