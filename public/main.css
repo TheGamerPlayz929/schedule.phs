@@ -704,7 +704,7 @@ body.privacy-modal-open::before {
   color: var(--fg-2);
   line-height: 1.1;
   margin-bottom: 0px;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.22), 0 0 24px rgba(255, 255, 255, 0.12);
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.42), 0 0 15px rgba(255, 255, 255, 0.28), 0 0 30px rgba(255, 255, 255, 0.16);
 }
 
 .hero-title {
@@ -714,7 +714,7 @@ body.privacy-modal-open::before {
   letter-spacing: 0;
   line-height: 1;
   color: var(--fg-1);
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.22), 0 0 24px rgba(255, 255, 255, 0.12);
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.42), 0 0 15px rgba(255, 255, 255, 0.28), 0 0 30px rgba(255, 255, 255, 0.16);
 }
 
 /* Do not expose placeholder period text or an empty timer during initialization. */
